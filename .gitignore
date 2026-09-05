@@ -1,0 +1,25 @@
+# Local toolchains, builds, and agent workspace state
+.arduino/
+.tools/
+.superpowers/
+build/
+*.bin
+*.elf
+*.map
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python artifacts for future hub software
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Editor and operating-system files
+.DS_Store
+*~
