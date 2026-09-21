@@ -1,0 +1,40 @@
+#pragma once
+
+#include "AirController.h"
+#include "DeviceConfig.h"
+#include "SensorReadings.h"
+
+#include <Arduino.h>
+
+#include <functional>
+
+struct RuntimeStatus {
+  uint32_t uptimeMs;
+  SampledClimate climate;
+  SampledPresence presence;
+  bool wifiConnected;
+  int32_t wifiRssi;
+  bool mqttConnected;
+  bool otaInProgress;
+};
+
+using RuntimeStatusProvider = std::function<RuntimeStatus()>;
+using StateChangeCallback = std::function<void()>;
+
+constexpr size_t STATUS_JSON_MAX_BYTES = 1536;
+
+String buildStatusJson(const DeviceConfig& config,
+                       const AirController& controller,
+                       const RuntimeStatus& runtime,
+                       uint32_t nowMs);
+
+bool buildStatusJson(const DeviceConfig& config,
+                     const AirController& controller,
+                     const RuntimeStatus& runtime,
+                     uint32_t nowMs,
+                     char* output,
+                     size_t outputSize);
+
+const char* channelStateName(ChannelState state);
+const char* hazardName(Hazard hazard);
+const char* alarmStateName(AlarmState state);
