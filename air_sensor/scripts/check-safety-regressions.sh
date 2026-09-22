@@ -20,12 +20,30 @@ for uart in coSerial presenceSerial particulateSerial; do
     fail "${uart} is not opened with explicit RX/TX pins."
 done
 
+# Network-facing services must not start concurrently with WiFiManager's
+# initialization task. The safety loop waits for an explicit ready handoff.
+grep -q 'bool ready() const;' "$repo_dir/NetworkConfig.h" ||
+  fail "NetworkConfig no longer exposes its initialization handoff."
+grep -q 'ready_\.store(true' "$repo_dir/NetworkConfig.cpp" ||
+  fail "The network task no longer publishes initialization completion."
+grep -q 'networkConfig->ready()' "$repo_dir/air_sensor.ino" ||
+  fail "HTTP/MQTT services can start before network initialization completes."
+
 # The octal-PSRAM hazard on the LED pins must stay documented next to the pins
 # and in the setup instructions.
 grep -q 'Octal SPI PSRAM' "$repo_dir/HardwareConfig.h" ||
   fail "The octal-PSRAM LED pin warning left HardwareConfig.h."
 grep -qi 'octal' "$repo_dir/README.md" ||
   fail "The octal-PSRAM LED pin warning left the README."
+
+# This unit is wired to the octal-PSRAM-safe LED pins. Keep the compiled
+# pinout aligned with the physical red/green/blue connections.
+grep -q '^constexpr uint8_t LED_RED_PIN = 21;' "$repo_dir/HardwareConfig.h" ||
+  fail "Red LED is not assigned to the wired GPIO21 pin."
+grep -q '^constexpr uint8_t LED_GREEN_PIN = 47;' "$repo_dir/HardwareConfig.h" ||
+  fail "Green LED is not assigned to the wired GPIO47 pin."
+grep -q '^constexpr uint8_t LED_BLUE_PIN = 48;' "$repo_dir/HardwareConfig.h" ||
+  fail "Blue LED is not assigned to the wired GPIO48 pin."
 
 # Silencing and OTA are buzzer-scope actions. Neither may reach the visual
 # alarm, and neither may suppress a live hazard.

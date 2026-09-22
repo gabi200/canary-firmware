@@ -56,13 +56,14 @@ constexpr uint8_t GAS_ADC_PIN = 10;
 // If the LED stays dark on an R8/R16V module, switch to the alternative set
 // below. GPIO38 also drives the onboard addressable RGB LED on DevKitC-1
 // v1.1, so a discrete blue LED shares that pin with it.
-constexpr uint8_t LED_RED_PIN = 37;
-constexpr uint8_t LED_GREEN_PIN = 36;
-constexpr uint8_t LED_BLUE_PIN = 38;
-// Octal-PSRAM alternative, verified free on DevKitC-1:
-// constexpr uint8_t LED_RED_PIN = 21;
-// constexpr uint8_t LED_GREEN_PIN = 47;
-// constexpr uint8_t LED_BLUE_PIN = 48;
+// Octal-PSRAM-safe pin set, matching this unit's physical wiring.
+constexpr uint8_t LED_RED_PIN = 21;
+constexpr uint8_t LED_GREEN_PIN = 47;
+constexpr uint8_t LED_BLUE_PIN = 48;
+// Original pin set for modules with Quad PSRAM or no PSRAM:
+// constexpr uint8_t LED_RED_PIN = 37;
+// constexpr uint8_t LED_GREEN_PIN = 36;
+// constexpr uint8_t LED_BLUE_PIN = 38;
 constexpr bool LED_COMMON_ANODE = false;
 constexpr uint32_t LED_PWM_FREQUENCY_HZ = 5000;
 constexpr uint8_t LED_PWM_RESOLUTION_BITS = 8;

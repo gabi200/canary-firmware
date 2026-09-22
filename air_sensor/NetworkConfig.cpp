@@ -111,6 +111,7 @@ NetworkConfig::NetworkConfig()
       taskHandle_(nullptr),
       wifiConnected_(false),
       portalActive_(false),
+      ready_(false),
       taskStarted_(false),
       forcePortal_(false),
       handoffChanged_(false),
@@ -159,6 +160,10 @@ void NetworkConfig::process() {
 
 bool NetworkConfig::wifiConnected() const {
   return wifiConnected_.load(std::memory_order_acquire);
+}
+
+bool NetworkConfig::ready() const {
+  return ready_.load(std::memory_order_acquire);
 }
 
 bool NetworkConfig::portalActive() const {
@@ -220,6 +225,7 @@ void NetworkConfig::networkTask() {
     wifiManager_.autoConnect(apName_);
   }
   publishNetworkStatus();
+  ready_.store(true, std::memory_order_release);
 
   for (;;) {
     wifiManager_.process();

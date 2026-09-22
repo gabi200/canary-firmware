@@ -19,6 +19,7 @@ class NetworkConfig {
   NetworkConfig();
   void begin(DeviceConfig& config, bool forcePortal);
   void process();
+  bool ready() const;
   bool wifiConnected() const;
   bool portalActive() const;
   bool takeConfigChanged(DeviceConfig& output);
@@ -65,6 +66,7 @@ class NetworkConfig {
   TaskHandle_t taskHandle_;
   std::atomic<bool> wifiConnected_;
   std::atomic<bool> portalActive_;
+  std::atomic<bool> ready_;
   bool taskStarted_;
   bool forcePortal_;
   bool handoffChanged_;

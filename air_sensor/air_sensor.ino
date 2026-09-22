@@ -57,6 +57,7 @@ bool configSaveImmediate = false;
 uint32_t lastConfigSaveAttemptMs = 0;
 bool rebootScheduled = false;
 uint32_t rebootScheduledAtMs = 0;
+bool networkServicesStarted = false;
 
 bool elapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t intervalMs) {
   return static_cast<uint32_t>(nowMs - sinceMs) >= intervalMs;
@@ -323,13 +324,11 @@ void setup() {
 
   const bool forcePortal = configPortalRequested();
   networkConfig = std::make_unique<NetworkConfig>();
-  networkConfig->begin(deviceConfig, forcePortal);
   httpApi = std::make_unique<HttpApi>(deviceConfig, *controller, runtimeStatus,
                                       notifyStateChanged);
-  httpApi->begin();
   mqttService = std::make_unique<MqttService>(deviceConfig, *controller,
                                               runtimeStatus);
-  mqttService->begin();
+  networkConfig->begin(deviceConfig, forcePortal);
 }
 
 void loop() {
@@ -342,23 +341,33 @@ void loop() {
     notifyStateChanged();
   }
   applyOutputs(nowMs);
-  httpApi->handleClient();
 
   networkConfig->process();
+  if (!networkServicesStarted && networkConfig->ready()) {
+    httpApi->begin();
+    mqttService->begin();
+    networkServicesStarted = true;
+  }
+  if (networkServicesStarted) {
+    httpApi->handleClient();
+  }
+
   const uint32_t serviceNowMs = millis();
   DeviceConfig changedConfig{};
   if (networkConfig->takeConfigChanged(changedConfig)) {
     queueConfigurationSave(changedConfig);
   }
 
-  mqttService->process(serviceNowMs);
+  if (networkServicesStarted) {
+    mqttService->process(serviceNowMs);
+  }
   // MQTT commands are applied above by the safety-loop owner; reflect a
   // silence or a self-test without waiting for the next pass through loop().
   applyOutputs(serviceNowMs);
   processConfigurationSave(serviceNowMs);
   restartWhenSafe(millis());
 
-  if (httpApi->rebootDue(millis())) {
+  if (networkServicesStarted && httpApi->rebootDue(millis())) {
     applyOutputs(millis());
     ESP.restart();
   }
