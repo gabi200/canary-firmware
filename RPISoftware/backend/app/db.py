@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
     AsyncSession,
@@ -27,6 +27,20 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 engine = create_async_engine(settings.database_url, future=True, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+if engine.dialect.name == "sqlite":
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _sqlite_pragmas(dbapi_connection, _record) -> None:
+        # WAL lets dashboard reads run alongside the MQTT writer (the Pi runs SQLite);
+        # busy_timeout makes a writer wait for the lock instead of failing "database is locked";
+        # synchronous=NORMAL (safe with WAL) skips an fsync per commit, sparing the SD card —
+        # a power cut can lose the last few commits, never corrupt the database.
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

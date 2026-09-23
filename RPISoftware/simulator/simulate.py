@@ -4,18 +4,26 @@
 Publishes canary.telemetry.v1 messages over MQTT so the full
 detection -> alarm -> evacuation -> victim-accounting path runs with no hardware.
 
+For the real sensors' MQTT format (air/water status documents) use hw_sim.py.
+
 Examples:
     python simulate.py --scenario presence            # seed occupancy for accounting
     python simulate.py --scenario gas_leak            # ramp kitchen gas to critical -> evacuation
     python simulate.py --scenario co                  # ramp bedroom CO
     python simulate.py --scenario water_leak
     python simulate.py --scenario normal --duration 60
+
+The broker requires a login (docker-compose Mosquitto): pass --username/--password
+or set MQTT_USERNAME / MQTT_PASSWORD (preferred: arguments are visible to other
+local users). MQTT_HOST / MQTT_PORT set the default broker address.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 import time
 from datetime import datetime, timezone
 
@@ -102,11 +110,24 @@ def ramp(client: mqtt.Client, device_id: str, start: float, end: float, steps: i
 
 
 def run(args: argparse.Namespace) -> None:
-    client = mqtt.Client(client_id="canary-simulator")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="canary-simulator")
     if args.username:
         client.username_pw_set(args.username, args.password)
-    client.connect(args.host, args.port, keepalive=30)
+    connack: list = []
+    client.on_connect = lambda c, userdata, flags, reason_code, props: connack.append(reason_code)
+    try:
+        client.connect(args.host, args.port, keepalive=30)
+    except OSError as exc:
+        sys.exit(f"[simulator] cannot reach the MQTT broker at {args.host}:{args.port}: {exc}")
     client.loop_start()
+    deadline = time.time() + 10
+    while not connack and time.time() < deadline:
+        time.sleep(0.05)
+    if not connack or connack[0].is_failure:
+        client.loop_stop()
+        why = connack[0] if connack else "no CONNACK within 10 s"
+        sys.exit(f"[simulator] broker {args.host}:{args.port} refused the connection ({why}); "
+                 "check --username/--password or MQTT_USERNAME/MQTT_PASSWORD")
     print(f"[simulator] connected to {args.host}:{args.port}, scenario={args.scenario}")
 
     if args.scenario in ("presence", "gas_leak", "co", "water_leak", "all"):
@@ -143,10 +164,11 @@ def run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Canary sensor simulator")
-    p.add_argument("--host", default="localhost")
-    p.add_argument("--port", type=int, default=1883)
-    p.add_argument("--username", default=None)
-    p.add_argument("--password", default=None)
+    p.add_argument("--host", default=os.environ.get("MQTT_HOST", "localhost"))
+    p.add_argument("--port", type=int, default=int(os.environ.get("MQTT_PORT", "1883")))
+    p.add_argument("--username", default=os.environ.get("MQTT_USERNAME") or None)
+    p.add_argument("--password", default=os.environ.get("MQTT_PASSWORD") or None,
+                   help="prefer env MQTT_PASSWORD: arguments are visible to other local users")
     p.add_argument(
         "--scenario",
         default="gas_leak",

@@ -10,7 +10,6 @@ dependencies = [
     "asyncpg>=0.29",
     "aiosqlite>=0.20",
     "aiomqtt>=2.3",
-    "redis>=5.0",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "pyjwt>=2.8",

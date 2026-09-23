@@ -1,4 +1,8 @@
-"""MQTT consumer (EMQX). Subscribes to telemetry/event topics and runs the pipeline.
+"""MQTT consumer. Subscribes to `settings.mqtt_subscribe` and dispatches by topic.
+
+- `<base>/status`, `<base>/availability`: the real ESP32 firmware (app.ingestion.hardware).
+- `<mqtt_topic_prefix>/.../telemetry|event`: legacy canary.telemetry.v1 (simulator).
+- anything else (e.g. `<base>/command/result`) is ignored.
 
 aiomqtt is imported lazily so the rest of the app (and the test suite) imports
 cleanly even when the MQTT client / broker is absent. The consumer reconnects with
@@ -15,6 +19,7 @@ import logging
 from app.config import settings
 from app.db import SessionLocal
 from app.enums import EdgeState
+from app.ingestion.hardware import handle_hardware_message
 from app.ingestion.pipeline import ingest_telemetry
 from app.schemas import TelemetryPayload
 
@@ -41,10 +46,21 @@ async def _handle_message(topic: str, raw: bytes) -> None:
         log.info("incident %s -> %s", result.incident_id, result.incident_state)
 
 
+async def dispatch(topic: str, raw: bytes, retain: bool = False) -> None:
+    """Route one message by topic; errors are logged, never raised into the loop."""
+    try:
+        if topic.endswith("/status") or topic.endswith("/availability"):
+            await handle_hardware_message(topic, raw, retain=retain)
+        elif topic.startswith(f"{settings.mqtt_topic_prefix}/"):
+            await _handle_message(topic, raw)
+    except Exception:  # noqa: BLE001 - one bad message must not drop the connection
+        log.exception("error handling MQTT message on %r", topic[:200])
+
+
 async def run_mqtt_consumer(stop: asyncio.Event) -> None:
     import aiomqtt  # lazy import
 
-    topic = f"{settings.mqtt_topic_prefix}/#"
+    topic = settings.mqtt_subscribe
     backoff = 1.0
     while not stop.is_set():
         try:
@@ -54,11 +70,11 @@ async def run_mqtt_consumer(stop: asyncio.Event) -> None:
                 username=settings.mqtt_username,
                 password=settings.mqtt_password,
             ) as client:
-                await client.subscribe(topic)
+                await client.subscribe(topic, qos=1)
                 log.info("MQTT consumer subscribed to %s", topic)
                 backoff = 1.0
                 async for message in client.messages:
-                    await _handle_message(str(message.topic), bytes(message.payload))
+                    await dispatch(str(message.topic), bytes(message.payload), bool(message.retain))
                     if stop.is_set():
                         break
         except asyncio.CancelledError:

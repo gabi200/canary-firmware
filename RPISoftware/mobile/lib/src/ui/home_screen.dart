@@ -6,6 +6,7 @@ import '../state/providers.dart';
 import 'alarm_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/hazard_banner.dart';
+import 'widgets/home_status_section.dart';
 import 'widgets/status_pill.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -50,7 +51,12 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(incidentControllerProvider.notifier).refresh(),
+        onRefresh: () async {
+          await Future.wait([
+            ref.read(incidentControllerProvider.notifier).refresh(),
+            ref.read(summaryProvider.notifier).refresh(),
+          ]);
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -66,6 +72,8 @@ class HomeScreen extends ConsumerWidget {
               ),
             ] else
               const _AllClearCard(),
+            const SizedBox(height: 24),
+            const HomeStatusSection(),
             const SizedBox(height: 24),
             Text('Active incidents', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),

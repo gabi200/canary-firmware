@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.detection.thresholds import thresholds_for
+from app.detection.thresholds import Thresholds, effective_thresholds
 from app.enums import (
     AUTO_EVAC_HAZARDS,
     EdgeState,
@@ -26,10 +26,16 @@ DETECTION = "detection"
 CRITICAL = "critical"
 
 
-def reading_level(sensor_type: SensorType, value: float, edge_state: EdgeState) -> str:
-    """Classify a single reading as normal / detection / critical."""
-    th = thresholds_for(sensor_type)
-    if th is None:  # wifi_presence or unknown -> not a hazard reading
+def reading_level(
+    sensor_type: SensorType, value: float, edge_state: EdgeState, thresholds: Thresholds | None = None
+) -> str:
+    """Classify a single reading as normal / detection / critical.
+
+    `thresholds` are the device's own (installer calibration) when it sent them;
+    otherwise the backend defaults for the sensor type apply.
+    """
+    th = effective_thresholds(sensor_type, thresholds)
+    if th is None:  # presence or unknown -> not a hazard reading
         return NORMAL
     if edge_state == EdgeState.alarm or value >= th.critical:
         return CRITICAL
@@ -38,9 +44,11 @@ def reading_level(sensor_type: SensorType, value: float, edge_state: EdgeState) 
     return NORMAL
 
 
-def is_clearing(sensor_type: SensorType, value: float, edge_state: EdgeState) -> bool:
+def is_clearing(
+    sensor_type: SensorType, value: float, edge_state: EdgeState, thresholds: Thresholds | None = None
+) -> bool:
     """True when a reading is low enough to count toward clearing an open incident."""
-    th = thresholds_for(sensor_type)
+    th = effective_thresholds(sensor_type, thresholds)
     if th is None:
         return True
     return value < th.clear and edge_state == EdgeState.normal
@@ -69,6 +77,7 @@ def evaluate(
     value: float,
     edge_state: EdgeState,
     ctx: DetectionContext,
+    thresholds: Thresholds | None = None,
 ) -> Decision:
     """Decide the target Incident state for a hazard reading.
 
@@ -80,7 +89,7 @@ def evaluate(
     if hazard is None:
         return Decision(None, Severity.info, "not_a_hazard", False, False)
 
-    level = reading_level(sensor_type, value, edge_state)
+    level = reading_level(sensor_type, value, edge_state, thresholds)
     if level == NORMAL:
         return Decision(None, Severity.info, "below_threshold", False, False)
 

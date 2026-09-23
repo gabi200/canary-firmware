@@ -69,3 +69,23 @@ def test_is_clearing():
     assert is_clearing(SensorType.combustible_gas, 100, EdgeState.normal)
     assert not is_clearing(SensorType.combustible_gas, 100, EdgeState.warn)
     assert not is_clearing(SensorType.combustible_gas, 2000, EdgeState.normal)
+
+
+def test_insane_device_thresholds_fall_back_to_backend_defaults():
+    from app.detection.engine import is_clearing
+    from app.detection.thresholds import Thresholds, effective_thresholds, thresholds_for
+
+    default = thresholds_for(SensorType.co)
+    for bad in (
+        Thresholds(detection=0, critical=0, clear=0, units="ppm"),  # 0/0: normal reading would be critical
+        Thresholds(detection=-5, critical=-1, clear=-5, units="ppm"),
+        Thresholds(detection=100, critical=50, clear=100, units="ppm"),  # inverted
+        Thresholds(detection=float("nan"), critical=100, clear=50, units="ppm"),
+    ):
+        assert effective_thresholds(SensorType.co, bad) is default
+        assert reading_level(SensorType.co, 3, EdgeState.normal, bad) == "normal"
+        assert is_clearing(SensorType.co, 0, EdgeState.normal, bad)
+    good = Thresholds(detection=50, critical=100, clear=50, units="ppm")
+    assert effective_thresholds(SensorType.co, good) is good
+    # a device's own alarm is never downgraded, whatever it says its thresholds are
+    assert reading_level(SensorType.co, 3, EdgeState.alarm, Thresholds(1e9, 2e9, 1e9, "ppm")) == "critical"

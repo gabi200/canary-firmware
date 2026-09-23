@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import ACCOUNTED_STATUSES, CheckInStatus, Role
@@ -67,18 +67,27 @@ class OccupancyService:
         return est
 
     async def latest_per_zone(self, building_id: str) -> dict[str, float]:
-        """Latest persons_est per zone for a building (MVP: in-python max-by-ts)."""
-        rows = (
-            await self.session.scalars(
-                select(OccupancyEstimate).where(OccupancyEstimate.building_id == building_id)
+        """Latest persons_est per zone for a building.
+
+        Polled every few seconds by dashboards, so the max-ts-per-zone is computed in
+        SQL (index ix_occupancy_building_zone_ts) instead of loading every row ever.
+        """
+        newest = (
+            select(OccupancyEstimate.zone_id, func.max(OccupancyEstimate.ts).label("ts"))
+            .where(OccupancyEstimate.building_id == building_id)
+            .group_by(OccupancyEstimate.zone_id)
+            .subquery()
+        )
+        rows = await self.session.execute(
+            select(OccupancyEstimate.zone_id, OccupancyEstimate.persons_est)
+            .join(
+                newest,
+                (OccupancyEstimate.zone_id == newest.c.zone_id) & (OccupancyEstimate.ts == newest.c.ts),
             )
-        ).all()
-        latest: dict[str, tuple[datetime, float]] = {}
-        for r in rows:
-            cur = latest.get(r.zone_id)
-            if cur is None or r.ts > cur[0]:
-                latest[r.zone_id] = (r.ts, r.persons_est)
-        return {z: v for z, (_, v) in latest.items()}
+            .where(OccupancyEstimate.building_id == building_id)
+            .order_by(OccupancyEstimate.id)
+        )
+        return {zone_id: persons_est for zone_id, persons_est in rows}
 
     async def accounting(self, incident_id: str, building_id: str) -> Accounting:
         per_zone = await self.latest_per_zone(building_id)

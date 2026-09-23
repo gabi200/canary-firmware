@@ -18,7 +18,8 @@ import { AssemblyPoint, HazardTriangle, RunningManExit } from "../components/Saf
 import { SignalBadge } from "../components/SignalBadge";
 import { StatusPill } from "../components/StatusPill";
 import { latestByDevice } from "../lib/latest";
-import { buildZoneNames, zoneLabel } from "../lib/labels";
+import { buildZoneNames, hazardLabel, zoneLabel } from "../lib/labels";
+import { parseTs } from "../lib/time";
 
 const STATE_COLOR: Record<string, string> = {
   evacuation: "#b62324",
@@ -26,12 +27,6 @@ const STATE_COLOR: Record<string, string> = {
   escalation: "#f85149",
   detection: "#d29922",
   verification: "#d29922",
-};
-
-const HAZARD_LABEL: Record<string, string> = {
-  combustible_gas: "Gas leak",
-  co: "Carbon monoxide",
-  water_leak: "Water leak",
 };
 
 export function DispatchView() {
@@ -78,18 +73,18 @@ export function DispatchView() {
             size={52}
             className={`safety-sign ${incident.state === "evacuation" ? "flash" : ""}`}
             hazard={incident.hazard_type}
-            title={HAZARD_LABEL[incident.hazard_type] ?? incident.hazard_type}
+            title={hazardLabel(incident.hazard_type)}
           />
           <div>
             <h2>
               {incident.state === "evacuation"
                 ? "EVACUATE NOW"
-                : (HAZARD_LABEL[incident.hazard_type] ?? incident.hazard_type)}
+                : hazardLabel(incident.hazard_type)}
             </h2>
             <div className="sub">
-              {HAZARD_LABEL[incident.hazard_type] ?? incident.hazard_type} · source{" "}
+              {hazardLabel(incident.hazard_type)} · source{" "}
               {zoneLabel(zoneNames, incident.primary_zone_id)} · opened{" "}
-              {new Date(incident.opened_ts).toLocaleTimeString()}
+              {new Date(parseTs(incident.opened_ts)).toLocaleTimeString()}
             </div>
           </div>
         </div>

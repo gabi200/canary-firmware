@@ -21,3 +21,29 @@ export function zoneLabel(names: Map<string, string>, id?: string | null): strin
   if (!id) return "—";
   return names.get(id) ?? prettyId(id);
 }
+
+const HAZARD_LABELS: Record<string, string> = {
+  combustible_gas: "Gas leak",
+  co: "Carbon monoxide",
+  water_leak: "Water leak",
+  particulate: "Smoke / particulates",
+};
+
+const SENSOR_LABELS: Record<string, string> = {
+  combustible_gas: "Combustible gas",
+  co: "Carbon monoxide",
+  water_leak: "Water leak",
+  particulate: "Smoke / particulates",
+  wifi_presence: "Wi-Fi presence",
+  radar_presence: "Radar presence",
+};
+
+/** Incident hazard_type -> label; unknown tokens degrade to spaced text. */
+export function hazardLabel(type: string): string {
+  return HAZARD_LABELS[type] ?? type.replace(/_/g, " ");
+}
+
+/** Device sensor_type -> label (presence types are occupancy, never hazards). */
+export function sensorLabel(type: string): string {
+  return SENSOR_LABELS[type] ?? type.replace(/_/g, " ");
+}

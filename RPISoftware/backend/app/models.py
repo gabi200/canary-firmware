@@ -3,6 +3,8 @@
 Enum-typed fields are stored as their canonical string tokens (app.enums) so the
 DB, the wire schema, and the API all agree. Time-series entities (SensorReading,
 DeviceHealth, OccupancyEstimate) become TimescaleDB hypertables on Postgres.
+Physical ESP32 nodes (Node) and their raw status history (NodeStatus) follow
+docs/HARDWARE.md.
 """
 
 from __future__ import annotations
@@ -12,15 +14,18 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 from app.db import Base
 
@@ -33,8 +38,26 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class UTCDateTime(TypeDecorator):
+    """Timezone-aware UTC on every dialect. SQLite drops tzinfo on round-trip, which
+    made the API emit zone-less timestamps that clients read as local time."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc)
+        return value
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+
 def _ts_col(**kw) -> Mapped[datetime]:
-    return mapped_column(DateTime(timezone=True), default=_now, **kw)
+    return mapped_column(UTCDateTime, default=_now, **kw)
 
 
 # --------------------------------------------------------------------------- #
@@ -89,7 +112,27 @@ class Device(Base):
     fw_version: Mapped[str] = mapped_column(String, default="")
     status: Mapped[str] = mapped_column(String, default="ok")
     installed_ts: Mapped[datetime] = _ts_col()
-    last_seen_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class Node(Base):
+    """A physical ESP32 (air or water), keyed by its MQTT base topic and auto-registered
+    on its first status document. Owns logical Device rows `{id}:{channel}`."""
+
+    __tablename__ = "nodes"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String)  # app.enums.NodeKind token
+    mqtt_base: Mapped[str] = mapped_column(String, unique=True)
+    name: Mapped[str] = mapped_column(String, default="")
+    firmware: Mapped[str] = mapped_column(String, default="")
+    building_id: Mapped[str] = mapped_column(ForeignKey("buildings.id"), index=True)
+    zone_id: Mapped[str] = mapped_column(ForeignKey("zones.id"), index=True)
+    online: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_seen_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    last_uptime_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    boot_epoch: Mapped[int] = mapped_column(Integer, default=1)
+    last_status: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # latest raw document
+    created_ts: Mapped[datetime] = _ts_col()
 
 
 # --------------------------------------------------------------------------- #
@@ -127,7 +170,7 @@ class Incident(Base):
     state: Mapped[str] = mapped_column(String, default="detection", index=True)
     opened_ts: Mapped[datetime] = _ts_col()
     updated_ts: Mapped[datetime] = _ts_col()
-    resolved_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     # corroboration / clearing bookkeeping (MVP-local fields)
     last_value: Mapped[float] = mapped_column(Float, default=0.0)
     samples_over_threshold: Mapped[int] = mapped_column(Integer, default=0)
@@ -259,8 +302,9 @@ class SensorReading(Base):
     snr: Mapped[float | None] = mapped_column(Float, nullable=True)
     link: Mapped[str] = mapped_column(String, default="wifi")
     epoch: Mapped[int] = mapped_column(Integer, default=0)
-    seq: Mapped[int] = mapped_column(Integer, default=0)
-    device_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 64-bit: hardware nodes use uptime_ms as seq, which outgrows a 32-bit int in ~25 days.
+    seq: Mapped[int] = mapped_column(BigInteger, default=0)
+    device_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     ts: Mapped[datetime] = _ts_col(index=True)  # ingest_ts
 
 
@@ -278,9 +322,23 @@ class DeviceHealth(Base):
 
 class OccupancyEstimate(Base):
     __tablename__ = "occupancy_estimates"
+    # serves the latest-estimate-per-zone lookup (polled by dashboards)
+    __table_args__ = (Index("ix_occupancy_building_zone_ts", "building_id", "zone_id", "ts"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     zone_id: Mapped[str] = mapped_column(String, index=True)
     building_id: Mapped[str] = mapped_column(String, index=True)
     persons_est: Mapped[float] = mapped_column(Float, default=0.0)
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
     ts: Mapped[datetime] = _ts_col(index=True)
+
+
+class NodeStatus(Base):
+    """Raw status snapshot: one row per accepted status document, payload verbatim."""
+
+    __tablename__ = "node_status"
+    __table_args__ = (Index("ix_node_status_node_ts", "node_id", "ts"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    node_id: Mapped[str] = mapped_column(String)  # indexed by ix_node_status_node_ts
+    ts: Mapped[datetime] = _ts_col(index=True)  # hub receipt time (devices have no wall clock)
+    uptime_ms: Mapped[int] = mapped_column(BigInteger)
+    payload: Mapped[dict] = mapped_column(JSON)

@@ -1,4 +1,5 @@
 import type { Device, Incident, Reading, Zone } from "../api/types";
+import { sensorLabel } from "../lib/labels";
 
 interface Props {
   zones: Zone[];
@@ -11,6 +12,7 @@ interface Props {
 const CELL_W = 200;
 const CELL_H = 130;
 const GAP = 18;
+const DOTS_PER_ROW = 8;
 
 function deviceColor(reading?: Reading): string {
   if (!reading) return "#8b98a8";
@@ -102,14 +104,14 @@ export function FloorPlan({ zones, devices, latest, incident, occupancyByZone }:
                 </text>
               )}
 
-              {/* sensor dots */}
+              {/* sensor dots (wrap upwards when a zone holds many channels) */}
               {devs.map((d, di) => {
-                const dotX = x + 18 + di * 22;
-                const dotY = y + CELL_H - 22;
+                const dotX = x + 18 + (di % DOTS_PER_ROW) * 22;
+                const dotY = y + CELL_H - 22 - Math.floor(di / DOTS_PER_ROW) * 20;
                 return (
                   <circle key={d.id} cx={dotX} cy={dotY} r={7} fill={deviceColor(latest.get(d.id))}>
                     <title>
-                      {d.sensor_type} · {latest.get(d.id)?.value ?? "—"} {latest.get(d.id)?.units ?? ""}
+                      {sensorLabel(d.sensor_type)} · {latest.get(d.id)?.value ?? "—"} {latest.get(d.id)?.units ?? ""}
                     </title>
                   </circle>
                 );

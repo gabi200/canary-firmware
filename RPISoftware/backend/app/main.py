@@ -1,8 +1,9 @@
 """FastAPI application entrypoint for Canary backend.
 
-Lifespan: create schema -> seed demo data -> start the MQTT consumer (if enabled).
-The MQTT task is best-effort: if the broker / aiomqtt is unavailable the API still
-serves and the HTTP telemetry ingress remains usable for testing.
+Lifespan: create schema -> seed demo data -> start the MQTT consumer (if enabled)
+and the hourly retention task. The MQTT task is best-effort: if the broker / aiomqtt
+is unavailable the API still serves and the HTTP telemetry ingress remains usable
+for testing.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
@@ -18,9 +20,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.config import settings
 from app.db import init_db
+from app.retention import run_retention
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("canary")
+
+
+class RedactTokens(logging.Filter):
+    """Keep the JWT that WebSocket clients pass as `?token=` out of uvicorn's logs."""
+
+    _TOKEN = re.compile(r"(token=)[^&\s\"]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(self._TOKEN.sub(r"\1***", a) if isinstance(a, str) else a for a in record.args)
+        return True
+
+
+for _name in ("uvicorn.access", "uvicorn.error"):
+    logging.getLogger(_name).addFilter(RedactTokens())
 
 
 @contextlib.asynccontextmanager
@@ -33,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await seed_if_empty()
 
     stop = asyncio.Event()
+    retention_task = asyncio.create_task(run_retention(stop))
     mqtt_task: asyncio.Task | None = None
     if settings.mqtt_enabled:
         try:
@@ -47,10 +66,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         stop.set()
-        if mqtt_task is not None:
-            mqtt_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await mqtt_task
+        for task in (mqtt_task, retention_task):
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
 
 
 app = FastAPI(

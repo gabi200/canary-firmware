@@ -149,3 +149,35 @@ async def test_resident_cannot_read_roster(client):
     r = await client.get(f"/api/v1/incidents/{incident['id']}/roster",
                          headers=await _hdr(client, "ana"))
     assert r.status_code == 403
+
+
+async def test_other_devices_normal_readings_do_not_clear_an_incident(client):
+    r = await client.post("/api/v1/telemetry", json=telemetry(
+        "dev_co_bedroom", "co", 200, zone_id="zone_bedroom", unit_id="unit_0312", seq=1, edge_state="alarm"))
+    assert r.json()["incident_state"] == "evacuation"
+
+    # The boiler-room CO sensor keeps reporting normal: it must not "all clear" an
+    # incident whose own source (the bedroom sensor) may have gone silent.
+    for seq in range(1, 6):
+        await client.post("/api/v1/telemetry", json=telemetry(
+            "dev_co_boiler", "co", 3, zone_id="zone_boiler", unit_id="common", seq=seq))
+    assert (await _active_incident(client))["state"] == "evacuation"
+
+    # The reporting sensor clearing for the hold window does close it.
+    for seq in range(2, 5):
+        await client.post("/api/v1/telemetry", json=telemetry(
+            "dev_co_bedroom", "co", 3, zone_id="zone_bedroom", unit_id="unit_0312", seq=seq))
+    resp = await client.get("/api/v1/buildings/bld_007/incidents", params={"active": True},
+                            headers=await _hdr(client, "mihai"))
+    assert resp.json() == []
+
+
+async def test_timestamps_are_utc_aware_on_sqlite(client):
+    # SQLite drops tzinfo; zone-less timestamps would be read as local time by clients.
+    await client.post("/api/v1/telemetry", json=telemetry(
+        "dev_gas_kitchen", "combustible_gas", 6000, zone_id="zone_kitchen", unit_id="unit_0312", edge_state="alarm"))
+    incident = await _active_incident(client)
+    readings = (await client.get("/api/v1/buildings/bld_007/readings",
+                                 headers=await _hdr(client, "mihai"))).json()
+    for ts in (incident["opened_ts"], incident["updated_ts"], readings[0]["ts"]):
+        assert ts.endswith(("Z", "+00:00")), ts

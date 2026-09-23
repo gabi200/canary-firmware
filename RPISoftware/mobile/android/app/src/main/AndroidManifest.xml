@@ -1,8 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds talk to the hub too; the debug/profile manifests only
+         grant this for the Flutter tool. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- usesCleartextTraffic: the Canary hub is a Raspberry Pi on the local
+         network served over plain http://<pi-ip> (no TLS on the LAN, arbitrary
+         private IP, so a per-domain network security config can't list it). -->
     <application
         android:label="canary_resident"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

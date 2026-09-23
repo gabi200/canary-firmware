@@ -16,6 +16,8 @@ class HazardBanner extends StatelessWidget {
         return Icons.cloud;
       case 'water_leak':
         return Icons.water_drop;
+      case 'particulate':
+        return Icons.grain;
       default:
         return Icons.warning_amber_rounded;
     }

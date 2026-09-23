@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import SensorType
+from app.detection.thresholds import Thresholds
+from app.enums import OCCUPANCY_SENSOR_TYPES
 from app.incidents.service import IncidentService
 from app.models import Device, SensorReading
 from app.occupancy.service import OccupancyService
@@ -67,7 +68,7 @@ async def ingest_telemetry(session: AsyncSession, payload: TelemetryPayload) -> 
         device.last_seen_ts = now
 
     # route by sensor type
-    if payload.sensor_type == SensorType.wifi_presence:
+    if payload.sensor_type in OCCUPANCY_SENSOR_TYPES:
         await OccupancyService(session).record_presence(
             building_id=loc.building_id,
             zone_id=loc.zone_id,
@@ -86,6 +87,7 @@ async def ingest_telemetry(session: AsyncSession, payload: TelemetryPayload) -> 
         value=payload.value,
         edge_state=payload.edge_state,
         device_ts=payload.device_ts,
+        thresholds=_device_thresholds(payload),
     )
     await session.commit()
 
@@ -101,3 +103,10 @@ async def ingest_telemetry(session: AsyncSession, payload: TelemetryPayload) -> 
 
 def device_ts_or(default: datetime, device_ts: datetime | None) -> datetime:
     return device_ts or default
+
+
+def _device_thresholds(payload: TelemetryPayload) -> Thresholds | None:
+    t = payload.thresholds
+    if t is None:
+        return None
+    return Thresholds(detection=t.detection, critical=t.critical, clear=t.clear, units=payload.units)

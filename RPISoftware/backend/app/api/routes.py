@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.nodes import NodeService, broadcast_node, parse_fields
 from app.analytics.service import AnalyticsService
 from app.db import get_session
 from app.enums import OPEN_INCIDENT_STATES, Role
@@ -18,6 +19,7 @@ from app.models import (
     EvacuationRoute,
     Incident,
     IncidentEvent,
+    Node,
     ResidentUnit,
     SensorReading,
     User,
@@ -30,6 +32,7 @@ from app.schemas import (
     AccountingOut,
     AssemblyPointOut,
     BuildingOut,
+    BuildingSummaryOut,
     CheckInOut,
     CheckInRequest,
     DeviceOut,
@@ -38,6 +41,9 @@ from app.schemas import (
     IncidentEventOut,
     IncidentOut,
     IngestResult,
+    NodeHistoryOut,
+    NodeOut,
+    NodeUpdate,
     ReadingOut,
     ResidentOut,
     RosterEntry,
@@ -176,6 +182,82 @@ async def building_residents(
         )
         for p in people
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Hardware nodes (docs/HARDWARE.md section 4)
+# --------------------------------------------------------------------------- #
+@router.get("/buildings/{building_id}/summary", response_model=BuildingSummaryOut, tags=["nodes"])
+async def building_summary(
+    building_id: str,
+    principal: Principal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_session),
+) -> BuildingSummaryOut:
+    """Analysis-only building status (residents included): no raw measurements."""
+    if await session.get(Building, building_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "building not found")
+    summary = await NodeService(session).building_summary(building_id)
+    if principal.role == Role.resident:
+        # Who is home stays with managers/dispatchers, like /occupancy.
+        for zone in summary.zones:
+            zone.occupied = None
+            for node in zone.nodes:
+                node.indicators = [i for i in node.indicators if i.key != "occupancy"]
+    return summary
+
+
+@router.get("/buildings/{building_id}/nodes", response_model=list[NodeOut], tags=["nodes"])
+async def list_nodes(
+    building_id: str,
+    _: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
+    session: AsyncSession = Depends(get_session),
+) -> list[NodeOut]:
+    """Physical nodes with their latest raw status document + analysis (dashboard)."""
+    svc = NodeService(session)
+    return await svc.node_outs(await svc.building_nodes(building_id))
+
+
+@router.get("/nodes/{node_id}/history", response_model=NodeHistoryOut, tags=["nodes"])
+async def node_history(
+    node_id: str,
+    minutes: int = Query(default=60, ge=1, le=10080),
+    fields: str | None = Query(default=None, description="comma-separated dotted paths, e.g. co.ppm,gas.adc"),
+    _: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
+    session: AsyncSession = Depends(get_session),
+) -> NodeHistoryOut:
+    node = await session.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "node not found")
+    try:
+        wanted = parse_fields(fields, node.kind)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    points = await NodeService(session).history(node, minutes, wanted)
+    return NodeHistoryOut(node_id=node.id, minutes=minutes, fields=wanted, points=points)
+
+
+@router.patch("/nodes/{node_id}", response_model=NodeOut, tags=["nodes"])
+async def update_node(
+    node_id: str,
+    req: NodeUpdate,
+    _: Principal = Depends(require_roles(Role.hoa_manager)),
+    session: AsyncSession = Depends(get_session),
+) -> NodeOut:
+    """Rename a node or move it (with its Device rows) to another zone."""
+    node = await session.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "node not found")
+    svc = NodeService(session)
+    if req.zone_id is not None:
+        zone = await session.get(Zone, req.zone_id)
+        if zone is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown zone")
+        await svc.move(node, zone)
+    if req.name is not None:
+        node.name = req.name
+    await session.commit()
+    await broadcast_node(node)
+    return (await svc.node_outs([node]))[0]
 
 
 # --------------------------------------------------------------------------- #

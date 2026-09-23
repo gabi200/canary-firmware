@@ -4,13 +4,16 @@ import '../../theme.dart';
 
 /// Small colored pill showing a hazard/incident state.
 class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.state, this.label});
+  const StatusPill({super.key, required this.state, this.label, this.color});
   final String state;
   final String? label;
 
+  /// Overrides the incident-state color (e.g. for hub analysis levels).
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
-    final color = HazardColors.forState(state);
+    final color = this.color ?? HazardColors.forState(state);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(

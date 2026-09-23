@@ -34,6 +34,20 @@ _HAZARD_LABEL = {
     "combustible_gas": "Gas leak",
     "co": "Carbon monoxide",
     "water_leak": "Water leak",
+    "particulate": "Smoke / particulates",
+}
+
+# Resident guidance for hazards that never auto-evacuate: telling people to
+# "prepare to evacuate" for a leak or a smoky kitchen would be wrong.
+_ALARM_BODY = {
+    "water_leak": "Water leak detected. If a shut-off valve is fitted, it closed automatically. "
+    "Avoid the area and check the unit.",
+    "particulate": "Smoke or heavy particulates detected. Check for smoke or fire and ventilate if safe. "
+    "If there is a fire, leave and call 112.",
+}
+_CLEAR_BODY = {
+    "water_leak": "The leak sensor is dry again. Once the leak is fixed, reopen the shut-off valve if one is fitted.",
+    "particulate": "Particulate levels are back to normal.",
 }
 
 # states that alert residents directly
@@ -54,16 +68,23 @@ _EXTERNAL_STATES = {
 def _message(incident: Incident, state: IncidentState) -> tuple[str, str]:
     hz = _HAZARD_LABEL.get(incident.hazard_type, incident.hazard_type)
     if state == IncidentState.alarm:
-        return (f"{hz} ALARM", f"{hz} detected. Prepare to evacuate. Follow guidance.")
+        body = _ALARM_BODY.get(incident.hazard_type, f"{hz} detected. Prepare to evacuate. Follow guidance.")
+        return (f"{hz} ALARM", body)
     if state == IncidentState.evacuation:
         return (f"EVACUATE NOW — {hz}", "Evacuate via the safe route to the assembly point. Check in when safe.")
     if state == IncidentState.escalation:
         return (f"{hz} escalated", "Incident escalated to monitoring/emergency partners.")
     if state == IncidentState.resolution:
-        return (f"{hz} — all clear", "The hazard has cleared. It is safe to return per instructions.")
+        body = _CLEAR_BODY.get(incident.hazard_type, "The hazard has cleared. It is safe to return per instructions.")
+        return (f"{hz} — all clear", body)
     if state == IncidentState.false_alarm:
         return (f"{hz} — stand down", "The alert was a false alarm. No action needed.")
     return (f"{hz} — {state.value}", f"Incident is now in state {state.value}.")
+
+
+def incident_title(incident: Incident) -> str:
+    """The resident-facing title for an incident in its current state."""
+    return _message(incident, IncidentState(incident.state))[0]
 
 
 class NotificationService:

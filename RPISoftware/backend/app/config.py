@@ -14,17 +14,22 @@ class Settings(BaseSettings):
     # Postgres/Timescale in prod; SQLite for local/tests.
     database_url: str = "postgresql+asyncpg://canary:canary@localhost:5432/canary"
 
-    # --- redis (cache + dedupe; optional in dev) ---
-    redis_url: str = "redis://localhost:6379/0"
-    use_redis: bool = False
-
-    # --- MQTT broker (EMQX) ---
+    # --- MQTT broker (Mosquitto) ---
     mqtt_enabled: bool = True
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
     mqtt_username: str | None = None
     mqtt_password: str | None = None
-    mqtt_topic_prefix: str = "canary/v1"
+    mqtt_topic_prefix: str = "canary/v1"  # legacy canary.telemetry.v1 topics
+    # One filter covers the hardware `<base>/status|availability` topics and the legacy ones.
+    mqtt_subscribe: str = "#"
+
+    # --- hardware nodes (docs/HARDWARE.md) ---
+    default_building_id: str = "bld_007"  # where auto-registered nodes land
+    default_zone_id: str = "zone_hallway"
+
+    # --- retention: prune raw snapshots, readings, occupancy older than this (<= 0 disables) ---
+    retention_days: int = 14
 
     # --- auth ---
     jwt_secret: str = "dev-only-change-me"

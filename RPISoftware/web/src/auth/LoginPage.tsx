@@ -59,7 +59,7 @@ export function LoginPage() {
             </button>
           </form>
           <div className="muted small" style={{ marginTop: 12 }}>
-            Server: {config.apiBase}
+            Server: {config.apiBase || `${window.location.origin} (same origin)`}
           </div>
         </div>
       </Card>

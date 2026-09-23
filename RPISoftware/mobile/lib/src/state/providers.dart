@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../services/storage.dart';
 import 'incident_controller.dart';
 import 'session_controller.dart';
+import 'summary_controller.dart';
 
 /// Overridden in main() with the initialized SharedPreferences-backed instance.
 final storageProvider = Provider<Storage>(
@@ -29,6 +30,16 @@ final incidentControllerProvider =
     ref.watch(apiClientProvider),
     ref.watch(storageProvider),
     session,
+  );
+});
+
+/// Hub analysis of the building's sensors (analysis only, never raw values).
+/// Rides the incident controller's WebSocket for live `node` events.
+final summaryProvider = StateNotifierProvider<SummaryController, SummaryState>((ref) {
+  return SummaryController(
+    ref.watch(apiClientProvider),
+    ref.watch(sessionProvider),
+    ref.watch(incidentControllerProvider.notifier).liveEvents,
   );
 });
 

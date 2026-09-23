@@ -12,6 +12,8 @@ from typing import Any
 
 from fastapi import WebSocket
 
+SEND_TIMEOUT_S = 2.0
+
 
 class ConnectionManager:
     def __init__(self) -> None:
@@ -28,15 +30,22 @@ class ConnectionManager:
             self._rooms[building_id].discard(ws)
 
     async def broadcast(self, building_id: str, message: dict[str, Any]) -> None:
-        # Snapshot under lock, send outside it; drop dead sockets.
+        # Snapshot under lock, send outside it; drop dead sockets. Sends run concurrently and
+        # are time-boxed: callers broadcast mid-transaction, so one stalled phone must not
+        # hold the database write lock. A slow client just misses this frame.
         async with self._lock:
             targets = list(self._rooms.get(building_id, set()))
-        dead: list[WebSocket] = []
-        for ws in targets:
+
+        async def send(ws: WebSocket) -> WebSocket | None:
             try:
-                await ws.send_json(message)
+                await asyncio.wait_for(ws.send_json(message), timeout=SEND_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                return None
             except Exception:  # noqa: BLE001 - socket closed/broken
-                dead.append(ws)
+                return ws
+            return None
+
+        dead = [ws for ws in await asyncio.gather(*(send(ws) for ws in targets)) if ws is not None]
         if dead:
             async with self._lock:
                 for ws in dead:

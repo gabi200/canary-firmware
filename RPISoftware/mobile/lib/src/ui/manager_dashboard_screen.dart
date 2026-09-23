@@ -8,6 +8,7 @@ import '../state/providers.dart';
 import '../theme.dart';
 import 'settings_screen.dart';
 import 'widgets/flashing_evacuate_banner.dart';
+import 'widgets/home_status_section.dart';
 import 'widgets/status_pill.dart';
 
 /// Operations dashboard for managers / dispatchers / admins — the mobile counterpart
@@ -24,6 +25,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
   bool _busy = false;
 
   Future<void> _refresh() async {
+    final sensors = ref.read(summaryProvider.notifier).refresh();
     await ref.read(incidentControllerProvider.notifier).refresh();
     final primary = _primary(ref.read(incidentControllerProvider));
     if (primary != null) {
@@ -31,6 +33,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
       ref.invalidate(rosterProvider(primary.id));
     }
     ref.invalidate(zoneLabelsProvider);
+    await sensors;
   }
 
   Incident? _primary(IncidentsState s) => s.incidents.isEmpty ? null : s.incidents.first;
@@ -103,7 +106,9 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
               const SizedBox(height: 16),
             ] else
               const _AllClearCard(),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            const HomeStatusSection(title: 'Building sensors'),
+            const SizedBox(height: 24),
             Text('Active incidents', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             if (state.incidents.isEmpty)

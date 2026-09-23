@@ -6,6 +6,7 @@ import '../models/check_in.dart';
 import '../models/dashboard.dart';
 import '../models/evacuation.dart';
 import '../models/incident.dart';
+import '../models/summary.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
@@ -75,6 +76,21 @@ class ApiClient {
       return EvacuationInfo.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _wrap(e, 'Could not load evacuation routes');
+    }
+  }
+
+  /// Hub analysis of the building's sensors (HARDWARE.md §4). Analysis only, no
+  /// raw measurements; any authenticated role (residents included) may read it.
+  Future<BuildingSummary> summary(String buildingId) async {
+    try {
+      final res = await _dio.get('/api/v1/buildings/$buildingId/summary');
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException('Unexpected sensor status response', statusCode: res.statusCode);
+      }
+      return BuildingSummary.fromJson(data);
+    } on DioException catch (e) {
+      throw _wrap(e, 'Could not load sensor status');
     }
   }
 

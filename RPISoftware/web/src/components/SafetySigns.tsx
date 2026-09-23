@@ -72,6 +72,17 @@ function HazardGlyph({ hazard }: { hazard: string }) {
           CO
         </text>
       );
+    case "particulate":
+      // smoke cloud with rising wisps
+      return (
+        <g fill={INK}>
+          <circle cx="24" cy="45" r="7" />
+          <circle cx="32" cy="40" r="9" />
+          <circle cx="40" cy="45" r="7" />
+          <rect x="24" y="44" width="16" height="8" />
+          <path d="M29 30 c-3 -4 3 -6 0 -10 M35 30 c-3 -4 3 -6 0 -10" fill="none" stroke={INK} strokeWidth="2.4" strokeLinecap="round" />
+        </g>
+      );
     default:
       // generic exclamation
       return (

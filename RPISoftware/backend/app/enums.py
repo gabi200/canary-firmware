@@ -15,20 +15,28 @@ class SensorType(str, Enum):
     combustible_gas = "combustible_gas"
     co = "co"
     water_leak = "water_leak"
+    particulate = "particulate"  # PM2.5 from the air node (smoke / particulates)
     wifi_presence = "wifi_presence"
+    radar_presence = "radar_presence"  # LD2410 presence from the air node
 
 
 class HazardType(str, Enum):
-    """Derived hazard tokens carried on alert/incident records (sensor_type minus wifi_presence)."""
+    """Derived hazard tokens carried on alert/incident records (sensor_type minus occupancy types)."""
 
     combustible_gas = "combustible_gas"
     co = "co"
     water_leak = "water_leak"
+    particulate = "particulate"
 
 
-# sensor_type values that map to a hazard (wifi_presence is occupancy, never a hazard)
+# sensor_type values that map to a hazard (presence types are occupancy, never a hazard)
 HAZARD_SENSOR_TYPES: frozenset[SensorType] = frozenset(
-    {SensorType.combustible_gas, SensorType.co, SensorType.water_leak}
+    {SensorType.combustible_gas, SensorType.co, SensorType.water_leak, SensorType.particulate}
+)
+
+# sensor_type values routed to occupancy estimation
+OCCUPANCY_SENSOR_TYPES: frozenset[SensorType] = frozenset(
+    {SensorType.wifi_presence, SensorType.radar_presence}
 )
 
 # hazards for which a critical reading triggers an automatic evacuation
@@ -38,10 +46,29 @@ AUTO_EVAC_HAZARDS: frozenset[HazardType] = frozenset(
 
 
 def hazard_for_sensor(sensor_type: SensorType) -> HazardType | None:
-    """Map a sensor_type to its hazard_type, or None for wifi_presence."""
-    if sensor_type == SensorType.wifi_presence:
+    """Map a sensor_type to its hazard_type, or None for occupancy (presence) types."""
+    if sensor_type not in HAZARD_SENSOR_TYPES:
         return None
     return HazardType(sensor_type.value)
+
+
+class NodeKind(str, Enum):
+    """Physical ESP32 node kinds (docs/HARDWARE.md section 2)."""
+
+    air = "air"
+    water = "water"
+
+
+# Logical channels each node kind owns, as Device rows `{node_id}:{channel}` (hazards first).
+NODE_CHANNELS: dict[NodeKind, tuple[tuple[str, SensorType], ...]] = {
+    NodeKind.air: (
+        ("co", SensorType.co),
+        ("gas", SensorType.combustible_gas),
+        ("particulate", SensorType.particulate),
+        ("presence", SensorType.radar_presence),
+    ),
+    NodeKind.water: (("leak", SensorType.water_leak),),
+}
 
 
 class EdgeState(str, Enum):

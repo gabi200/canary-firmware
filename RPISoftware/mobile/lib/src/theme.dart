@@ -7,6 +7,21 @@ class HazardColors {
   static const alarm = Color(0xFFD32F2F); // red
   static const evacuation = Color(0xFFB71C1C); // deep red
   static const info = Color(0xFF1565C0); // blue
+  static const unknown = Color(0xFF757575); // grey — no data / offline
+
+  /// Hub analysis level or status (HARDWARE.md §3): ok | attention | danger | unknown.
+  static Color forLevel(String level) {
+    switch (level) {
+      case 'danger':
+        return alarm;
+      case 'attention':
+        return warning;
+      case 'ok':
+        return normal;
+      default:
+        return unknown;
+    }
+  }
 
   static Color forState(String state) {
     switch (state) {

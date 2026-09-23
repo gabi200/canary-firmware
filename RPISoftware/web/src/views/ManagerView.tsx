@@ -10,6 +10,7 @@ import {
   useZones,
 } from "../api/hooks";
 import { Card } from "../components/Card";
+import { EnvironmentCard } from "../components/EnvironmentCard";
 import { FloorPlan } from "../components/FloorPlan";
 import { IncidentActions } from "../components/IncidentActions";
 import { ResidentList, ResidentRoster } from "../components/ResidentRoster";
@@ -19,7 +20,7 @@ import { StatusPill } from "../components/StatusPill";
 import { TrendChart } from "../components/TrendChart";
 import { config } from "../config";
 import { latestByDevice } from "../lib/latest";
-import { buildZoneNames, zoneLabel } from "../lib/labels";
+import { buildZoneNames, hazardLabel, sensorLabel, zoneLabel } from "../lib/labels";
 
 const CLOSED = new Set(["resolution", "false_alarm", "normal"]);
 
@@ -74,7 +75,7 @@ export function ManagerView() {
             <div>
               <h2>EVACUATE NOW</h2>
               <div className="sub">
-                {primary.hazard_type.replace(/_/g, " ")} · {zoneLabel(zoneNames, primary.primary_zone_id)}
+                {hazardLabel(primary.hazard_type)} · {zoneLabel(zoneNames, primary.primary_zone_id)}
               </div>
             </div>
           </div>
@@ -111,7 +112,7 @@ export function ManagerView() {
                     <StatusPill state={inc.state} />
                     <div className="grow">
                       <div>
-                        {inc.hazard_type.replace(/_/g, " ")}
+                        {hazardLabel(inc.hazard_type)}
                         {inc.advisory && <span className="pill detection" style={{ marginLeft: 8 }}>advisory</span>}
                       </div>
                       <div className="muted small">{zoneLabel(zoneNames, inc.primary_zone_id)}</div>
@@ -123,6 +124,8 @@ export function ManagerView() {
               ))
             )}
           </Card>
+
+          <EnvironmentCard />
 
           <Card title={primary ? "Residents — live status" : "Residents"}>
             {primary && roster.data ? (
@@ -145,7 +148,7 @@ export function ManagerView() {
                 <div className="grow">
                   <div className="small">{d.id}</div>
                   <div className="muted small">
-                    {d.sensor_type} · fw {d.fw_version}
+                    {sensorLabel(d.sensor_type)} · fw {d.fw_version}
                   </div>
                 </div>
                 <span className={`pill ${d.status === "ok" ? "normal" : "alarm"}`}>{d.status}</span>
@@ -156,10 +159,10 @@ export function ManagerView() {
       </div>
 
       <div className="grid cols-2" style={{ marginTop: 16 }}>
-        <Card title="Combustible gas (ppm)">
+        <Card title="Combustible gas">
           <TrendChart readings={gas.data ?? []} />
         </Card>
-        <Card title="Carbon monoxide (ppm)">
+        <Card title="Carbon monoxide">
           <TrendChart readings={co.data ?? []} />
         </Card>
       </div>

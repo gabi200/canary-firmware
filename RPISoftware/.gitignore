@@ -1,0 +1,20 @@
+# Hub software. Complements the repository-root .gitignore.
+
+# Secrets written by scripts/pi_setup.sh: never commit them
+.env
+mosquitto/config/passwd
+mosquitto/config/passwd.*
+
+# Local SQLite databases (dev and test runs)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Dependencies and build output
+node_modules/
+web/dist/
+*.egg-info/
+__pycache__/
+.venv/
+.pytest_cache/

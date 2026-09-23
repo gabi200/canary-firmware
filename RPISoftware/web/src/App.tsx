@@ -7,6 +7,7 @@ import { Topbar } from "./components/Topbar";
 import { useIncidentSocket } from "./realtime/useIncidentSocket";
 import { DispatchView } from "./views/DispatchView";
 import { ManagerView } from "./views/ManagerView";
+import { SensorsView } from "./views/SensorsView";
 
 function AuthedLayout() {
   const { session, token, buildingId } = useAuth();
@@ -48,6 +49,16 @@ export default function App() {
             <RequireAuth roles={["dispatcher_external", "hoa_manager"]}>
               <div className="content">
                 <DispatchView />
+              </div>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/sensors"
+          element={
+            <RequireAuth roles={["hoa_manager", "dispatcher_external"]}>
+              <div className="content">
+                <SensorsView />
               </div>
             </RequireAuth>
           }

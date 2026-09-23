@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.analytics.false_alarm import MICRO_LEAK_TREND, ReadingSample, classify
 from app.analytics.service import AnalyticsService, _epoch
 from app.detection.engine import NORMAL, DetectionContext, evaluate, is_clearing, reading_level
-from app.detection.thresholds import thresholds_for
+from app.detection.thresholds import Thresholds, effective_thresholds
 from app.enums import (
     ALARMED_STATES,
     AUTO_EVAC_HAZARDS,
@@ -60,17 +60,23 @@ class IncidentService:
         value: float,
         edge_state: EdgeState,
         device_ts: datetime | None = None,
+        thresholds: Thresholds | None = None,
     ) -> Incident | None:
+        """`thresholds` are the reporting device's own (installer calibration); when
+        absent the backend defaults for `sensor_type` apply."""
         hazard = hazard_for_sensor(sensor_type)
         if hazard is None:
             return None
 
+        th = effective_thresholds(sensor_type, thresholds)
         incident = await self._open_incident(building_id, hazard.value)
-        level = reading_level(sensor_type, value, edge_state)
+        level = reading_level(sensor_type, value, edge_state, th)
 
         # Clearing path: count consecutive low readings, close after the hold window.
-        if is_clearing(sensor_type, value, edge_state):
-            if incident is not None:
+        # Only a device that reported this hazard can clear it: another node's normal
+        # heartbeat must never "all clear" an incident whose source went silent.
+        if is_clearing(sensor_type, value, edge_state, th):
+            if incident is not None and device_id in (incident.distinct_device_ids or []):
                 incident.clear_count += 1
                 from app.config import settings
 
@@ -82,7 +88,7 @@ class IncidentService:
         # micro-leak trend; never create a phantom over-threshold incident here.
         if level == NORMAL:
             if incident is None:
-                await self._maybe_micro_leak(building_id, zone_id, device_id, sensor_type)
+                await self._maybe_micro_leak(building_id, zone_id, device_id, sensor_type, th)
             return incident
 
         # Over-threshold: open if needed, update corroboration bookkeeping.
@@ -123,13 +129,15 @@ class IncidentService:
             neighbor_corroboration=len(zones) >= 2,
             unaccounted_gt0=unaccounted_gt0,
         )
-        decision = evaluate(sensor_type, value, edge_state, ctx)
+        decision = evaluate(sensor_type, value, edge_state, ctx, th)
         if decision.target_state is None:
             return incident
 
         # False-alarm reduction: classify the signal shape. May HOLD a corroborated,
         # non-critical escalation in verification. Critical / edge alarms are never held.
-        assessment = await self._assess_false_alarm(building_id, device_id, sensor_type, edge_state, multi_sensor)
+        assessment = await self._assess_false_alarm(
+            building_id, device_id, sensor_type, edge_state, multi_sensor, th
+        )
         incident.false_alarm_class = assessment.classification
         incident.false_alarm_reason = assessment.reason
         incident.benign_score = assessment.benign_score
@@ -189,9 +197,15 @@ class IncidentService:
         return [ReadingSample(ts=_epoch(r.ts), value=r.value) for r in rows]
 
     async def _assess_false_alarm(
-        self, building_id: str, device_id: str, sensor_type: SensorType, edge_state: EdgeState, multi_sensor: bool
+        self,
+        building_id: str,
+        device_id: str,
+        sensor_type: SensorType,
+        edge_state: EdgeState,
+        multi_sensor: bool,
+        thresholds: Thresholds | None = None,
     ):
-        th = thresholds_for(sensor_type)
+        th = effective_thresholds(sensor_type, thresholds)
         window = await self._device_window(building_id, device_id, sensor_type)
         return classify(
             window,
@@ -203,11 +217,16 @@ class IncidentService:
         )
 
     async def _maybe_micro_leak(
-        self, building_id: str, zone_id: str, device_id: str, sensor_type: SensorType
+        self,
+        building_id: str,
+        zone_id: str,
+        device_id: str,
+        sensor_type: SensorType,
+        thresholds: Thresholds | None = None,
     ) -> Incident | None:
         """Open a low-severity advisory incident when a slow sub-threshold rise is
         detected (managers only — not a resident alarm)."""
-        th = thresholds_for(sensor_type)
+        th = effective_thresholds(sensor_type, thresholds)
         window = await self._device_window(building_id, device_id, sensor_type)
         assessment = classify(
             window, detection=th.detection, critical=th.critical, clear=th.clear,

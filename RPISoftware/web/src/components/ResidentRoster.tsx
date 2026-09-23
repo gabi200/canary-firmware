@@ -1,4 +1,5 @@
 import type { Roster, RosterEntry } from "../api/types";
+import { parseTs } from "../lib/time";
 
 /** Maps a check-in status to a label + pill style. `unknown`/`no_response` mean "not yet
  *  confirmed safe" — the people a responder still has to account for. */
@@ -26,7 +27,7 @@ function RosterRow({ entry }: { entry: RosterEntry }) {
         <div className="muted small">
           {entry.unit_label ?? entry.unit_id ?? "—"}
           {entry.phone ? ` · ${entry.phone}` : ""}
-          {entry.ts ? ` · ${new Date(entry.ts).toLocaleTimeString()}` : ""}
+          {entry.ts ? ` · ${new Date(parseTs(entry.ts)).toLocaleTimeString()}` : ""}
         </div>
       </div>
       <span className={`pill ${meta.cls}`}>{meta.label}</span>

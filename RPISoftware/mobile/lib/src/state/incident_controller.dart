@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,6 +60,11 @@ class IncidentController extends StateNotifier<IncidentsState> {
   final AuthSession? _session;
   WsClient? _ws;
   final Set<String> _alarmed = {};
+  final _live = StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Every decoded WebSocket frame, re-broadcast for other live views (the
+  /// sensor summary refetches on `node` events).
+  Stream<Map<String, dynamic>> get liveEvents => _live.stream;
 
   Future<void> _init() async {
     await refresh();
@@ -87,10 +94,19 @@ class IncidentController extends StateNotifier<IncidentsState> {
     flushQueue();
   }
 
-  void _setConnected(bool v) => state = state.copyWith(connected: v);
+  // The socket's onDone fires after dispose (logout); don't touch state then.
+  void _setConnected(bool v) {
+    if (mounted) state = state.copyWith(connected: v);
+  }
 
   void _onEvent(Map<String, dynamic> ev) {
-    final type = ev['type'] as String?;
+    if (!mounted) return;
+    _live.add(ev);
+    final type = ev['type'];
+    // Sensor analysis update (HARDWARE.md §5): never an incident, and no eventSeq
+    // bump — these arrive on every sensor heartbeat and would make manager
+    // dashboards refetch accounting/roster continuously.
+    if (type == 'node') return;
     // Any live frame advances eventSeq so manager dashboards refetch accounting/roster.
     state = state.copyWith(eventSeq: state.eventSeq + 1);
     if (type != 'incident') {
@@ -161,6 +177,7 @@ class IncidentController extends StateNotifier<IncidentsState> {
   @override
   void dispose() {
     _ws?.dispose();
+    _live.close();
     super.dispose();
   }
 }

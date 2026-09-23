@@ -1,0 +1,12 @@
+# Installed and built inside the image; never copy local ones in.
+node_modules/
+dist/
+*.log
+
+# A local .env (e.g. VITE_API_BASE=http://localhost:8000) must not leak into
+# the image build: the image is always built for same-origin (/api via nginx).
+.env
+.env.*
+
+Dockerfile
+.dockerignore

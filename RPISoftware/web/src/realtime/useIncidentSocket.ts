@@ -4,10 +4,33 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { WsEvent } from "../api/types";
 import { config } from "../config";
 
+/** Runs `fn` at most once per `ms`; a call inside the window schedules one trailing run
+ *  so the latest event is never dropped. */
+function throttle(fn: () => void, ms: number) {
+  let last = 0;
+  let timer: number | undefined;
+  const run = () => {
+    timer = undefined;
+    last = Date.now();
+    fn();
+  };
+  const call = () => {
+    const wait = last + ms - Date.now();
+    if (wait <= 0) run();
+    else if (timer === undefined) timer = window.setTimeout(run, wait);
+  };
+  call.cancel = () => window.clearTimeout(timer);
+  return call;
+}
+
 /**
  * Subscribes to the per-building incident WebSocket and invalidates the relevant
  * React Query caches on each event so the dashboard updates live. Auto-reconnects
  * with capped backoff. Returns connection status + the latest event.
+ *
+ * `node` events (a hardware status/availability message was processed) refresh only the
+ * sensor queries: summary + nodes (bursts coalesced) and the reporting nodes' raw history
+ * (at most every 10 s).
  */
 export function useIncidentSocket(buildingId: string, token: string | null) {
   const qc = useQueryClient();
@@ -20,6 +43,16 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
     let ws: WebSocket | null = null;
     let timer: number | undefined;
     let backoff = 1000;
+    const refreshNodes = throttle(() => {
+      qc.invalidateQueries({ queryKey: ["summary"] });
+      qc.invalidateQueries({ queryKey: ["nodes"] });
+    }, 2_000);
+    // only the nodes that reported since the last history refresh
+    const historyDue = new Set<string>();
+    const refreshHistory = throttle(() => {
+      for (const id of historyDue) qc.invalidateQueries({ queryKey: ["history", id] });
+      historyDue.clear();
+    }, 10_000);
 
     // Closing a socket that is still CONNECTING triggers the noisy browser warning
     // "WebSocket is closed before the connection is established" (common under React
@@ -37,12 +70,24 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
       const url = `${config.wsBase}/api/v1/ws/incidents?building_id=${buildingId}&token=${token}`;
       ws = new WebSocket(url);
       ws.onopen = () => {
+        if (stopped) return; // socket of a cleaned-up effect (StrictMode / token change)
         setConnected(true);
         backoff = 1000;
       };
       ws.onmessage = (ev) => {
+        if (stopped) return;
         try {
           const data = JSON.parse(ev.data as string) as WsEvent;
+          if (data.type === "node") {
+            setLastEvent(data);
+            refreshNodes();
+            if (data.node_id) {
+              historyDue.add(data.node_id);
+              refreshHistory();
+            }
+            return;
+          }
+          if (data.type !== "incident" && data.type !== "checkin") return; // unknown event type
           setLastEvent(data);
           qc.invalidateQueries({ queryKey: ["incidents"] });
           qc.invalidateQueries({ queryKey: ["accounting"] });
@@ -51,14 +96,16 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
           if (data.type === "incident") {
             qc.invalidateQueries({ queryKey: ["events"] });
             qc.invalidateQueries({ queryKey: ["triangulation"] });
+            refreshNodes(); // building status/headline are derived from open incidents
           }
         } catch {
           /* ignore malformed frame */
         }
       };
       ws.onclose = () => {
-        setConnected(false);
+        // a stale socket closing late must not mark the current one as disconnected
         if (stopped) return;
+        setConnected(false);
         timer = window.setTimeout(connect, backoff);
         backoff = Math.min(backoff * 2, 15000);
       };
@@ -68,7 +115,10 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
     connect();
     return () => {
       stopped = true;
+      setConnected(false);
       if (timer) window.clearTimeout(timer);
+      refreshNodes.cancel();
+      refreshHistory.cancel();
       closeSocket(ws);
     };
   }, [buildingId, token, qc]);

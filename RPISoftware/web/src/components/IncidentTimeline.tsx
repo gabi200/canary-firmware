@@ -1,8 +1,9 @@
 import type { IncidentEvent } from "../api/types";
+import { parseTs } from "../lib/time";
 import { StatusPill } from "./StatusPill";
 
 function fmt(ts: string): string {
-  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return new Date(parseTs(ts)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 export function IncidentTimeline({ events }: { events: IncidentEvent[] }) {

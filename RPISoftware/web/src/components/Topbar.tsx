@@ -16,6 +16,9 @@ export function Topbar({ connected }: { connected: boolean }) {
         <NavLink to="/dispatch" className={({ isActive }) => (isActive ? "active" : "")}>
           Dispatch
         </NavLink>
+        <NavLink to="/sensors" className={({ isActive }) => (isActive ? "active" : "")}>
+          Sensors
+        </NavLink>
       </nav>
       <div className="spacer" />
       <span className={`live ${connected ? "" : "off"}`}>

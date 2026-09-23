@@ -3,7 +3,28 @@
 
 > Buildable implementation plan: architecture, tech stack, data models, API contracts, AI/analytics approach, and a phased roadmap. Greenfield design deliverable. Multi-unit residential buildings; Romanian HOA / "asociatii de proprietari" context; emergency services = 112/ISU.
 
-**Contents:** Foundation; A) Backend; B) AI & Analytics; C) Web Dashboard; D) Mobile App; E) Cross-Cutting (Logging, Security, Integration, NFRs); F) Roadmap; G) Open Questions & Trade-offs.
+**Contents:** As built (Raspberry Pi hub); Foundation; A) Backend; B) AI & Analytics; C) Web Dashboard; D) Mobile App; E) Cross-Cutting (Logging, Security, Integration, NFRs); F) Roadmap; G) Open Questions & Trade-offs.
+
+## As built (Raspberry Pi hub)
+
+Everything after this section is the design and delivery **plan**. What exists today is a single-building hub on one Raspberry Pi (this directory), fed by the ESP32 firmware in `../air_sensor` and `../water_sensor`. How to run it: [`README.md`](./README.md) and [`RUNME.md`](./RUNME.md). The firmware ↔ hub contract: [`docs/HARDWARE.md`](./docs/HARDWARE.md). Checks and troubleshooting: [`DEBUG.md`](./DEBUG.md). Sections of the plan that differ from the build carry an **As built** note; everything else in them is still planned, not delivered.
+
+| Area | Plan | Built |
+|---|---|---|
+| Edge nodes | ESP32-S3 per zone on ESP-IDF + TFLite Micro: gas, CO, leak, Wi-Fi presence; MQTT over TLS, LoRa fallback | Arduino-core firmware for two nodes. Air (ESP32-S3): ZE03 CO, MQ5 gas (raw ADC, not ppm), PMS5003T particulates + temperature/humidity, LD2410 radar presence, LED + buzzer. Water (ESP32-C3): leak probe, valve relay, buzzer. Both grade readings against their own thresholds; plaintext MQTT; no LoRa, no Wi-Fi presence sensing |
+| MQTT topics / payload | `canary/v1/{building}/.../{device}/telemetry` carrying `canary.telemetry.v1` (§5) | Retained `<base>/status` documents and `<base>/availability`; the hub translates each status into `canary.telemetry.v1` readings. `canary/v1/.../telemetry\|event` is still accepted (legacy simulator) |
+| Broker | Mosquitto per gateway, bridged to a cloud EMQX cluster; mTLS + per-device ACL | Mosquitto 2 on the Pi; login required, one MQTT user per sensor (named like its base topic); per-device ACL optional, off by default. No EMQX, no bridge |
+| Tiers | Edge → per-building gateway (local panel, signage, LAN/BLE check-in, store-and-forward) → multi-AZ cloud | Edge → one Pi running broker, backend and dashboard with `docker compose`. No gateway panel or signage, no cloud |
+| Backend | Separate services over Redis Streams, Postgres-before-ack | One FastAPI process: MQTT consumer, detection, incident state machine, analysis, REST + WebSocket |
+| Storage | PostgreSQL 16 + TimescaleDB + Redis 7 | SQLite (WAL) on a Docker volume by default; Postgres optional (hypertables only if Timescale is installed). No Redis. Raw history pruned hourly after 14 days |
+| Detection / analytics | §7 machine with timers; learned triangulation, occupancy and false-alarm models (§B) | §7 states without timers; rule-based triangulation, occupancy and false-alarm reduction; device thresholds and alarms applied under explicit safety rules ([`docs/HARDWARE.md`](./docs/HARDWARE.md) §2) |
+| Notification / escalation | FCM/APNs, SMS, email, signed webhooks to ARC, ISU and the gas distributor | `Notification` rows + WebSocket only; FCM optional in the app and off by default; no external adapters |
+| Web / mobile | React with Zustand, Konva, ECharts, OIDC; Flutter with FCM and a gateway LAN/BLE path | React + TanStack Query + SVG + Recharts; Flutter + Riverpod over REST + WebSocket to the Pi; username-only dev login |
+| Security | TLS/mTLS everywhere, OIDC, per-device certificates, hash-chained audit | Plaintext MQTT/HTTP on a trusted LAN/VLAN; per-sensor MQTT passwords; plain append-only audit table |
+| Device commands | Valve / alarm-test on `cmd` topics | Not sent yet (the firmware's `<base>/valve/set` and `<base>/buzzer/set` exist) |
+| Operations | Kubernetes, CI/CD, Prometheus/Grafana/OpenTelemetry/Loki | `docker compose` with `restart: unless-stopped` and bounded logs; `scripts/smoke.sh` as the test gate |
+
+Status: covered by the backend test suite and a firmware-accurate simulator, not yet run on a physical Pi with the real sensors. Known limitations: [`README.md`](./README.md).
 
 ---
 
@@ -24,6 +45,8 @@
 ---
 
 ## 2. System Architecture
+
+> **As built:** no gateway tier and no cloud. One Raspberry Pi runs Mosquitto, the backend and the dashboard; the data stores are SQLite by default (Postgres optional) instead of PostgreSQL + TimescaleDB, and there is no Redis. See "As built" at the top.
 
 **Component breakdown.**
 
@@ -93,6 +116,8 @@
 
 ## 3. Data-Flow Overview
 
+> **As built:** each sensor publishes retained `<base>/status` documents to Mosquitto on the Pi. The backend stores every document raw, turns it into readings, drops duplicates by `(device_id, epoch, seq)` in the database and runs detection in the same process. Alerts reach the dashboard and the app over the WebSocket; check-ins go to the Pi's REST API over the LAN. There is no gateway panel, bridge, EMQX, TimescaleDB or Redis on this path.
+
 **Telemetry path.** `Device` samples → on-device pre-inference → publish JSON to MQTT (`.../telemetry`) → gateway broker (buffers if WAN down) → bridge to cloud EMQX → **Ingestion** validates + dedupes on `(device_id, epoch, seq)` → writes `SensorReading` to TimescaleDB, updates latest value + rolling features in Redis → **Detection** consumes the stream and evaluates per-sensor thresholds and cross-sensor gradients.
 
 **Alert / escalation path.** Detection crosses a guard → `Incident` opens at `detection` → Verification corroborates (neighboring zones, edge corroboration flag, AI triangulation) → on confirmation, transition to `alarm`: Notification fans out resident push + manager web push, gateway raises local alarm panel, edge nodes already self-alarming. Persistence/severity guard → `escalation`: Escalation service notifies the contracted ARC/duty manager (the always-present primary target, obligated to call 112/ISU) and the relevant gas distributor; where a signed ISU agreement exists, an optional machine-readable webhook is also sent. `evacuation` activates `EvacuationRoute`/`AssemblyPoint` guidance. Every transition writes an `IncidentEvent` + `AuditLogEntry`. **Edge-local alert path runs in parallel and unconditionally** — it never waits on the cloud — and the **gateway degraded path** (directional evacuation signage + local check-in + degraded accounting) runs whenever the WAN is down.
@@ -117,9 +142,13 @@
 | Mobile | Flutter (Dart) + Firebase Cloud Messaging; LAN/BLE client to gateway | Single codebase iOS/Android resident app; FCM for cloud-path push, gateway LAN/BLE for check-in when WAN is down. |
 | Infra / deploy / observability | Docker + Kubernetes (managed), GitHub Actions CI/CD, Prometheus + Grafana, OpenTelemetry, Loki | Reproducible deploys and end-to-end latency SLO monitoring for the safety path. |
 
+> **As built:** the backend row stands (Python 3.12 + FastAPI). Edge: Arduino ESP32 core, threshold grading on the device, plaintext MQTT, no TensorFlow Lite Micro, no LoRa. Messaging: Mosquitto 2 on the Pi only. Stores: SQLite by default, Postgres optional (Timescale hypertables only if the extension is present); Redis is not used. Web: TanStack Query + native WebSocket, SVG floor plan, Recharts (no Zustand, Konva or ECharts). Mobile: FCM optional and off by default, no gateway LAN/BLE client. Infra: `docker compose` on one Pi; no Kubernetes, CI/CD pipeline or observability stack.
+
 ---
 
 ## 5. Sensor Message Schema
+
+> **As built:** the real firmware does not publish this schema. Each ESP32 publishes a retained JSON status document on `<base>/status` (plus `<base>/availability`), and the hub translates it into `canary.telemetry.v1` readings, one per channel ([`docs/HARDWARE.md`](./docs/HARDWARE.md) §1–2). In those readings `epoch` is the hub's boot counter for the node and `seq` the device uptime in ms; there is no `device_ts` (the devices have no wall clock); an optional `thresholds` object carries the device's own calibration. The hub's schema also adds the sensor types `particulate` and `radar_presence`. This JSON is sent directly only by the legacy simulator (`.../telemetry` and `.../event` topics) and to the HTTP ingress `POST /api/v1/telemetry`. The `health`, `cmd` and `gateway/status` topics and the LoRa/CBOR variant are not built.
 
 **MQTT topic hierarchy.** Lowercase, slash-delimited, IDs are stable identifiers (not human labels):
 
@@ -174,6 +203,8 @@ canary/v1/{building_id}/gateway/status                                        # 
 
 ## 6. Core Data Model
 
+> **As built:** every table lives in one database (SQLite by default; hypertables only on Postgres with Timescale), created on startup with no migrations. The hardware adds `nodes` (one row per physical ESP32) and `node_status` (every raw status document); see [`docs/HARDWARE.md`](./docs/HARDWARE.md) §2.
+
 **Store placement.** **PostgreSQL (system-of-record):** `Building`, `Floor`, `Unit`, `Zone`, `Device`, `User`, `Role`, `ResidentUnit`, `Incident`, `IncidentEvent`, `AuditLogEntry`, `Notification`, `EvacuationRoute`, `AssemblyPoint`, `CheckIn`, `ExternalIntegration`. **TimescaleDB (time-series hypertables):** `SensorReading`, `DeviceHealth`, `OccupancyEstimate`. (`Device`/`Sensor` is one entity: a `Device` *is* a sensor node with a `sensor_type`.)
 
 **Text ER.**
@@ -214,6 +245,8 @@ Notes: forward-only into `alarm`/`escalation` for safety (no silent regression o
 
 ## 8. Non-Functional Targets
 
+> **As built:** none of these targets has been measured, and the gateway, cloud and push paths they rely on are not built. In the hub, alerts reach the dashboard and the app over the WebSocket; the edge-local alarm is the firmware's own.
+
 **Detection-to-alert latency budget (target: combustible-gas/CO critical event from physical detection to FCM-accepted ≤ 5 s end-to-end on the WiFi/cloud path; edge-local alarm ≤ 1 s and independent).** The controllable, measurable budget ends at the **FCM hand-off**. Device-side receipt is best-effort and outside the system's control: under Android Doze, OEM background killers (notably Xiaomi/Huawei/Oppo in the RO market), or a hard-killed iOS app, FCM high-priority delivery can take seconds to minutes. The **asserted resident-alerting guarantee is therefore the edge siren + gateway local panel** (the physical alarm), not the phone push.
 
 | Hop | Budget |
@@ -246,9 +279,13 @@ The invariant across all modes: **a real hazard always produces a local audible/
 
 ## Backend Architecture
 
+> **As built:** the backend is one FastAPI process on the Pi (`backend/app/`), not the service set described here: an aiomqtt consumer, the ingestion pipeline, detection, the incident service, analysis, notifications (database rows + WebSocket) and the REST/WebSocket API. It needs no EMQX, TimescaleDB or Redis. The notes in the subsections below say what differs.
+
 This section deepens the cloud + per-building backend that sits between the EMQX broker (§2) and the API gateway. It is implemented in Python 3.12 / FastAPI, writes `SensorReading`/`DeviceHealth`/`OccupancyEstimate` to TimescaleDB and the rest of the entities to PostgreSQL 16, and uses Redis 7 Streams as the internal bus — **except on the safety path, where incident-advancing events are persisted to PostgreSQL synchronously before ack** (see §2). Every component obeys the §1 invariant: **nothing here is on the ≤1 s edge-local alarm path** — the cloud is the corroboration, accounting, and escalation brain, not the last line of defense. The corollary, made explicit throughout this section: **when the cloud loses visibility into a node (missed heartbeat, malformed message, gap), the occupant's protection still rests on the edge node's own local alarm**, and the cloud's job in that moment is to make its own blindness *loud* — to managers and, where a node is in or near alarm, to Detection.
 
 ### 1. Ingestion
+
+> **As built:** one aiomqtt consumer subscribes to `#` on Mosquitto (QoS 1) and dispatches by topic suffix: no shared subscriptions, no event fast-path, no DLQ and no degraded-zone signal. Hardware messages are size-, depth- and type-checked, and a malformed one is logged and dropped. Duplicates are found by a database lookup on `(device_id, epoch, seq)`, with the unique constraint as backstop; there is no Redis tier. Sensors log in with per-sensor passwords, not certificates. A stale or offline node shows as `attention` in the analysis ([`docs/HARDWARE.md`](./docs/HARDWARE.md) §3) but does not feed detection.
 
 #### Broker integration and consumer topology
 
@@ -436,6 +473,8 @@ dlq:*                  # dead-letter streams per failure class
 
 ### 3. Storage usage
 
+> **As built:** SQLite in WAL mode (`synchronous=NORMAL`, `busy_timeout=5000`) on the `backend_data` volume by default, or Postgres via `CANARY_DATABASE_URL`, with hypertables only when Timescale is installed. No continuous aggregates, compression or Redis hot path; detection reads recent readings from the database. An hourly job deletes raw status documents, readings and occupancy estimates older than `CANARY_RETENTION_DAYS` (default 14), 2000 rows per transaction; incidents, events, check-ins and the audit log are kept.
+
 #### TimescaleDB (time-series)
 
 `SensorReading`, `DeviceHealth`, `OccupancyEstimate` are hypertables.
@@ -503,6 +542,8 @@ All entities from §6. Notes specific to the backend:
 
 ### 4. Incident state machine in full
 
+> **As built:** the states and forward-only rules are implemented (`backend/app/incidents/`), without timers. An incident closes after `CANARY_CLEAR_HOLD_SAMPLES` (3) consecutive clearing readings from a device that reported the hazard, or when a manager or dispatcher resolves it. `escalation` is passed through only on the automatic critical gas/CO path to `evacuation`. There is no acknowledge step and no `incident_unlock`; dismissing as a false alarm is refused (409) once an incident has reached `escalation` or `evacuation`. One incident per hazard type per building is open at a time.
+
 This is the §7 machine, expanded with timers, guards, and exact notify targets. The Incident Orchestrator owns it. A row exists from `Detection` onward; `Normal` is the no-open-incident state. Forward-only into active-alarm states; the only exits from an active alarm are `Resolution`/`FalseAlarm`, each requiring a logged actor. The **edge-local alarm path is independent of this machine** (§7).
 
 Timers (configurable per building; defaults shown):
@@ -543,6 +584,8 @@ def can_resolve(inc: Incident) -> bool:
 **Honesty note:** `unaccounted_occupants > 0` as an escalation trigger inherits all the accuracy limits of WiFi-presence sensing (see §6 below). It is surfaced to ISU as an **estimate with confidence**, never as a hard count — overstating certainty here could send responders into a building chasing a phantom occupant or, worse, leave early because the estimate said "all clear."
 
 ### 5. REST API surface
+
+> **As built:** the implemented endpoints are listed in [`README.md`](./README.md) ("Key endpoints") and [`docs/HARDWARE.md`](./docs/HARDWARE.md) §4. Auth is a username-only dev token (JWT, 8 h) with role checks only: no refresh, OIDC, building scope or `incident_unlock`. No SSE, no rate limiting. The WebSocket sends `incident`, `checkin` and `node` events, not the topics below.
 
 Base: `/api/v1`. OpenAPI auto-generated by FastAPI for the React and Flutter clients and external connectors.
 
@@ -640,6 +683,8 @@ Example resident push (FCM data message, actionable):
 
 ### 6. Notification service
 
+> **As built:** the notification service writes `Notification` rows (managers on every transition; residents on alarm, evacuation, all-clear and stand-down; the seeded ARC integration on escalation, evacuation and resolution) and broadcasts the incident on the WebSocket. The rows are a record only: no push, SMS, email or webhook transport is wired in the backend.
+
 A pool of async workers consuming `stream:notify`. Each job is `{incident_id, recipients[], channel_policy, severity, template, dedupe_key}`. For `critical`/`emergency` jobs the originating transition is on the safety path, so the job was persisted to Postgres before its `stream:notify` ack (§2) — a Redis failover cannot lose an emergency notification job.
 
 **Channels & adapters** (one adapter interface, swappable providers):
@@ -681,6 +726,8 @@ queued -> sent -> delivered -> read   (+ failed, dead, fellover)
 Honest limit: push delivery receipts are best-effort and laggy; "not delivered" never means "resident not alerted" because the **edge siren + gateway panel** (§7) alerted them physically regardless. Notification tracking informs accounting, it is not the alarm.
 
 ### 7. Resilience & deployment topology
+
+> **As built:** one Raspberry Pi running `docker compose`: `mosquitto`, `backend` and `web` (simulators in the `sim` profile), all `restart: unless-stopped`, with bounded json-file logs. No gateway/cloud split, no HA and no observability stack. If the broker goes away the backend reconnects with backoff (up to 30 s) and skips re-delivered retained documents it already has. The sensors' own alarms (buzzer, LED, water valve) never depend on the hub.
 
 The architecture is layered so each layer can lose the one above it and still protect occupants. The §8 invariant holds: **a real hazard always produces a local audible/visual alarm within ≤1 s, regardless of cloud or gateway state.**
 
@@ -731,6 +778,8 @@ The architecture is layered so each layer can lose the one above it and still pr
 ---
 
 ## AI & Analytics
+
+> **As built:** rule-based versions only, in `backend/app/analytics/` and `backend/app/occupancy/`: triangulation for gas/CO (concentration-weighted centroid + time of first detection, confidence capped at 0.95), occupancy from the air node's radar presence (or the legacy simulator's `wifi_presence`), and false-alarm classification of each sensor's recent readings. No learned models and no Wi-Fi CSI sensing.
 
 This section specifies three analytics modules that sit on the cloud backend (Python 3.12 / FastAPI, per Foundation §4) and consume the `SensorReading`, `OccupancyEstimate`, `DeviceHealth`, and `CheckIn` data. Every module emits a confidence score and a typed verdict that the **Incident Orchestrator** consumes during the `Verification`, `Alarm`, `Escalation`, and `Evacuation` states (§7). All three are designed **explainable-first, learned-later**: rules ship at launch (cold-start), ML upgrades plug into the same interface once labelled data exists. None of these modules can suppress the edge-local alarm path — they only inform cloud-side incident decisions.
 
@@ -1077,6 +1126,8 @@ In all cases the verdict and `reason` are written to the `IncidentEvent`, giving
 
 ## Web Dashboard (Frontend)
 
+> **As built:** React 18 + TypeScript + Vite, TanStack Query, and a native WebSocket whose events invalidate queries; hand-rolled SVG floor plan, Recharts, plain CSS; username-only dev login. Views: Manager, Dispatch and Sensors (raw ESP32 data next to the hub's analysis). Served by nginx on the Pi, same origin as the API. See [`web/README.md`](./web/README.md).
+
 The web console serves two of the three audiences in the foundation: **HOA/managers** (`hoa_manager` role) for monitoring, and **utilities/emergency services** (`dispatcher_external` role) for the incident view. Residents are out of scope here (Flutter app). This section deepens the React/TypeScript console that consumes the API Gateway's REST + WebSocket/SSE surface and renders the `Incident` lifecycle from §7.
 
 ### Stack
@@ -1241,6 +1292,8 @@ GET /api/v1/incidents/{incident_id}/events?cursor=&limit=     // IncidentEvent t
 ---
 
 ## Mobile App
+
+> **As built:** Flutter + Riverpod talking to the Pi over REST + WebSocket on the LAN: full-screen alarm, evacuation guidance, check-in with an offline queue, and the hub's sensor analysis without raw values ("Home status"; "Building sensors" on the manager screen). Sign-in by username (no invite codes). FCM is optional and off by default; there is no gateway LAN/BLE path and no foreground service. See [`mobile/README.md`](./mobile/README.md).
 
 The resident app is the last meter of the safety path: when the backend transitions an `Incident` to `Alarm`/`Evacuation`, this app is what wakes a sleeping resident at 03:00, routes them away from the hazard, and feeds their `CheckIn` back into victim-accounting. It is built in **Flutter (Dart)**.
 
@@ -1570,6 +1623,8 @@ The home/status surface, driven by `activeIncidentProvider`:
 
 ## Cross-Cutting: Logging, Security, Integration, Non-Functional
 
+> **As built:** logs go to stdout (Docker json-file, 10 MB × 3 for each hub container), with the JWT in WebSocket URLs kept out of uvicorn's and nginx's logs. The audit log is a plain append-only table: no hash chain, WORM seal or notarization. MQTT and HTTP are plaintext on a trusted LAN/VLAN; sensors log in with per-sensor passwords (no certificates) and people with a username only. No external integration or actuation is wired.
+
 This section deepens the operational and security spine that every other component depends on. It refers to entities (`Incident`, `AuditLogEntry`, `IncidentEvent`, `ExternalIntegration`, `OccupancyEstimate`, `Device`, `CheckIn`), states (`Detection`→`Verification`→`Alarm`→`Escalation`→`Evacuation`→`Resolution`/`FalseAlarm`), topics (`canary/v1/...`), and the latency budget from the Foundation verbatim.
 
 ### 1. Logging & Auditability
@@ -1812,9 +1867,9 @@ The invariant across every failure mode, restated from the Foundation: **a real 
 
 ---
 
-I have the avoid-ai-writing guidance loaded (technical-blog profile). Now I'll produce the revised section. The two fixes drive the changes: the edge-local alarm budget moves from p95 to a hard worst-case bound everywhere it appears, and gateway autonomous building-wide alarm moves from P3 into P1 with a matching exit criterion. I'll keep everything else intact and consistent with the foundation.
-
 ## Phased Delivery Roadmap
+
+> **As built:** the hub implements the software path of P1–P2 in one process on the Pi (rule-based detection, the incident state machine through `evacuation`, check-ins, accounting, the manager/dispatcher console and the resident app) plus the rule-based first stage of P5 (triangulation, radar occupancy, false-alarm reduction). Not built: the gateway's local alarm panel and signage and push delivery (P1), LoRa and store-and-forward replay (P3), external escalation adapters (P4), learned models (P5). The edge-local alarm is the firmware's own (air: buzzer and LED; water: buzzer and valve). Nothing has run in a live building yet.
 
 The build order follows one rule: the safety-critical path (`detection -> alert -> evacuation -> victim-accounting`) ships before anything else, and within it, the parts that save lives with the least machinery ship first. Concretely, that means the **edge-local fail-loud alarm** and a **thin detection -> push -> check-in slice** come before the cloud `Incident` state machine is complete, and rule-based detection comes well before any learned triangulation or presence model. One piece of resilience is not deferred: the gateway's cloud-independent building-wide alarm ships with the MVP, because it is the backstop the whole safety story rests on the moment the system is live in a real building. AI features are deliberately the last two phases, because they sit on top of data the earlier phases generate and validate.
 

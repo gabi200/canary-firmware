@@ -33,6 +33,8 @@ class Incident {
         return 'Carbon monoxide';
       case 'water_leak':
         return 'Water leak';
+      case 'particulate':
+        return 'Smoke / particulates';
       default:
         return hazardType;
     }

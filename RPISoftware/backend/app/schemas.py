@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.enums import (
     CheckInSource,
@@ -42,6 +43,17 @@ class Battery(BaseModel):
     low_battery: bool = False
 
 
+class ReadingThresholds(BaseModel):
+    """The reporting device's own grading thresholds (installer calibration), in the
+    reading's units. When absent the backend defaults for the sensor type apply."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    detection: float
+    critical: float
+    clear: float
+
+
 class TelemetryPayload(BaseModel):
     # `schema` is the wire field name; aliased to avoid shadowing pydantic internals.
     model_config = ConfigDict(populate_by_name=True)
@@ -62,6 +74,7 @@ class TelemetryPayload(BaseModel):
     seq: int = 0
     device_ts: datetime | None = None
     ingest_ts: datetime | None = None
+    thresholds: ReadingThresholds | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -266,3 +279,86 @@ class ReadingOut(BaseModel):
     units: str
     edge_state: str
     ts: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Hardware nodes + analysis (docs/HARDWARE.md sections 3-4)
+# --------------------------------------------------------------------------- #
+class IndicatorOut(BaseModel):
+    key: str
+    label: str
+    level: str  # ok | attention | danger | unknown
+    value: str
+    detail: str | None = None
+    trend: str | None = None  # rising | falling | stable | None
+
+
+class NodeAnalysisOut(BaseModel):
+    """Plain-language analysis of one node. Never carries raw measurements."""
+
+    node_id: str
+    kind: str
+    name: str
+    zone_id: str
+    online: bool
+    stale: bool
+    last_seen_ts: datetime | None
+    status: str  # ok | attention | danger
+    headline: str
+    advice: list[str]
+    indicators: list[IndicatorOut]
+
+
+class ZoneSummaryOut(BaseModel):
+    zone_id: str
+    zone_label: str
+    status: str
+    occupied: bool | None
+    nodes: list[NodeAnalysisOut]
+
+
+class BuildingSummaryOut(BaseModel):
+    """Analysis-only building view (residents included): no raw measurements."""
+
+    building_id: str
+    generated_ts: datetime
+    status: str
+    headline: str
+    nodes_total: int
+    nodes_online: int
+    active_incidents: int
+    zones: list[ZoneSummaryOut]
+
+
+class NodeOut(BaseModel):
+    """A physical node: latest raw status document + its analysis (dashboard)."""
+
+    id: str
+    kind: str
+    mqtt_base: str
+    name: str
+    firmware: str
+    building_id: str
+    zone_id: str
+    online: bool
+    last_seen_ts: datetime | None
+    boot_epoch: int
+    status: dict | None
+    analysis: NodeAnalysisOut
+
+
+class NodeUpdate(BaseModel):
+    zone_id: str | None = None
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)] | None = None
+
+
+class HistoryPoint(BaseModel):
+    ts: datetime
+    values: dict[str, int | float | str | None]
+
+
+class NodeHistoryOut(BaseModel):
+    node_id: str
+    minutes: int
+    fields: list[str]
+    points: list[HistoryPoint]

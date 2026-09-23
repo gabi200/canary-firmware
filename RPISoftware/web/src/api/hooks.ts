@@ -1,15 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "../auth/AuthContext";
 import { api } from "./client";
 import type {
   Accounting,
   Building,
+  BuildingSummary,
   Device,
   Evacuation,
   Incident,
   IncidentAction,
   IncidentEvent,
+  NodeHistory,
+  NodeOut,
+  NodePatch,
   Occupancy,
   Reading,
   Resident,
@@ -144,6 +148,62 @@ export function useIncidentAction() {
       qc.invalidateQueries({ queryKey: ["incidents"] });
       qc.invalidateQueries({ queryKey: ["accounting"] });
       qc.invalidateQueries({ queryKey: ["events"] });
+    },
+  });
+}
+
+/** Building / zone / node analysis (no raw values). Refreshed live by `node` WS events. */
+export function useSummary() {
+  const { token, buildingId } = useCtx();
+  return useQuery({
+    queryKey: ["summary", buildingId],
+    queryFn: () => api.get<BuildingSummary>(`/api/v1/buildings/${buildingId}/summary`, token),
+    refetchInterval: 15_000,
+  });
+}
+
+/** Hardware nodes: latest raw status document + analysis per physical device. */
+export function useNodes() {
+  const { token, buildingId } = useCtx();
+  return useQuery({
+    queryKey: ["nodes", buildingId],
+    queryFn: () => api.get<NodeOut[]>(`/api/v1/buildings/${buildingId}/nodes`, token),
+    refetchInterval: 15_000,
+  });
+}
+
+/** Raw status history of one node; `fields` are dotted paths into its status document. */
+export function useNodeHistory(nodeId: string, minutes: number, fields?: string[]) {
+  const { token } = useCtx();
+  const qs = new URLSearchParams({ minutes: String(minutes) });
+  if (fields?.length) qs.set("fields", fields.join(","));
+  return useQuery({
+    queryKey: ["history", nodeId, minutes, fields?.join(",") ?? ""],
+    queryFn: () =>
+      api.get<NodeHistory>(`/api/v1/nodes/${encodeURIComponent(nodeId)}/history?${qs}`, token),
+    // keep the previous range on screen while a newly selected one loads
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Move (zone_id) or rename a node. Managers / admins only (backend enforces). */
+export function useUpdateNode() {
+  const { token, buildingId } = useCtx();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ nodeId, patch }: { nodeId: string; patch: NodePatch }) =>
+      api.patch<NodeOut>(`/api/v1/nodes/${encodeURIComponent(nodeId)}`, token, patch),
+    onSuccess: (updated) => {
+      if (updated) {
+        qc.setQueryData<NodeOut[]>(["nodes", buildingId], (old) =>
+          old?.map((n) => (n.id === updated.id ? updated : n)),
+        );
+      }
+      qc.invalidateQueries({ queryKey: ["nodes"] });
+      qc.invalidateQueries({ queryKey: ["summary"] });
+      // the node's per-channel devices move with it (floor plan, device health)
+      qc.invalidateQueries({ queryKey: ["devices"] });
     },
   });
 }

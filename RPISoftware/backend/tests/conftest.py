@@ -19,13 +19,18 @@ from app.db import SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed  # noqa: E402
 
-_DB_FILE = pathlib.Path("./test_canary.db")
+# the database file plus its WAL side files (SQLite runs in WAL mode)
+_DB_FILES = [pathlib.Path(f"./test_canary.db{suffix}") for suffix in ("", "-wal", "-shm")]
+
+
+def _remove_db_files() -> None:
+    for path in _DB_FILES:
+        path.unlink(missing_ok=True)
 
 
 @pytest_asyncio.fixture
 async def client() -> AsyncClient:
-    if _DB_FILE.exists():
-        _DB_FILE.unlink()
+    _remove_db_files()
     await init_db()
     async with SessionLocal() as session:
         await seed(session)
@@ -35,8 +40,7 @@ async def client() -> AsyncClient:
         yield c
 
     await engine.dispose()
-    if _DB_FILE.exists():
-        _DB_FILE.unlink()
+    _remove_db_files()
 
 
 async def auth_token(client: AsyncClient, username: str) -> str:
