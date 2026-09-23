@@ -1,0 +1,72 @@
+name: canary
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: canary
+      POSTGRES_PASSWORD: canary
+      POSTGRES_DB: canary
+    ports:
+      - "5432:5432"
+    volumes:
+      - canary_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canary -d canary"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  emqx:
+    image: emqx/emqx:5.8
+    ports:
+      - "1883:1883"    # MQTT
+      - "18083:18083"  # dashboard (admin/public)
+    healthcheck:
+      test: ["CMD", "emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      CANARY_DATABASE_URL: postgresql+asyncpg://canary:canary@timescaledb:5432/canary
+      CANARY_MQTT_ENABLED: "true"
+      CANARY_MQTT_HOST: emqx
+      CANARY_MQTT_PORT: "1883"
+      CANARY_REDIS_URL: redis://redis:6379/0
+      CANARY_JWT_SECRET: dev-only-change-me
+    ports:
+      - "8000:8000"
+
+  # Run on demand:  docker compose run --rm simulator --scenario gas_leak
+  simulator:
+    build: ./simulator
+    profiles: ["sim"]
+    depends_on:
+      emqx:
+        condition: service_started
+      backend:
+        condition: service_started
+    command: ["--host", "emqx", "--scenario", "gas_leak"]
+
+volumes:
+  canary_pg:
