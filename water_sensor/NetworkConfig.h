@@ -17,7 +17,9 @@ class NetworkConfig {
   void begin(DeviceConfig& config, bool forcePortal);
   void process();
   bool wifiConnected() const;
+  int32_t wifiRssi() const;
   bool portalActive() const;
+  bool servicesReady() const;
   bool takeConfigChanged(DeviceConfig& output);
 
  private:
@@ -41,7 +43,9 @@ class NetworkConfig {
   WiFiManagerParameter mqttUserParam_;
   WiFiManagerParameter mqttPasswordParam_;
   WiFiManagerParameter mqttTopicParam_;
-  WiFiManagerParameter apiTokenParam_;
+  WiFiManagerParameter apiTokenRequiredParam_;
+  WiFiManagerParameter apiTokenOptionalParam_;
+  WiFiManagerParameter* apiTokenParam_;
   WiFiManagerParameter wetThresholdParam_;
   WiFiManagerParameter dryThresholdParam_;
   WiFiManagerParameter debounceParam_;
@@ -55,7 +59,9 @@ class NetworkConfig {
   SemaphoreHandle_t handoffMutex_;
   TaskHandle_t taskHandle_;
   std::atomic<bool> wifiConnected_;
+  std::atomic<int32_t> wifiRssi_;
   std::atomic<bool> portalActive_;
+  std::atomic<bool> servicesReady_;
   bool taskStarted_;
   bool forcePortal_;
   bool handoffChanged_;

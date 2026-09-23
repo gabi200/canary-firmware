@@ -106,6 +106,16 @@ static void testInvalidStartingConfigAlwaysForcesPortal() {
   CHECK(existing.shouldForcePortal(true));
 }
 
+static void testApiTokenIsRequiredOnlyUntilAValidConfigIsSaved() {
+  PortalSubmissionPolicy firstRun(false);
+  CHECK(firstRun.requiresApiTokenInput());
+  CHECK(firstRun.evaluate(true) == PortalSubmissionAction::PublishConfig);
+  CHECK(!firstRun.requiresApiTokenInput());
+
+  PortalSubmissionPolicy existing(true);
+  CHECK(!existing.requiresApiTokenInput());
+}
+
 static void testWetLatchesAndCloses() {
   LeakController controller(config());
   controller.restore(PersistentState{false, ValveState::Open}, 0);
@@ -575,6 +585,7 @@ int main() {
   testInvalidExistingConfigRestoresCredentialsAndRestartsPortal();
   testValidFirstRunPublishesAndProtectsLaterCredentials();
   testInvalidStartingConfigAlwaysForcesPortal();
+  testApiTokenIsRequiredOnlyUntilAValidConfigIsSaved();
   testWetLatchesAndCloses();
   testDryDoesNotClearLatch();
   testWetOpenIsRejected();

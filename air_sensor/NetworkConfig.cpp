@@ -230,9 +230,15 @@ void NetworkConfig::networkTask() {
   for (;;) {
     wifiManager_.process();
     handleSubmissionRecovery();
-    if (captureCredentialsPending_) {
+    if (captureCredentialsPending_ &&
+        submissionPolicy_.takePublishReady(WiFi.status() == WL_CONNECTED)) {
       captureStoredWiFiCredentials();
       captureCredentialsPending_ = false;
+      if (xSemaphoreTake(handoffMutex_, portMAX_DELAY) == pdTRUE) {
+        handoffConfig_ = currentConfig_;
+        handoffChanged_ = true;
+        xSemaphoreGive(handoffMutex_);
+      }
     }
     publishNetworkStatus();
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -256,11 +262,6 @@ void NetworkConfig::onSave() {
 
   currentConfig_ = candidate;
   captureCredentialsPending_ = true;
-  if (xSemaphoreTake(handoffMutex_, portMAX_DELAY) == pdTRUE) {
-    handoffConfig_ = candidate;
-    handoffChanged_ = true;
-    xSemaphoreGive(handoffMutex_);
-  }
 }
 
 void NetworkConfig::publishNetworkStatus() {

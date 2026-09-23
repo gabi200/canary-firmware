@@ -33,6 +33,10 @@ bool configRebootPending = false;
 bool closeStateSavedForReboot = false;
 bool rebootScheduled = false;
 uint32_t rebootScheduledAtMs = 0;
+bool networkServicesStarted = false;
+uint32_t lastDebugHeartbeatMs = 0;
+
+constexpr uint32_t DEBUG_HEARTBEAT_MS = 5000;
 
 RuntimeStatus runtimeStatus() {
   const bool wifiConnected = networkConfig && networkConfig->wifiConnected();
@@ -40,7 +44,7 @@ RuntimeStatus runtimeStatus() {
       millis(),
       latestAdc,
       wifiConnected,
-      wifiConnected ? WiFi.RSSI() : 0,
+      wifiConnected ? networkConfig->wifiRssi() : 0,
       mqttService && mqttService->connected(),
       httpApi && httpApi->otaInProgress(),
   };
@@ -189,10 +193,17 @@ void setup() {
   pinMode(Hardware::CONFIG_BUTTON_PIN, INPUT_PULLUP);
 
   Serial.begin(115200);
+  delay(250);
+  Serial.println();
+  Serial.printf("[boot] water-sensor firmware %s\n", Hardware::FIRMWARE_VERSION);
+  Serial.println("[boot] serial ready at 115200 baud");
 
   configStore = std::make_unique<ConfigStore>();
   configStore->begin();
   deviceConfig = configStore->loadConfig();
+  const ConfigValidation configValidation = validateDeviceConfig(deviceConfig);
+  Serial.printf("[boot] configuration %s\n",
+                configValidation.valid ? "valid" : "requires provisioning");
 
   const LeakConfig leakConfig{
       deviceConfig.wetThreshold,
@@ -212,14 +223,15 @@ void setup() {
   const bool forcePortal = Hardware::CONFIG_BUTTON_ACTIVE_LOW
                                ? configButtonLevel == LOW
                                : configButtonLevel == HIGH;
+  Serial.printf("[boot] config button level=%d force_portal=%s\n",
+                configButtonLevel, forcePortal ? "yes" : "no");
   networkConfig = std::make_unique<NetworkConfig>();
   networkConfig->begin(deviceConfig, forcePortal);
   httpApi = std::make_unique<HttpApi>(deviceConfig, *controller, *configStore,
                                       runtimeStatus, notifyStateChanged);
-  httpApi->begin();
   mqttService = std::make_unique<MqttService>(deviceConfig, *controller,
                                               *configStore, runtimeStatus);
-  mqttService->begin();
+  Serial.println("[boot] setup complete; valve starts closed");
 }
 
 void loop() {
@@ -229,16 +241,27 @@ void loop() {
     notifyStateChanged();
   }
   applyOutputs(nowMs);
-  httpApi->handleClient();
 
   networkConfig->process();
+  if (!networkServicesStarted && networkConfig->servicesReady()) {
+    Serial.println("[services] starting HTTP and MQTT");
+    httpApi->begin();
+    mqttService->begin();
+    networkServicesStarted = true;
+    Serial.println("[services] startup complete");
+  }
+  if (networkServicesStarted) {
+    httpApi->handleClient();
+  }
   const uint32_t persistenceNowMs = millis();
   DeviceConfig changedConfig{};
   if (networkConfig->takeConfigChanged(changedConfig)) {
     queueConfigurationSave(changedConfig, persistenceNowMs);
   }
 
-  mqttService->process(persistenceNowMs);
+  if (networkServicesStarted) {
+    mqttService->process(persistenceNowMs);
+  }
   // MQTT commands are applied above by the safety-loop owner; reflect a
   // commanded closure/opening before persistence and without waiting for the
   // next pass through loop().
@@ -254,4 +277,17 @@ void loop() {
     applyOutputs(millis());
     ESP.restart();
   }
+
+  if (elapsed(nowMs, lastDebugHeartbeatMs, DEBUG_HEARTBEAT_MS)) {
+    lastDebugHeartbeatMs = nowMs;
+    Serial.printf(
+        "[status] uptime=%lu adc=%u wifi=%s portal=%s services=%s heap=%lu\n",
+        static_cast<unsigned long>(nowMs), static_cast<unsigned>(latestAdc),
+        networkConfig->wifiConnected() ? "connected" : "disconnected",
+        networkConfig->portalActive() ? "active" : "inactive",
+        networkServicesStarted ? "running" : "waiting",
+        static_cast<unsigned long>(ESP.getFreeHeap()));
+  }
+
+  delay(1);
 }

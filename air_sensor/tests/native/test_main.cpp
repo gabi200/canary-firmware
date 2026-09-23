@@ -393,12 +393,20 @@ void testPortalSubmissionPolicy() {
   CHECK(firstRun.evaluate(false) ==
         PortalSubmissionAction::ClearCredentialsAndRestart);
   CHECK(firstRun.evaluate(true) == PortalSubmissionAction::PublishConfig);
+  CHECK(!firstRun.takePublishReady(false));
+  CHECK(firstRun.takePublishReady(true));
+  CHECK(!firstRun.takePublishReady(true));
   CHECK(firstRun.evaluate(false) ==
         PortalSubmissionAction::RestoreCredentialsAndRestart);
+  CHECK(!firstRun.takePublishReady(true));
 
   PortalSubmissionPolicy configured(true);
   CHECK(!configured.shouldForcePortal(false));
   CHECK(configured.shouldForcePortal(true));
+  CHECK(configured.evaluate(true) == PortalSubmissionAction::PublishConfig);
+  CHECK(configured.evaluate(false) ==
+        PortalSubmissionAction::RestoreCredentialsAndRestart);
+  CHECK(!configured.takePublishReady(true));
 }
 
 DeviceConfig validDeviceConfig() {

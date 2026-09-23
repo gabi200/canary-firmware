@@ -17,6 +17,10 @@ class PortalSubmissionPolicy {
     return explicitlyForced || !hasValidConfig_;
   }
 
+  bool requiresApiTokenInput() const {
+    return !hasValidConfig_;
+  }
+
   PortalSubmissionAction evaluate(bool submissionValid) {
     if (submissionValid) {
       hasValidConfig_ = true;

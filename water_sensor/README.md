@@ -71,7 +71,8 @@ is connected.
 
 The checked setup was built with Arduino CLI 1.5.1, ESP32 core 3.3.11,
 ArduinoJson 7.4.3, PubSubClient 2.8, and WiFiManager 2.0.17. The repository
-includes `arduino-cli.yaml`; it places board and library data in `.arduino/`.
+includes `arduino-cli.yaml` for the Espressif board-index URL and uses the
+normal Arduino data and sketchbook directories for installed cores and libraries.
 
 ### Arduino CLI
 
@@ -83,7 +84,7 @@ present. On a fresh setup, install the declared versions:
 ./.tools/arduino-cli core install esp32:esp32@3.3.11 --config-file arduino-cli.yaml
 ./.tools/arduino-cli lib install ArduinoJson@7.4.3 PubSubClient@2.8 WiFiManager@2.0.17 --config-file arduino-cli.yaml
 ./.tools/arduino-cli compile --config-file arduino-cli.yaml \
-  --fqbn esp32:esp32:esp32c3:PartitionScheme=default \
+  --fqbn esp32:esp32:esp32c3:PartitionScheme=default,CDCOnBoot=cdc \
   --warnings all --output-dir build .
 ```
 
@@ -93,7 +94,7 @@ the board, for example (replace the port):
 
 ```bash
 ./.tools/arduino-cli upload --config-file arduino-cli.yaml \
-  --fqbn esp32:esp32:esp32c3:PartitionScheme=default \
+  --fqbn esp32:esp32:esp32c3:PartitionScheme=default,CDCOnBoot=cdc \
   --port /dev/ttyACM0 --input-dir build .
 ```
 
@@ -106,7 +107,9 @@ the board, for example (replace the port):
    and WiFiManager 2.0.17.
 4. Open this directory as the `water_sensor` sketch, select an ESP32-C3 board
    matching the hardware, select the **default** OTA-capable partition scheme,
-   then compile/upload. Review `HardwareConfig.h` before the first upload.
+   set **USB CDC On Boot** to **Enabled**, then compile/upload. Review
+   `HardwareConfig.h` before the first upload. Startup diagnostics and the
+   five-second status heartbeat use the USB serial monitor at 115200 baud.
 
 ## Provisioning, configuration, and recovery
 

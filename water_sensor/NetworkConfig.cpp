@@ -11,6 +11,12 @@ namespace {
 
 constexpr char PASSWORD_ATTRIBUTES[] =
     "type=\"password\" autocomplete=\"new-password\"";
+constexpr char REQUIRED_API_TOKEN_ATTRIBUTES[] =
+    "type=\"password\" autocomplete=\"new-password\" required "
+    "minlength=\"12\" maxlength=\"64\"";
+constexpr char OPTIONAL_API_TOKEN_ATTRIBUTES[] =
+    "type=\"password\" autocomplete=\"new-password\" "
+    "minlength=\"12\" maxlength=\"64\"";
 constexpr char BOOLEAN_ATTRIBUTES[] =
     "type=\"number\" min=\"0\" max=\"1\" step=\"1\"";
 constexpr char PORT_ATTRIBUTES[] =
@@ -22,7 +28,7 @@ constexpr char DEBOUNCE_ATTRIBUTES[] =
 constexpr char ALARM_ATTRIBUTES[] =
     "type=\"number\" min=\"10\" max=\"3600\" step=\"1\"";
 constexpr uint32_t NETWORK_TASK_STACK_BYTES = 8192;
-constexpr UBaseType_t NETWORK_TASK_PRIORITY = tskIDLE_PRIORITY;
+constexpr UBaseType_t NETWORK_TASK_PRIORITY = tskIDLE_PRIORITY + 1;
 
 template <size_t Capacity>
 bool copyText(char (&destination)[Capacity], const char* source) {
@@ -75,9 +81,13 @@ NetworkConfig::NetworkConfig()
           "mqtt_password", "MQTT password (leave blank to keep)", "", 64,
           PASSWORD_ATTRIBUTES),
       mqttTopicParam_("mqtt_topic", "MQTT base topic", "", 64),
-      apiTokenParam_(
-          "api_token", "API token (12-64 chars; blank keeps existing)", "", 64,
-          PASSWORD_ATTRIBUTES),
+      apiTokenRequiredParam_(
+          "api_token", "API token (required, 12-64 chars)", "", 64,
+          REQUIRED_API_TOKEN_ATTRIBUTES),
+      apiTokenOptionalParam_(
+          "api_token", "API token (blank keeps existing)", "", 64,
+          OPTIONAL_API_TOKEN_ATTRIBUTES),
+      apiTokenParam_(nullptr),
       wetThresholdParam_(
           "wet_threshold", "Wet threshold", "1200", 4, ADC_ATTRIBUTES),
       dryThresholdParam_(
@@ -96,7 +106,9 @@ NetworkConfig::NetworkConfig()
       handoffMutex_(nullptr),
       taskHandle_(nullptr),
       wifiConnected_(false),
+      wifiRssi_(0),
       portalActive_(false),
+      servicesReady_(false),
       taskStarted_(false),
       forcePortal_(false),
       handoffChanged_(false),
@@ -110,24 +122,31 @@ void NetworkConfig::begin(DeviceConfig& config, bool forcePortal) {
   if (taskStarted_) {
     return;
   }
-  taskStarted_ = true;
   currentConfig_ = config;
   handoffConfig_ = config;
   pendingConfig_ = config;
   submissionPolicy_ = PortalSubmissionPolicy(validateDeviceConfig(config).valid);
+  apiTokenParam_ = submissionPolicy_.requiresApiTokenInput()
+                       ? &apiTokenRequiredParam_
+                       : &apiTokenOptionalParam_;
   forcePortal_ = submissionPolicy_.shouldForcePortal(forcePortal);
   std::snprintf(apName_, sizeof(apName_), "%s-setup", config.deviceName);
   handoffMutex_ = xSemaphoreCreateMutex();
   if (handoffMutex_ == nullptr) {
+    Serial.println("[network] ERROR: could not create handoff mutex");
     return;
   }
 
-  xTaskCreate(networkTaskStatic,
-              "network-config",
-              NETWORK_TASK_STACK_BYTES,
-              this,
-              NETWORK_TASK_PRIORITY,
-              &taskHandle_);
+  const BaseType_t taskResult =
+      xTaskCreate(networkTaskStatic, "network-config", NETWORK_TASK_STACK_BYTES,
+                  this, NETWORK_TASK_PRIORITY, &taskHandle_);
+  if (taskResult != pdPASS) {
+    Serial.println("[network] ERROR: could not create network task");
+    return;
+  }
+  taskStarted_ = true;
+  Serial.printf("[network] task created at priority %u\n",
+                static_cast<unsigned>(NETWORK_TASK_PRIORITY));
 }
 
 void NetworkConfig::process() {
@@ -147,8 +166,16 @@ bool NetworkConfig::wifiConnected() const {
   return wifiConnected_.load(std::memory_order_acquire);
 }
 
+int32_t NetworkConfig::wifiRssi() const {
+  return wifiRssi_.load(std::memory_order_acquire);
+}
+
 bool NetworkConfig::portalActive() const {
   return portalActive_.load(std::memory_order_acquire);
+}
+
+bool NetworkConfig::servicesReady() const {
+  return servicesReady_.load(std::memory_order_acquire);
 }
 
 bool NetworkConfig::takeConfigChanged(DeviceConfig& output) {
@@ -171,12 +198,15 @@ void NetworkConfig::networkTaskStatic(void* context) {
 }
 
 void NetworkConfig::networkTask() {
+  Serial.println("[network] task running");
   copyConfigToBuffers(currentConfig_);
 
   callbackOwner_ = this;
-  wifiManager_.setDebugOutput(false);
+  wifiManager_.setDebugOutput(true, WM_DEBUG_NOTIFY);
   wifiManager_.setConfigPortalBlocking(false);
   wifiManager_.setConfigPortalTimeout(300);
+  wifiManager_.setWiFiAPChannel(1);
+  wifiManager_.setWiFiAPHidden(false);
   wifiManager_.setSaveParamsCallback(onSaveStatic);
 
   wifiManager_.addParameter(&deviceNameParam_);
@@ -186,19 +216,27 @@ void NetworkConfig::networkTask() {
   wifiManager_.addParameter(&mqttUserParam_);
   wifiManager_.addParameter(&mqttPasswordParam_);
   wifiManager_.addParameter(&mqttTopicParam_);
-  wifiManager_.addParameter(&apiTokenParam_);
+  wifiManager_.addParameter(apiTokenParam_);
   wifiManager_.addParameter(&wetThresholdParam_);
   wifiManager_.addParameter(&dryThresholdParam_);
   wifiManager_.addParameter(&debounceParam_);
   wifiManager_.addParameter(&alarmDurationParam_);
 
   WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   captureStoredWiFiCredentials();
   if (forcePortal_) {
+    Serial.printf("[network] starting forced portal: %s\n", apName_);
     wifiManager_.startConfigPortal(apName_);
   } else {
+    Serial.printf("[network] connecting saved Wi-Fi; fallback portal: %s\n",
+                  apName_);
     wifiManager_.autoConnect(apName_);
   }
+  const bool txPowerConfigured = WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  Serial.printf("[network] radio tx power: requested=8.5 dBm applied=%s actual=%d\n",
+                txPowerConfigured ? "yes" : "no",
+                static_cast<int>(WiFi.getTxPower()));
   publishNetworkStatus();
 
   for (;;) {
@@ -207,6 +245,17 @@ void NetworkConfig::networkTask() {
     if (captureCredentialsPending_) {
       captureStoredWiFiCredentials();
       captureCredentialsPending_ = false;
+      // The parameter callback runs before WiFiManager saves Wi-Fi credentials.
+      // Publish only after process() returns, so the main loop cannot reboot
+      // while WiFiManager is still handling the submitted network.
+      Serial.printf("[network] save processed: wifi_status=%d saved_ssid=%s\n",
+                    static_cast<int>(WiFi.status()),
+                    savedWifiSsid_.isEmpty() ? "absent" : "present");
+      if (xSemaphoreTake(handoffMutex_, portMAX_DELAY) == pdTRUE) {
+        handoffConfig_ = currentConfig_;
+        handoffChanged_ = true;
+        xSemaphoreGive(handoffMutex_);
+      }
     }
     publishNetworkStatus();
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -220,28 +269,55 @@ void NetworkConfig::onSave() {
   // WiFiManager keeps submitted values in its parameter buffers. Clear secrets
   // before the portal can render another page, regardless of validation result.
   mqttPasswordParam_.setValue("", sizeof(currentConfig_.mqttPassword) - 1);
-  apiTokenParam_.setValue("", sizeof(currentConfig_.apiToken) - 1);
+  apiTokenParam_->setValue("", sizeof(currentConfig_.apiToken) - 1);
   const PortalSubmissionAction action = submissionPolicy_.evaluate(valid);
   if (action != PortalSubmissionAction::PublishConfig) {
+    Serial.println(
+        "[config] rejected; correct the reported field and submit again");
     recoveryAction_ = action;
     recoveryPending_ = true;
     return;
   }
 
+  Serial.println("[config] accepted; applying network settings");
   currentConfig_ = candidate;
   captureCredentialsPending_ = true;
-  if (xSemaphoreTake(handoffMutex_, portMAX_DELAY) == pdTRUE) {
-    handoffConfig_ = candidate;
-    handoffChanged_ = true;
-    xSemaphoreGive(handoffMutex_);
-  }
 }
 
 void NetworkConfig::publishNetworkStatus() {
-  wifiConnected_.store(WiFi.status() == WL_CONNECTED,
-                       std::memory_order_release);
-  portalActive_.store(wifiManager_.getConfigPortalActive(),
-                      std::memory_order_release);
+  const bool connected = WiFi.status() == WL_CONNECTED;
+  const bool portalActive = wifiManager_.getConfigPortalActive();
+  const int32_t rssi = connected ? WiFi.RSSI() : 0;
+  const bool wasConnected = wifiConnected_.load(std::memory_order_acquire);
+  const bool wasPortalActive = portalActive_.load(std::memory_order_acquire);
+  wifiRssi_.store(rssi, std::memory_order_release);
+  wifiConnected_.store(connected, std::memory_order_release);
+  portalActive_.store(portalActive, std::memory_order_release);
+  servicesReady_.store(connected && !portalActive, std::memory_order_release);
+  if (connected != wasConnected) {
+    if (connected) {
+      Serial.printf("[network] connected: ip=%s rssi=%ld dBm\n",
+                    WiFi.localIP().toString().c_str(),
+                    static_cast<long>(rssi));
+    } else {
+      Serial.println("[network] disconnected");
+    }
+  }
+  if (portalActive != wasPortalActive) {
+    if (portalActive) {
+      const String actualSsid = WiFi.softAPSSID();
+      const String apMac = WiFi.softAPmacAddress();
+      Serial.printf(
+          "[network] portal active: ssid=%s actual_ssid=%s ip=%s mac=%s "
+          "mode=%u channel=%ld tx_power=%d\n",
+          apName_, actualSsid.c_str(), WiFi.softAPIP().toString().c_str(),
+          apMac.c_str(), static_cast<unsigned>(WiFi.getMode()),
+          static_cast<long>(WiFi.channel()),
+          static_cast<int>(WiFi.getTxPower()));
+    } else {
+      Serial.println("[network] portal stopped");
+    }
+  }
 }
 
 void NetworkConfig::handleSubmissionRecovery() {
@@ -250,6 +326,8 @@ void NetworkConfig::handleSubmissionRecovery() {
   }
   const PortalSubmissionAction action = recoveryAction_;
   recoveryPending_ = false;
+
+  Serial.println("[network] reopening setup portal after invalid settings");
 
   if (wifiManager_.getConfigPortalActive()) {
     wifiManager_.stopConfigPortal();
@@ -291,7 +369,7 @@ void NetworkConfig::copyConfigToBuffers(const DeviceConfig& config) {
   mqttPasswordParam_.setValue("", sizeof(config.mqttPassword) - 1);
   mqttTopicParam_.setValue(config.mqttBaseTopic,
                            sizeof(config.mqttBaseTopic) - 1);
-  apiTokenParam_.setValue("", sizeof(config.apiToken) - 1);
+  apiTokenParam_->setValue("", sizeof(config.apiToken) - 1);
   setUnsignedValue(wetThresholdParam_, config.wetThreshold, 4);
   setUnsignedValue(dryThresholdParam_, config.dryThreshold, 4);
   setUnsignedValue(debounceParam_, config.debounceMs, 5);
@@ -311,8 +389,9 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
       !copyText(candidate.mqttPassword, mqttPasswordParam_.getValue())) {
     return false;
   }
-  if (apiTokenParam_.getValue()[0] != '\0' &&
-      !copyText(candidate.apiToken, apiTokenParam_.getValue())) {
+  if (apiTokenParam_->getValue()[0] != '\0' &&
+      !copyText(candidate.apiToken, apiTokenParam_->getValue())) {
+    Serial.println("[config] invalid field: apiToken");
     return false;
   }
 
@@ -338,7 +417,9 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
   candidate.dryThreshold = static_cast<uint16_t>(dryThreshold);
   candidate.debounceMs = debounceMs;
   candidate.alarmDurationSeconds = alarmDurationSeconds;
-  if (!validateDeviceConfig(candidate).valid) {
+  const ConfigValidation validation = validateDeviceConfig(candidate);
+  if (!validation.valid) {
+    Serial.printf("[config] invalid field: %s\n", validation.field);
     return false;
   }
 

@@ -15,7 +15,7 @@ constexpr uint32_t STATUS_HEARTBEAT_MS = 60000;
 constexpr uint32_t STATUS_RETRY_MS = 1000;
 constexpr uint32_t RECONNECT_MAX_MS = 30000;
 constexpr uint32_t NETWORK_TASK_STACK_BYTES = 8192;
-constexpr UBaseType_t NETWORK_TASK_PRIORITY = tskIDLE_PRIORITY;
+constexpr UBaseType_t NETWORK_TASK_PRIORITY = tskIDLE_PRIORITY + 1;
 constexpr size_t COMMAND_BYTES = 24;
 
 bool isAsciiWhitespace(char value) {
@@ -109,22 +109,26 @@ void MqttService::begin() {
       formatTopic(resultTopic_, sizeof(resultTopic_), "command/result");
   if (!topicsValid_ || !config_.mqttEnabled) {
     if (!topicsValid_) {
-      Serial.println("MQTT disabled: topic is too long");
+      Serial.println("[mqtt] disabled: topic is too long");
+    } else {
+      Serial.println("[mqtt] disabled by configuration");
     }
     return;
   }
 
   handoffMutex_ = xSemaphoreCreateMutex();
   if (handoffMutex_ == nullptr) {
-    Serial.println("MQTT disabled: handoff allocation failed");
+    Serial.println("[mqtt] disabled: handoff allocation failed");
     return;
   }
   if (xTaskCreate(networkTaskStatic, "mqtt-service", NETWORK_TASK_STACK_BYTES,
                   this, NETWORK_TASK_PRIORITY, &taskHandle_) != pdPASS) {
-    Serial.println("MQTT disabled: task creation failed");
+    Serial.println("[mqtt] disabled: task creation failed");
     return;
   }
   taskStarted_ = true;
+  Serial.printf("[mqtt] task created at priority %u\n",
+                static_cast<unsigned>(NETWORK_TASK_PRIORITY));
 }
 
 void MqttService::process(uint32_t nowMs) {
@@ -229,6 +233,7 @@ void MqttService::networkTaskStatic(void* context) {
 }
 
 void MqttService::networkTask() {
+  Serial.println("[mqtt] task running");
   for (;;) {
     processNetwork(millis());
     vTaskDelay(pdMS_TO_TICKS(1));
