@@ -1,0 +1,125 @@
+# Canary hub: MQTT broker + backend API + web dashboard, sized for a Raspberry
+# Pi on 64-bit Raspberry Pi OS (arm64). Every image is multi-arch, so the same
+# file also runs on a laptop for development.
+#
+#   first run    scripts/pi_setup.sh [sensor-user ...]    # .env secrets + MQTT users
+#   start        docker compose up -d --build
+#   dashboard    http://<pi-ip>/          (also proxies /api, /health, /docs)
+#   API          http://<pi-ip>:8000      (REST + WebSocket, e.g. for the mobile app)
+#   simulators   docker compose --profile sim run --rm hw-sim --scenario co --fast
+#   logs         docker compose logs -f backend mosquitto
+#
+# RUNME.md walks through all of it; docs/HARDWARE.md is the MQTT/API contract.
+
+name: canary
+
+# Bounded json-file logs so a long-running Pi does not fill its SD card.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# The simulators log in as the backend's broker user "hub".
+x-sim-env: &sim-env
+  MQTT_HOST: mosquitto
+  MQTT_PORT: "1883"
+  MQTT_USERNAME: hub
+  MQTT_PASSWORD: ${CANARY_MQTT_PASSWORD:?run scripts/pi_setup.sh first}
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"   # plaintext MQTT for the ESP32 sensors: trusted LAN / IoT VLAN only
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro   # mosquitto.conf + generated passwd
+      - mosquitto_data:/mosquitto/data            # retained status/availability survive restarts
+    healthcheck:
+      # Checks the listening socket. An MQTT probe would need credentials and
+      # would log a connect/disconnect pair on every run.
+      test: ["CMD-SHELL", "netstat -ltn | grep -q ':1883 '"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    logging: *logging
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    # Secrets written by scripts/pi_setup.sh. Any other backend setting
+    # (CANARY_*, docs/HARDWARE.md section 6) can be added to .env as well.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # SQLite on a named volume. To use Postgres instead, set in .env e.g.
+      #   CANARY_DATABASE_URL=postgresql+asyncpg://canary:<password>@<host>:5432/canary
+      CANARY_DATABASE_URL: ${CANARY_DATABASE_URL:-sqlite+aiosqlite:////data/canary.db}
+      CANARY_MQTT_ENABLED: "true"
+      CANARY_MQTT_HOST: mosquitto
+      CANARY_MQTT_PORT: "1883"
+      CANARY_MQTT_USERNAME: hub
+      # Required: refuse to start rather than fall back to insecure defaults.
+      CANARY_MQTT_PASSWORD: ${CANARY_MQTT_PASSWORD:?run scripts/pi_setup.sh first}
+      CANARY_JWT_SECRET: ${CANARY_JWT_SECRET:?run scripts/pi_setup.sh first}
+    volumes:
+      - backend_data:/data
+    ports:
+      - "8000:8000"   # REST + WebSocket for the mobile app (the dashboard uses port 80)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging: *logging
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${CANARY_HTTP_PORT:-80}:80"   # dashboard; set CANARY_HTTP_PORT in .env if 80 is taken
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  # --- Simulators: profile "sim", never started by a plain `docker compose up` ---
+
+  # Firmware-accurate ESP32 air + water nodes (status documents of docs/HARDWARE.md).
+  #   docker compose --profile sim run --rm hw-sim --scenario co --fast
+  hw-sim:
+    build: ./simulator
+    profiles: ["sim"]
+    init: true
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment: *sim-env
+    command: ["--scenario", "normal"]
+
+  # Legacy canary.telemetry.v1 simulator (sensors of the seeded demo building).
+  #   docker compose --profile sim run --rm simulator --scenario gas_leak
+  simulator:
+    build: ./simulator
+    profiles: ["sim"]
+    init: true
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment: *sim-env
+    entrypoint: ["python", "simulate.py"]
+    command: ["--scenario", "gas_leak"]
+
+volumes:
+  mosquitto_data:
+  backend_data:
