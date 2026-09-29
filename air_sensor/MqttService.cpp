@@ -381,6 +381,18 @@ bool MqttService::connect(uint32_t nowMs) {
                            : mqttClient_.connect(clientId, availabilityTopic_, 1,
                                                  true, "offline");
   if (!success) {
+    // state(): -4 timeout, -2 no TCP connection (lookup or reachability),
+    // 4 bad user/password, 5 not authorised. The password is never logged.
+    IPAddress resolved;
+    const bool resolvedOk = WiFi.hostByName(networkConfig_.mqttHost, resolved) == 1;
+    Serial.printf(
+        "[mqtt] connect failed: host=%s -> %s port=%u user=%s state=%d; "
+        "retry in %lu ms\n",
+        networkConfig_.mqttHost,
+        resolvedOk ? resolved.toString().c_str() : "unresolved",
+        static_cast<unsigned>(networkConfig_.mqttPort),
+        useCredentials ? networkConfig_.mqttUser : "(none)",
+        mqttClient_.state(), static_cast<unsigned long>(reconnectDelayMs_));
     nextConnectMs_ = nowMs + reconnectDelayMs_;
     reconnectDelayMs_ = reconnectDelayMs_ < RECONNECT_MAX_MS / 2
                             ? reconnectDelayMs_ * 2
@@ -388,6 +400,8 @@ bool MqttService::connect(uint32_t nowMs) {
     return false;
   }
 
+  Serial.printf("[mqtt] connected to %s:%u as %s\n", networkConfig_.mqttHost,
+                static_cast<unsigned>(networkConfig_.mqttPort), clientId);
   mqttClient_.publish(availabilityTopic_, "online", true);
   mqttClient_.subscribe(buzzerCommandTopic_, 1);
   connected_.store(true, std::memory_order_release);

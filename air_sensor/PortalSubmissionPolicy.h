@@ -29,8 +29,11 @@ class PortalSubmissionPolicy {
                : PortalSubmissionAction::ClearCredentialsAndRestart;
   }
 
-  bool takePublishReady(bool wifiConnected) {
-    if (!publishPending_ || !wifiConnected) {
+  // Call after WiFiManager::process() has returned from the save that was
+  // accepted. Wi-Fi need not be connected: a parameters-only save never
+  // reconnects, and the restart that applies the settings reconnects anyway.
+  bool takePublishReady() {
+    if (!publishPending_) {
       return false;
     }
     publishPending_ = false;

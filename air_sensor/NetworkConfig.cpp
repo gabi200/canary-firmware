@@ -240,8 +240,10 @@ void NetworkConfig::networkTask() {
   for (;;) {
     wifiManager_.process();
     handleSubmissionRecovery();
-    if (captureCredentialsPending_ &&
-        submissionPolicy_.takePublishReady(WiFi.status() == WL_CONNECTED)) {
+    // The parameter callback runs before WiFiManager handles any submitted
+    // Wi-Fi network. Publish once process() has returned, so the main loop
+    // cannot restart while WiFiManager is still saving credentials.
+    if (captureCredentialsPending_ && submissionPolicy_.takePublishReady()) {
       captureStoredWiFiCredentials();
       captureCredentialsPending_ = false;
       if (xSemaphoreTake(handoffMutex_, portMAX_DELAY) == pdTRUE) {
@@ -282,7 +284,7 @@ void NetworkConfig::onSave() {
     return;
   }
 
-  Serial.println("[config] accepted; waiting for Wi-Fi before applying");
+  Serial.println("[config] accepted; applying settings");
   currentConfig_ = candidate;
   captureCredentialsPending_ = true;
 }

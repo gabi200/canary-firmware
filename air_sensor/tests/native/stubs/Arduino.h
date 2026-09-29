@@ -30,6 +30,8 @@ class FakeSerial {
  public:
   template <typename T>
   void println(const T&) {}
+  template <typename... Args>
+  void printf(const char*, Args...) {}
 };
 
 
