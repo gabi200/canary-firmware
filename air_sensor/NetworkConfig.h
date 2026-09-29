@@ -31,6 +31,7 @@ class NetworkConfig {
   void onSave();
   void networkTask();
   void publishNetworkStatus();
+  void startDiscovery();
   void handleSubmissionRecovery();
   void captureStoredWiFiCredentials();
   void restoreStoredWiFiCredentials();
@@ -75,4 +76,6 @@ class NetworkConfig {
   bool captureCredentialsPending_;
   PortalSubmissionAction recoveryAction_;
   char apName_[40];
+  char hostname_[33];
+  bool discoveryStarted_;
 };

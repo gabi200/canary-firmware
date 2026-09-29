@@ -58,6 +58,13 @@ uint32_t lastConfigSaveAttemptMs = 0;
 bool rebootScheduled = false;
 uint32_t rebootScheduledAtMs = 0;
 bool networkServicesStarted = false;
+bool configButtonWasPressed = false;
+uint32_t configButtonPressedAtMs = 0;
+
+// Survives ESP.restart() but not a power cycle, so a runtime button hold can
+// ask the next boot to open the setup portal.
+constexpr uint32_t PORTAL_REQUEST_MARKER = 0x504F5254;  // "PORT"
+RTC_NOINIT_ATTR uint32_t portalRequestMarker;
 
 bool elapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t intervalMs) {
   return static_cast<uint32_t>(nowMs - sinceMs) >= intervalMs;
@@ -219,6 +226,7 @@ void processConfigurationSave(uint32_t nowMs) {
   }
 
   if (configStore->saveConfig(pendingDeviceConfig)) {
+    Serial.println("[config] saved; restarting to apply");
     deviceConfig = pendingDeviceConfig;
     configSavePending = false;
     configSaveImmediate = false;
@@ -227,6 +235,7 @@ void processConfigurationSave(uint32_t nowMs) {
     return;
   }
 
+  Serial.println("[config] save failed; retrying");
   configSaveImmediate = false;
   lastConfigSaveAttemptMs = nowMs;
 }
@@ -247,8 +256,14 @@ bool configButtonPressed() {
 
 // GPIO0 is a boot strapping pin, so holding it through reset enters the ROM
 // download mode instead of this firmware. The portal is therefore requested by
-// holding the button for a window just after boot.
+// holding the button while the firmware runs (see pollConfigButton), which
+// restarts with a marker, or by a hold already in progress when setup() runs.
 bool configPortalRequested() {
+  if (portalRequestMarker == PORTAL_REQUEST_MARKER) {
+    portalRequestMarker = 0;
+    return true;
+  }
+  portalRequestMarker = 0;
   if (!configButtonPressed()) {
     return false;
   }
@@ -260,6 +275,27 @@ bool configPortalRequested() {
     delay(10);
   }
   return true;
+}
+
+void pollConfigButton(uint32_t nowMs) {
+  if (!configButtonPressed()) {
+    configButtonWasPressed = false;
+    return;
+  }
+  if (!configButtonWasPressed) {
+    configButtonWasPressed = true;
+    configButtonPressedAtMs = nowMs;
+    return;
+  }
+  if (!elapsed(nowMs, configButtonPressedAtMs, Hardware::CONFIG_BUTTON_HOLD_MS) ||
+      configSavePending ||
+      (networkServicesStarted && httpApi->otaInProgress())) {
+    return;
+  }
+  Serial.println("[config] button held; restarting into setup portal");
+  portalRequestMarker = PORTAL_REQUEST_MARKER;
+  applyOutputs(nowMs);
+  ESP.restart();
 }
 
 void configureLedPin(uint8_t pin) {
@@ -323,6 +359,11 @@ void setup() {
   applyOutputs(millis());
 
   const bool forcePortal = configPortalRequested();
+  Serial.printf("[boot] air-sensor firmware %s, stored api_token length=%u%s\n",
+                Hardware::FIRMWARE_VERSION,
+                static_cast<unsigned>(
+                    strnlen(deviceConfig.apiToken, sizeof(deviceConfig.apiToken))),
+                forcePortal ? ", opening setup portal" : "");
   networkConfig = std::make_unique<NetworkConfig>();
   httpApi = std::make_unique<HttpApi>(deviceConfig, *controller, runtimeStatus,
                                       notifyStateChanged);
@@ -341,6 +382,7 @@ void loop() {
     notifyStateChanged();
   }
   applyOutputs(nowMs);
+  pollConfigButton(nowMs);
 
   networkConfig->process();
   if (!networkServicesStarted && networkConfig->ready()) {

@@ -20,23 +20,23 @@ alarm and does not replace one.
   firmware and these sensor modules are not. Install listed, certified alarms
   for life safety and treat this device as an additional early-warning and
   logging aid.
-- **Check the ESP32-S3 module part number before trusting the LED pins.**
-  GPIO35, GPIO36, and GPIO37 carry the extra data lines of an in-package Octal
-  SPI PSRAM. On any module whose suffix is `R8` or `R16V` (N4R8, N8R8, N16R8,
-  N16R16VA, and every WROOM-2), those pins are wired to the PSRAM and are not
-  usable, even though the DevKitC-1 silkscreen exposes them on header J3.
-  Every Espressif-branded ESP32-S3-DevKitC-1 SKU ships with Octal PSRAM, so on
-  a genuine DevKitC-1 the green (GPIO36) and red (GPIO37) channels will not
-  work: `analogWrite()` returns normally and the pin drives nothing, with no
-  light and no error. Modules with Quad PSRAM or no PSRAM (N4, N8, N16, N4R2,
-  N8R2, N16R2) leave those pins free, which is the wiring the compiled
-  defaults assume. Read the part number printed on the module shield before
-  wiring, and cross-check it against the PSRAM line in the core's boot log or
-  a sketch that prints `ESP.getPsramSize()`. If the module has Octal PSRAM,
-  switch to the commented-out alternative set in `HardwareConfig.h` (GPIO21
-  red, GPIO47 green, GPIO48 blue) and rewire.
-- GPIO38 also drives the onboard addressable RGB LED on DevKitC-1 v1.1, so a
-  discrete blue LED on that pin shares it with the onboard one.
+- **The LED uses GPIO21 (red), GPIO47 (green), and GPIO48 (blue).** These
+  avoid GPIO35, GPIO36, and GPIO37, which carry the extra data lines of an
+  in-package Octal SPI PSRAM. On any module whose suffix is `R8` or `R16V`
+  (N4R8, N8R8, N16R8, N16R16VA, and every WROOM-2), those three pins are wired
+  to the PSRAM and are not usable, even though the DevKitC-1 silkscreen exposes
+  them on header J3; `analogWrite()` to them returns normally and drives
+  nothing, with no light and no error. Every Espressif-branded
+  ESP32-S3-DevKitC-1 SKU ships with Octal PSRAM, so the compiled pins work on
+  those boards and on modules with Quad PSRAM or none. `HardwareConfig.h` keeps
+  the older GPIO37/36/38 set commented out; use it only on a module without
+  Octal PSRAM (N4, N8, N16, N4R2, N8R2, N16R2), and confirm the PSRAM type from
+  the part number on the module shield and the core's boot log first.
+- GPIO48 also drives the onboard addressable RGB LED on DevKitC-1 v1.0, so on
+  that board revision the discrete blue LED shares its pin with the onboard
+  one (v1.1 moved the onboard LED to GPIO38). On `R16V` modules GPIO47 and
+  GPIO48 switch at 1.8 V instead of 3.3 V, so size the LED series resistors or
+  add a driver accordingly.
 - GPIO39 is MTCK and has a weak internal pull-up enabled at reset. An
   active-high buzzer stage can therefore chirp from power-on until `setup()`
   drives the pin low. Add an external pull-down resistor at the driver input
@@ -82,7 +82,8 @@ alarm and does not replace one.
   installation depends on the sensors still being alive.
 - GPIO0 is an ESP32-S3 boot strapping pin, so it cannot be held during reset
   without entering the ROM download mode. The config portal is requested by
-  **holding the button for 3 seconds shortly after boot**, not during reset.
+  **holding the button for 3 seconds while the device is running**, not
+  during reset.
 
 ## Hardware and wiring
 
@@ -99,9 +100,9 @@ wiring; read the LED-pin warning above first.
 | PMS5003T UART2 receive (sensor TX) | GPIO13 | `PARTICULATE_RX_PIN`, 9600 8N1 |
 | PMS5003T UART2 transmit (sensor RX) | GPIO14 | `PARTICULATE_TX_PIN` |
 | MQ5 analog output | GPIO10 | `GAS_ADC_PIN`, ADC1_CH9, 12-bit, 11 dB |
-| RGB LED red | GPIO37 | `LED_RED_PIN`, PWM 5 kHz, 8-bit |
-| RGB LED green | GPIO36 | `LED_GREEN_PIN` |
-| RGB LED blue | GPIO38 | `LED_BLUE_PIN`, `LED_COMMON_ANODE = false` |
+| RGB LED red | GPIO21 | `LED_RED_PIN`, PWM 5 kHz, 8-bit |
+| RGB LED green | GPIO47 | `LED_GREEN_PIN` |
+| RGB LED blue | GPIO48 | `LED_BLUE_PIN`, `LED_COMMON_ANODE = false` |
 | Active-buzzer driver | GPIO39 | `BUZZER_ACTIVE_HIGH = true` |
 | Config button | GPIO0 | `CONFIG_BUTTON_ACTIVE_LOW = true`, `INPUT_PULLUP` |
 
@@ -155,7 +156,7 @@ drained at most 192 bytes per pass through `loop()`, so one chatty sensor
 cannot starve the others. Never open a sensor UART without explicit pins:
 `Serial2` defaults to GPIO19/20, which are the USB data pins.
 
-**LED and buzzer.** GPIO37/36/38 drive the LED through `analogWrite()` at 5 kHz
+**LED and buzzer.** GPIO21/47/48 drive the LED through `analogWrite()` at 5 kHz
 with 8-bit resolution. `LED_COMMON_ANODE` is `false`, so a common-anode LED
 needs that flag flipped as well as suitable series resistors. GPIO39 is
 intended for an active buzzer or its driver; use a transistor driver when the
@@ -246,8 +247,8 @@ the port):
 4. Open this directory as the `air_sensor` sketch, select an ESP32-S3 board
    matching the hardware, set **USB CDC On Boot** to **Enabled**, select the
    **default** OTA-capable partition scheme, then compile/upload. Review
-   `HardwareConfig.h` before the first upload, and confirm the module's PSRAM
-   type before trusting the LED pins.
+   `HardwareConfig.h` before the first upload, and read the LED-pin note above
+   before switching to the alternative LED pins.
 
 ## Provisioning, configuration, and recovery
 
@@ -296,9 +297,11 @@ one has them cleared. A successful save is written to NVS and the device then
 restarts to apply it.
 
 To reopen provisioning later, press and hold the config button for 3 seconds
-shortly after the device starts. GPIO0 is a boot strapping pin, so holding it
-through reset enters the ROM download mode instead of this firmware; the hold
-window is sampled during `setup()`, after boot. With the shipped defaults the
+at any time while the device is running. The device restarts straight into the
+setup portal. GPIO0 is a boot strapping pin, so do not hold it while powering
+on or pressing reset: that enters the ROM download mode instead of this
+firmware. The hold is ignored while an OTA upload or a configuration save is in
+progress. With the shipped defaults the
 button is active-low and uses the internal pull-up, so hold it to GND. Do not
 assume another board's BOOT button is wired identically without checking it.
 
@@ -361,6 +364,20 @@ export BROKER=broker.example.invalid
 `DEVICE_IP`, `API_TOKEN`, `BROKER`, `USER`, and `PASS` are documentation
 metavariables. The sample IP and broker names are documentation-only values.
 `API_TOKEN` is the portal token; `USER` and `PASS` are MQTT broker credentials.
+
+### Finding the device without its IP
+
+The address DHCP hands out can change, so the device also answers by name over
+mDNS once it joins Wi-Fi. The host name is the configured device name lowercased,
+with every run of characters other than letters and digits turned into one
+hyphen (`canary` by default, `canary-air` if nothing usable remains). Use
+`http://<name>.local` wherever this guide says `$DEVICE_IP`, for example
+`export DEVICE_IP=canary.local`. Every Canary sensor also advertises a
+`_canary._tcp` service on port 80 with TXT records `type=air`, `fw` and
+`api=/api/status`, so a client can list all sensors with
+`avahi-browse -rt _canary._tcp` (Linux) or `dns-sd -B _canary._tcp` (macOS)
+instead of storing addresses. Give each device a unique name so the `.local`
+names do not collide.
 
 Do not put `API_TOKEN` or `PASS` in a shell command, shell history, source
 control, or a `mosquitto_* -P` argument: command arguments can be exposed to
@@ -541,18 +558,22 @@ compiled firmware `.bin`. The page does not store the token. Alternatively:
 
 ```bash
 # Expected 401 and no write: missing Authorization header.
-curl -i -X POST -F 'firmware=@build/air_sensor.ino.bin' \
+curl -i -X POST -H 'Expect:' -F 'firmware=@build/air_sensor.ino.bin' \
   http://$DEVICE_IP/api/ota
 
 # Expected OTA error: deliberately not a firmware image.
-curl -i -X POST --config "$HTTP_CURL_CONFIG" \
+curl -i -X POST --config "$HTTP_CURL_CONFIG" -H 'Expect:' \
   -F 'firmware=@HardwareConfig.h' \
   http://$DEVICE_IP/api/ota
 
 # Expected success response: {"ok":true,"rebooting":true}.
-curl -i -X POST --config "$HTTP_CURL_CONFIG" \
+curl -i -X POST --config "$HTTP_CURL_CONFIG" -H 'Expect:' \
   -F 'firmware=@build/air_sensor.ino.bin' http://$DEVICE_IP/api/ota
 ```
+
+`-H 'Expect:'` stops curl from pausing about a second before a large upload to
+wait for a `100 Continue` reply the firmware does not send; without it the
+device's 1-second idle limit fails the upload with `Firmware upload timed out`.
 
 The OTA request authenticates before any flash write begins, and rejects a
 second concurrent upload with `ota_active`. **An OTA does not mute a live
@@ -591,8 +612,9 @@ Record the observed results and installation details below only after testing
 the actual board, sensors, LED, and buzzer.
 
 - [ ] Record the ESP32-S3 module part number and PSRAM type. Confirm all three
-  LED channels actually light; on an `R8` or `R16V` module GPIO36 and GPIO37
-  drive nothing and the alternative pin set is required.
+  LED channels (GPIO21, GPIO47, GPIO48) actually light. If the alternative
+  GPIO37/36/38 set is in use, confirm the module has no Octal PSRAM: on an `R8`
+  or `R16V` module GPIO36 and GPIO37 drive nothing.
 - [ ] From power-on until `setup()` completes, confirm the buzzer stays
   silent; add an external pull-down on GPIO39 if it chirps.
 - [ ] With the MQ5 heater at temperature, measure the divider output at the
@@ -628,8 +650,8 @@ the actual board, sensors, LED, and buzzer.
 - [ ] Confirm an OTA does not mute a live alarm, that a valid image reboots
   into the intended firmware version, and that a failed upload leaves the
   prior firmware bootable.
-- [ ] Confirm holding the config button for 3 seconds shortly after boot opens
-  the `canary-setup` portal, and that holding it through reset instead enters
+- [ ] Confirm holding the config button for 3 seconds while running restarts
+  into the `<device-name>-setup` portal, and that holding it through reset instead enters
   the ROM download mode.
 - [ ] Confirm an invalid portal submission reopens the portal without saving,
   and that a valid save persists across restart.

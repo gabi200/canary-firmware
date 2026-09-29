@@ -161,6 +161,20 @@ export BROKER=broker.example.invalid
 metavariables. The sample IP and broker names are documentation-only values.
 `API_TOKEN` is the portal token; `USER` and `PASS` are MQTT broker credentials.
 
+### Finding the device without its IP
+
+The address DHCP hands out can change, so the device also answers by name over
+mDNS once it joins Wi-Fi. The host name is the configured device name lowercased,
+with every run of characters other than letters and digits turned into one
+hyphen (`water-sensor` by default, `canary-water` if nothing usable remains). Use
+`http://<name>.local` wherever this guide says `$DEVICE_IP`, for example
+`export DEVICE_IP=water-sensor.local`. Every Canary sensor also advertises a
+`_canary._tcp` service on port 80 with TXT records `type=water`, `fw` and
+`api=/api/status`, so a client can list all sensors with
+`avahi-browse -rt _canary._tcp` (Linux) or `dns-sd -B _canary._tcp` (macOS)
+instead of storing addresses. Give each device a unique name so the `.local`
+names do not collide.
+
 Do not put `API_TOKEN` or `PASS` in a shell command, shell history, source
 control, or a `mosquitto_* -P` argument: command arguments can be exposed to
 other local processes. Put secrets in permission-restricted client option files
@@ -317,18 +331,22 @@ compiled firmware `.bin`. The page does not store the token. Alternatively:
 
 ```bash
 # Expected 401 and no write: missing Authorization header.
-curl -i -X POST -F 'firmware=@build/water_sensor.ino.bin' \
+curl -i -X POST -H 'Expect:' -F 'firmware=@build/water_sensor.ino.bin' \
   http://$DEVICE_IP/api/ota
 
 # Expected OTA error and a closed valve: deliberately not a firmware image.
-curl -i -X POST --config "$HTTP_CURL_CONFIG" \
+curl -i -X POST --config "$HTTP_CURL_CONFIG" -H 'Expect:' \
   -F 'firmware=@docs/superpowers/specs/2026-09-02-esp32-c3-water-leak-controller-design.md' \
   http://$DEVICE_IP/api/ota
 
 # Expected success response: {"ok":true,"rebooting":true}.
-curl -i -X POST --config "$HTTP_CURL_CONFIG" \
+curl -i -X POST --config "$HTTP_CURL_CONFIG" -H 'Expect:' \
   -F 'firmware=@build/water_sensor.ino.bin' http://$DEVICE_IP/api/ota
 ```
+
+`-H 'Expect:'` stops curl from pausing about a second before a large upload to
+wait for a `100 Continue` reply the firmware does not send; without it the
+device's 1-second idle limit fails the upload with `Firmware upload timed out`.
 
 The OTA request authenticates before writes begin. It forces and persists the
 valve closed, blocks valve-open requests during upload, and reboots after a

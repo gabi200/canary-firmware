@@ -1,6 +1,7 @@
 #include "AirController.h"
 #include "Auth.h"
 #include "DeviceConfig.h"
+#include "Hostname.h"
 #include "MqttService.h"
 #include "MqttServiceTestSupport.h"
 #include "OutputLogic.h"
@@ -667,6 +668,23 @@ void testMqttStatusSerializationRetriesWithoutErrorFlooding() {
 
 }  // namespace
 
+static void testHostnameSanitizesDeviceName() {
+  char host[33];
+  makeHostname("Kitchen Sink #2", "fallback", host, sizeof(host));
+  CHECK(std::strcmp(host, "kitchen-sink-2") == 0);
+  makeHostname("--Water__Sensor--", "fallback", host, sizeof(host));
+  CHECK(std::strcmp(host, "water-sensor") == 0);
+  makeHostname("!!!", "fallback", host, sizeof(host));
+  CHECK(std::strcmp(host, "fallback") == 0);
+  makeHostname("", "fallback", host, sizeof(host));
+  CHECK(std::strcmp(host, "fallback") == 0);
+  char small[6];
+  makeHostname("ab cd ef", "fallback", small, sizeof(small));
+  CHECK(std::strcmp(small, "ab-cd") == 0);
+  makeHostname("abcd efgh", "fallback", small, sizeof(small));
+  CHECK(std::strcmp(small, "abcd") == 0);
+}
+
 int main() {
   testStartupIsWarmupAndSilent();
   testWarmupSuppressesAlarmsAndPeaks();
@@ -698,6 +716,7 @@ int main() {
   testMqttSilenceIsAppliedOnTheSafetyLoop();
   testMqttReportsRejectedAndUnknownCommands();
   testMqttStatusSerializationRetriesWithoutErrorFlooding();
+  testHostnameSanitizesDeviceName();
   if (failures) return EXIT_FAILURE;
   std::cout << "All native tests passed\n";
   return EXIT_SUCCESS;

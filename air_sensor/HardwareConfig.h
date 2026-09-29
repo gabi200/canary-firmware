@@ -42,7 +42,7 @@ constexpr uint32_t PARTICULATE_BAUD = 9600;
 // scale. Size the divider so the MQ5's full 5 V swing lands at or below 2.5 V.
 constexpr uint8_t GAS_ADC_PIN = 10;
 
-// WARNING - check the module part number before trusting these three pins.
+// WARNING - check the module part number before using the alternative pins.
 // GPIO33-GPIO37 carry the extra data lines of an in-package Octal SPI PSRAM.
 // On any module whose suffix is R8 or R16V (N8R8, N16R8, N16R16VA, every
 // WROOM-2), GPIO35/36/37 are wired to that PSRAM and are NOT usable, even
@@ -51,16 +51,17 @@ constexpr uint8_t GAS_ADC_PIN = 10;
 // pin fails silently: no light, no error.
 //
 // Modules with Quad PSRAM or no PSRAM (N4, N8, N16, N4R2, N8R2, N16R2) leave
-// these pins free, which is the wiring assumed here.
+// these pins free.
 //
-// If the LED stays dark on an R8/R16V module, switch to the alternative set
-// below. GPIO38 also drives the onboard addressable RGB LED on DevKitC-1
-// v1.1, so a discrete blue LED shares that pin with it.
+// The compiled set avoids GPIO35-37, so it works on every module. GPIO48 also
+// drives the onboard addressable RGB LED on DevKitC-1 v1.0, and on R16V
+// modules GPIO47/48 switch at 1.8 V.
 // Octal-PSRAM-safe pin set, matching this unit's physical wiring.
 constexpr uint8_t LED_RED_PIN = 21;
 constexpr uint8_t LED_GREEN_PIN = 47;
 constexpr uint8_t LED_BLUE_PIN = 48;
-// Original pin set for modules with Quad PSRAM or no PSRAM:
+// Original pin set, only for modules with Quad PSRAM or no PSRAM. GPIO38 also
+// drives the onboard addressable RGB LED on DevKitC-1 v1.1:
 // constexpr uint8_t LED_RED_PIN = 37;
 // constexpr uint8_t LED_GREEN_PIN = 36;
 // constexpr uint8_t LED_BLUE_PIN = 38;
@@ -75,8 +76,8 @@ constexpr uint8_t BUZZER_PIN = 39;
 constexpr bool BUZZER_ACTIVE_HIGH = true;
 
 // GPIO0 is the ESP32-S3 boot strapping pin, so it cannot be held during reset
-// without entering the ROM download mode. The button is therefore sampled for
-// a hold window just after boot instead.
+// without entering the ROM download mode. A hold while the firmware runs
+// restarts into the setup portal instead.
 constexpr uint8_t CONFIG_BUTTON_PIN = 0;
 constexpr bool CONFIG_BUTTON_ACTIVE_LOW = true;
 constexpr uint32_t CONFIG_BUTTON_HOLD_MS = 3000;

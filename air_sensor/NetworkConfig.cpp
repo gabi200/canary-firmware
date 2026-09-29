@@ -1,5 +1,9 @@
 #include "NetworkConfig.h"
 
+#include "HardwareConfig.h"
+#include "Hostname.h"
+
+#include <ESPmDNS.h>
 #include <WiFi.h>
 
 #include <cerrno>
@@ -119,7 +123,9 @@ NetworkConfig::NetworkConfig()
       recoveryPending_(false),
       captureCredentialsPending_(false),
       recoveryAction_(PortalSubmissionAction::ClearCredentialsAndRestart),
-      apName_{} {}
+      apName_{},
+      hostname_{},
+      discoveryStarted_(false) {}
 
 void NetworkConfig::begin(DeviceConfig& config, bool forcePortal) {
   if (taskStarted_) {
@@ -132,6 +138,7 @@ void NetworkConfig::begin(DeviceConfig& config, bool forcePortal) {
   submissionPolicy_ = PortalSubmissionPolicy(validateDeviceConfig(config).valid);
   forcePortal_ = submissionPolicy_.shouldForcePortal(forcePortal);
   std::snprintf(apName_, sizeof(apName_), "%s-setup", config.deviceName);
+  makeHostname(config.deviceName, "canary-air", hostname_, sizeof(hostname_));
   handoffMutex_ = xSemaphoreCreateMutex();
   if (handoffMutex_ == nullptr) {
     return;
@@ -217,9 +224,12 @@ void NetworkConfig::networkTask() {
   wifiManager_.addParameter(&pm10DangerParam_);
   wifiManager_.addParameter(&silenceParam_);
 
+  // Set before the STA interface starts so DHCP registers the name too.
+  WiFi.setHostname(hostname_);
   WiFi.mode(WIFI_STA);
   captureStoredWiFiCredentials();
   if (forcePortal_) {
+    Serial.printf("[network] starting setup portal: %s\n", apName_);
     wifiManager_.startConfigPortal(apName_);
   } else {
     wifiManager_.autoConnect(apName_);
@@ -237,6 +247,7 @@ void NetworkConfig::networkTask() {
       if (xSemaphoreTake(handoffMutex_, portMAX_DELAY) == pdTRUE) {
         handoffConfig_ = currentConfig_;
         handoffChanged_ = true;
+        Serial.println("[config] portal settings handed to main loop");
         xSemaphoreGive(handoffMutex_);
       }
     }
@@ -246,6 +257,15 @@ void NetworkConfig::networkTask() {
 }
 
 void NetworkConfig::onSave() {
+  // Log only the token's length: the value itself must never reach the console.
+  const size_t submittedTokenLength =
+      strnlen(apiTokenParam_.getValue(), sizeof(currentConfig_.apiToken));
+  if (submittedTokenLength == 0) {
+    Serial.println("[config] portal save: api_token blank, keeping stored token");
+  } else {
+    Serial.printf("[config] portal save: api_token submitted, length=%u\n",
+                  static_cast<unsigned>(submittedTokenLength));
+  }
   DeviceConfig candidate{};
   const bool valid = copyBuffersToConfig(candidate);
 
@@ -255,20 +275,47 @@ void NetworkConfig::onSave() {
   apiTokenParam_.setValue("", sizeof(currentConfig_.apiToken) - 1);
   const PortalSubmissionAction action = submissionPolicy_.evaluate(valid);
   if (action != PortalSubmissionAction::PublishConfig) {
+    Serial.println(
+        "[config] rejected; correct the reported field and submit again");
     recoveryAction_ = action;
     recoveryPending_ = true;
     return;
   }
 
+  Serial.println("[config] accepted; waiting for Wi-Fi before applying");
   currentConfig_ = candidate;
   captureCredentialsPending_ = true;
 }
 
 void NetworkConfig::publishNetworkStatus() {
-  wifiConnected_.store(WiFi.status() == WL_CONNECTED,
-                       std::memory_order_release);
-  portalActive_.store(wifiManager_.getConfigPortalActive(),
-                      std::memory_order_release);
+  const bool connected = WiFi.status() == WL_CONNECTED;
+  const bool portalActive = wifiManager_.getConfigPortalActive();
+  wifiConnected_.store(connected, std::memory_order_release);
+  portalActive_.store(portalActive, std::memory_order_release);
+  if (connected && !portalActive) {
+    startDiscovery();
+  }
+}
+
+void NetworkConfig::startDiscovery() {
+  if (discoveryStarted_) {
+    return;
+  }
+  // Started once: the ESP-IDF responder follows later DHCP address changes
+  // and reconnects on its own, so clients can keep using <hostname>.local.
+  if (!MDNS.begin(hostname_)) {
+    Serial.println("[network] ERROR: could not start mDNS responder");
+    return;
+  }
+  discoveryStarted_ = true;
+  MDNS.setInstanceName(hostname_);
+  MDNS.addService("http", "tcp", 80);
+  MDNS.addService("canary", "tcp", 80);
+  MDNS.addServiceTxt("canary", "tcp", "type", "air");
+  MDNS.addServiceTxt("canary", "tcp", "fw", Hardware::FIRMWARE_VERSION);
+  MDNS.addServiceTxt("canary", "tcp", "api", "/api/status");
+  Serial.printf("[network] mDNS: http://%s.local (_canary._tcp type=air)\n",
+                hostname_);
 }
 
 void NetworkConfig::handleSubmissionRecovery() {
@@ -346,6 +393,7 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
   }
   if (apiTokenParam_.getValue()[0] != '\0' &&
       !copyText(candidate.apiToken, apiTokenParam_.getValue())) {
+    Serial.println("[config] invalid field: apiToken");
     return false;
   }
 
@@ -388,7 +436,9 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
   candidate.pm10WarnUgm3 = static_cast<uint16_t>(pm10Warn);
   candidate.pm10DangerUgm3 = static_cast<uint16_t>(pm10Danger);
   candidate.alarmSilenceSeconds = silenceSeconds;
-  if (!validateDeviceConfig(candidate).valid) {
+  const ConfigValidation validation = validateDeviceConfig(candidate);
+  if (!validation.valid) {
+    Serial.printf("[config] invalid field: %s\n", validation.field);
     return false;
   }
 

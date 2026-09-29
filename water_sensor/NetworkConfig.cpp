@@ -1,5 +1,9 @@
 #include "NetworkConfig.h"
 
+#include "HardwareConfig.h"
+#include "Hostname.h"
+
+#include <ESPmDNS.h>
 #include <WiFi.h>
 
 #include <cerrno>
@@ -116,7 +120,9 @@ NetworkConfig::NetworkConfig()
       recoveryPending_(false),
       captureCredentialsPending_(false),
       recoveryAction_(PortalSubmissionAction::ClearCredentialsAndRestart),
-      apName_{} {}
+      apName_{},
+      hostname_{},
+      discoveryStarted_(false) {}
 
 void NetworkConfig::begin(DeviceConfig& config, bool forcePortal) {
   if (taskStarted_) {
@@ -131,6 +137,7 @@ void NetworkConfig::begin(DeviceConfig& config, bool forcePortal) {
                        : &apiTokenOptionalParam_;
   forcePortal_ = submissionPolicy_.shouldForcePortal(forcePortal);
   std::snprintf(apName_, sizeof(apName_), "%s-setup", config.deviceName);
+  makeHostname(config.deviceName, "canary-water", hostname_, sizeof(hostname_));
   handoffMutex_ = xSemaphoreCreateMutex();
   if (handoffMutex_ == nullptr) {
     Serial.println("[network] ERROR: could not create handoff mutex");
@@ -222,6 +229,8 @@ void NetworkConfig::networkTask() {
   wifiManager_.addParameter(&debounceParam_);
   wifiManager_.addParameter(&alarmDurationParam_);
 
+  // Set before the STA interface starts so DHCP registers the name too.
+  WiFi.setHostname(hostname_);
   WiFi.mode(WIFI_STA);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
   captureStoredWiFiCredentials();
@@ -294,6 +303,9 @@ void NetworkConfig::publishNetworkStatus() {
   wifiConnected_.store(connected, std::memory_order_release);
   portalActive_.store(portalActive, std::memory_order_release);
   servicesReady_.store(connected && !portalActive, std::memory_order_release);
+  if (connected && !portalActive) {
+    startDiscovery();
+  }
   if (connected != wasConnected) {
     if (connected) {
       Serial.printf("[network] connected: ip=%s rssi=%ld dBm\n",
@@ -318,6 +330,27 @@ void NetworkConfig::publishNetworkStatus() {
       Serial.println("[network] portal stopped");
     }
   }
+}
+
+void NetworkConfig::startDiscovery() {
+  if (discoveryStarted_) {
+    return;
+  }
+  // Started once: the ESP-IDF responder follows later DHCP address changes
+  // and reconnects on its own, so clients can keep using <hostname>.local.
+  if (!MDNS.begin(hostname_)) {
+    Serial.println("[network] ERROR: could not start mDNS responder");
+    return;
+  }
+  discoveryStarted_ = true;
+  MDNS.setInstanceName(hostname_);
+  MDNS.addService("http", "tcp", 80);
+  MDNS.addService("canary", "tcp", 80);
+  MDNS.addServiceTxt("canary", "tcp", "type", "water");
+  MDNS.addServiceTxt("canary", "tcp", "fw", Hardware::FIRMWARE_VERSION);
+  MDNS.addServiceTxt("canary", "tcp", "api", "/api/status");
+  Serial.printf("[network] mDNS: http://%s.local (_canary._tcp type=water)\n",
+                hostname_);
 }
 
 void NetworkConfig::handleSubmissionRecovery() {
