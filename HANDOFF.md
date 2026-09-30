@@ -4,9 +4,6 @@ Branch: `feat/evacuate-route-line` · Last updated: 2026-09-30
 
 ## Done
 
-- **Agent setup.** `AGENTS.md` (repo root) holds the project rules and the delegation tiers.
-  `.codex/agents/` holds the Codex roles: `scout` (gpt-6-luna, low), `builder`
-  (gpt-5.6-terra, medium), `engineer` (gpt-6-sol, medium), `expert` (gpt-5.6-sol, high, ceiling).
 - **Backend.** `GET /buildings/{id}/evacuation` returns `waypoints` (`id`, `label`, `kind`, `hint`)
   with human-readable names, skips malformed path entries instead of failing, and orders
   routes deterministically. The seed route uses real Romanian names and hints.
@@ -27,20 +24,24 @@ Branch: `feat/evacuate-route-line` · Last updated: 2026-09-30
 
 ## To do next
 
-| # | Task | Suggested agent |
-| --- | --- | --- |
-| 1 | Widget tests and golden screenshots for the Evacuate screen: each hazard type, `crosses` / `unknown` warnings, offline chip, check-in → Change flow, 2× text scale | builder · gpt-5.6-terra |
-| 2 | Home screen shows raw IDs: `bld_007` in the app bar and `zone_kitchen` in the red EVACUATE banner (`home_screen.dart`, `flashing_evacuate_banner.dart`). Use the building name and `zoneLabelsProvider`. Sweep `lib/src/ui` for other raw IDs and literal colors | scout · gpt-6-luna |
-| 3 | Romanian localization (`flutter_localizations` + ARB files) with diacritics. The UI is English while the building data is Romanian | builder · gpt-5.6-terra |
-| 4 | Freshness chip: the incident controller sets `connected` when a WebSocket attempt *starts*, so "Live" can show before the socket is up. Set it on the first message or ack, and show "Updated N s ago" | builder · gpt-5.6-terra |
-| 5 | Cache the last evacuation info locally so the route still shows offline ("Offline · showing saved route") | builder · gpt-5.6-terra |
-| 6 | Optional read-aloud of the next step (TTS) | builder · gpt-5.6-terra |
-| 7 | Floor-plan view (model C) as a "See on floor plan" toggle above the route line | engineer · gpt-6-sol |
+1. Widget tests and golden screenshots for the Evacuate screen: each hazard type,
+   `crosses` / `unknown` warnings, offline chip, check-in → Change flow, 2× text scale.
+2. Home screen shows raw IDs: `bld_007` in the app bar and `zone_kitchen` in the red
+   EVACUATE banner (`home_screen.dart`, `flashing_evacuate_banner.dart`). Use the building
+   name and `zoneLabelsProvider`. Sweep `lib/src/ui` for other raw IDs and literal colors.
+3. Romanian localization (`flutter_localizations` + ARB files) with diacritics. The UI is
+   English while the building data is Romanian.
+4. Freshness chip: the incident controller sets `connected` when a WebSocket attempt
+   *starts*, so "Live" can show before the socket is up. Set it on the first message or
+   ack, and show "Updated N s ago".
+5. Cache the last evacuation info locally so the route still shows offline
+   ("Offline · showing saved route").
+6. Optional read-aloud of the next step (TTS).
+7. Floor-plan view (model C) as a "See on floor plan" toggle above the route line.
 
-## Known safety limits (from the gpt-5.6-sol review, deferred)
+## Known safety limits (from a safety review, deferred)
 
 These need a real route graph on the backend. They matter for real buildings, not the demo.
-Route and graph changes go to the engineer tier, with the expert tier reviewing them.
 
 1. **Resident location is unknown.** The session has no unit or zone, so `userZoneId` is always
    null and the route starts at "Start here" instead of "Ap. 12". Add the resident's unit and
@@ -58,11 +59,6 @@ Route and graph changes go to the engineer tier, with the expert tier reviewing 
 
 ## Working notes
 
-- **Codex sandbox:** `flutter` and `pytest` fail inside it (it can't write to the Flutter SDK or the
-  backend venv). Codex writes the code; the orchestrator runs the checks.
-- **Delegation:** the `codex:rescue` bridge runs one task at a time and `--resume` follows only
-  the latest thread. For parallel work, use `codex exec -s workspace-write -m <model>
-  -c model_reasoning_effort=<effort> - < prompt.md`.
 - **Running locally:**
   - Stack: `cd RPISoftware && docker compose up -d --build`. Dashboard at http://localhost,
     API at :8000.
