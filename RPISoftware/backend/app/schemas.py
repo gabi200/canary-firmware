@@ -222,6 +222,13 @@ class AssemblyPointOut(BaseModel):
     lon: float | None
 
 
+class WaypointOut(BaseModel):
+    id: str
+    label: str
+    kind: str
+    hint: str = ""
+
+
 class EvacuationRouteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -230,7 +237,8 @@ class EvacuationRouteOut(BaseModel):
     from_zone_id: str | None
     to_assembly_point_id: str
     label: str
-    path: list = []
+    path: list[str] = []
+    waypoints: list[WaypointOut] = []
 
 
 class EvacuationOut(BaseModel):
