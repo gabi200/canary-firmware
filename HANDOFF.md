@@ -1,43 +1,38 @@
-# Handoff: Evacuate screen redesign
+# Handoff: Resident app UX
 
-Branch: `feat/evacuate-route-line` · Last updated: 2026-09-30
+Branch: `feat/read-aloud` (stacked: `feat/home-labels-freshness` → `feat/evacuate-tests-offline` →
+`feat/romanian-l10n` → `feat/read-aloud`; none merged into `main` yet) · Last updated: 2026-10-01
 
 ## Done
 
-- **Backend.** `GET /buildings/{id}/evacuation` returns `waypoints` (`id`, `label`, `kind`, `hint`)
-  with human-readable names, skips malformed path entries instead of failing, and orders
-  routes deterministically. The seed route uses real Romanian names and hints.
-  101 tests pass.
-- **Mobile, Evacuate screen (model A, "route line").** `lib/src/ui/alarm_screen.dart`,
-  `widgets/route_line.dart`:
-  - hazard header with a Live/Offline chip; Minimize replaces the ✕
-  - a "don't" line per hazard type (`logic/hazard_advice.dart`)
-  - vertical route: Start here → steps with hints → assembly point, plus an "Avoid: <zone>" marker
-  - a pinned action bar: I'm out and safe / I need help / Call 112 (`url_launcher`) /
-    Safe but still inside; the check-in can be changed later
-  - haptic pulse on open; the screen stays awake (`wakelock_plus`)
-- **Mobile, route safety.** `logic/route_selection.dart` rates each route `clear`, `unknown` or
-  `crosses` against every affected zone. The screen shows a red warning for `crosses` and an
-  amber one for `unknown`. Parsing skips malformed routes and waypoints instead of dropping
-  everything. 21 tests pass; `flutter analyze` reports no errors or warnings.
-- Verified by hand on the Pixel 9 Pro XL emulator with a simulated gas leak.
+- **Evacuate screen redesign** (model A, route line), merged into `main` on 2026-09-30.
+- **#2 Names, not IDs.** `GET /buildings/{id}/summary` returns `building_name`; app bars show it, and
+  zones and incident states go through `logic/display_labels.dart`. Literal colors moved to theme tokens.
+- **#4 Honest Live chip.** The incident WebSocket sends `hello` on connect and `ping` every 15 s. The app
+  is Live only after a frame, goes offline on a drop or after 40 s of silence, and shows "updated N s ago".
+  Queued check-ins retry on every frame without overlapping or losing check-ins queued mid-flush.
+- **#5 Offline route.** The last good evacuation route is cached per building (warmed from Home) and
+  shown with a "Saved route from HH:mm" notice when the hub is unreachable.
+- **#1 Tests.** Widget tests and goldens for the Evacuate screen (hazard types, crosses/unknown, chip,
+  check-in → Change, 2× text, no route, Romanian at 2×). Goldens use the Ahem test font; regenerate with
+  `flutter test --update-goldens` and look at `test/goldens/*.png`.
+- **#3 Romanian.** gen-l10n ARB catalogs in `lib/l10n` (Romanian default, English if the device is
+  English). Comma-below diacritics are enforced by a test. Hub data is not translated.
+  After editing an ARB file run `flutter gen-l10n`; generated code in `lib/l10n/gen` is committed.
+- **#6 Read aloud.** "Citiți cu voce tare" next to the route heading (`flutter_tts`, behind
+  `speechProvider`). Never automatic; stops on check-in, minimize and dispose.
+- **#7 Floor plan (schematic, demo only).** "Vedeți pe schiță" toggle above the route line. Built from zone
+  `pos_x`/`pos_y` only, with a permanent "Schemă orientativă · nu la scară" badge. Not a real map.
+- Checks on `feat/read-aloud`: `flutter analyze` (5 pre-existing infos), `flutter test` 64 passed,
+  backend `pytest` 102 passed (backend last changed in #2/#4). Not yet checked on the emulator.
 
 ## To do next
 
-1. Widget tests and golden screenshots for the Evacuate screen: each hazard type,
-   `crosses` / `unknown` warnings, offline chip, check-in → Change flow, 2× text scale.
-2. Home screen shows raw IDs: `bld_007` in the app bar and `zone_kitchen` in the red
-   EVACUATE banner (`home_screen.dart`, `flashing_evacuate_banner.dart`). Use the building
-   name and `zoneLabelsProvider`. Sweep `lib/src/ui` for other raw IDs and literal colors.
-3. Romanian localization (`flutter_localizations` + ARB files) with diacritics. The UI is
-   English while the building data is Romanian.
-4. Freshness chip: the incident controller sets `connected` when a WebSocket attempt
-   *starts*, so "Live" can show before the socket is up. Set it on the first message or
-   ack, and show "Updated N s ago".
-5. Cache the last evacuation info locally so the route still shows offline
-   ("Offline · showing saved route").
-6. Optional read-aloud of the next step (TTS).
-7. Floor-plan view (model C) as a "See on floor plan" toggle above the route line.
+1. **Next session:** check on the Pixel 9 Pro XL emulator. Rebuild the stack first (`docker compose up -d --build`; the backend changed in #2/#4). Simulate a gas leak, then check: building name and zone labels on Home, "Conectat · actualizat acum N s", airplane mode → saved route notice and offline chip, read aloud in Romanian, the floor-plan toggle, check-in → Modifică
+2. Merge the stacked branches into `main` (or open one PR from `feat/read-aloud`) after the emulator check
+3. Native-speaker review of Romanian copy: "Evidența persoanelor", "Alertă: {hazard}", "Conectează locuința", "Vedeți pe schiță"
+4. Onboarding and settings still show the raw building ID field (by design for setup); hide it behind an "Advanced" toggle
+5. Real floor geometry on the backend (rooms, stairs and exit positions) so the floor plan can become a map; ties into safety limits 1–3 below
 
 ## Known safety limits (from a safety review, deferred)
 
