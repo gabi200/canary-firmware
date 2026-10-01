@@ -9,12 +9,14 @@ import 'package:intl/intl.dart';
 
 import '../logic/hazard_advice.dart';
 import '../logic/connection_status.dart';
+import '../logic/evacuation_script.dart';
 import '../logic/route_selection.dart';
 import '../models/check_in.dart';
 import '../models/incident.dart';
 import '../state/dashboard_providers.dart';
 import '../state/incident_controller.dart';
 import '../state/providers.dart';
+import '../services/speech.dart';
 import '../theme.dart';
 import 'widgets/route_line.dart';
 import '../../l10n/gen/app_localizations.dart';
@@ -30,16 +32,21 @@ class AlarmScreen extends ConsumerStatefulWidget {
 class _AlarmScreenState extends ConsumerState<AlarmScreen> {
   CheckInStatus? _checkedInAs;
   bool _submitting = false;
+  bool _reading = false;
+  // Captured in initState: ref must not be used from dispose().
+  late final Speech _speech;
 
   @override
   void initState() {
     super.initState();
+    _speech = ref.read(speechProvider);
     HapticFeedback.heavyImpact();
     WakelockPlus.enable();
   }
 
   @override
   void dispose() {
+    unawaited(_speech.stop());
     WakelockPlus.disable();
     super.dispose();
   }
@@ -53,6 +60,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
 
   Future<void> _checkIn(CheckInStatus status) async {
     if (_submitting) return;
+    unawaited(_stopReading());
     setState(() => _submitting = true);
     final result = await ref
         .read(incidentControllerProvider.notifier)
@@ -69,6 +77,18 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
       backgroundColor: result == CheckInResult.sent
           ? HazardColors.normal : HazardColors.warning,
     ));
+  }
+
+  Future<void> _stopReading() async {
+    await _speech.stop();
+    if (mounted) setState(() => _reading = false);
+  }
+
+  Future<void> _toggleReading(String script, Locale locale) async {
+    if (_reading) return _stopReading();
+    setState(() => _reading = true);
+    await _speech.speak(script, locale);
+    if (mounted) setState(() => _reading = false);
   }
 
   Future<void> _call112() async {
@@ -95,8 +115,27 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
     final zoneName = labels?[incident.primaryZoneId]?.trim();
     final routeState = ref.watch(evacuationProvider);
     final info = routeState.valueOrNull;
-    final choice = info == null ? null : selectRoute(info,
-      hazardZoneIds: incident.hazardZoneIds, userZoneId: null);
+    final choice = info == null
+        ? null
+        : selectRoute(
+            info,
+            hazardZoneIds: incident.hazardZoneIds,
+            userZoneId: null,
+          );
+    final assemblyPointName = choice == null
+        ? null
+        : info?.assemblyById(choice.route.toAssemblyPointId)?.label ??
+            (choice.route.waypoints.isEmpty
+                ? null
+                : choice.route.waypoints.last.label);
+    final readAloudScript = buildEvacuationScript(
+      l10n: l10n,
+      hazardDont: hazardDont(l10n, incident.hazardType),
+      waypoints: choice?.route.waypoints ?? const [],
+      avoidZoneName: zoneName,
+      assemblyPointName: assemblyPointName,
+      safety: choice?.safety,
+    );
 
     return Scaffold(
       backgroundColor: HazardColors.surface,
@@ -128,7 +167,10 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: () {
+                    unawaited(_stopReading());
+                    Navigator.of(context).maybePop();
+                  },
                   icon: const Icon(Icons.expand_more),
                   label: Text(l10n.minimize),
                   style: TextButton.styleFrom(
@@ -205,9 +247,38 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   _SavedRouteNotice(savedAt: savedAt),
                   const SizedBox(height: 16),
                 ],
-                Text(l10n.evacuationRoute,
-                  style: const TextStyle(color: HazardColors.text,
-                    fontSize: 20, fontWeight: FontWeight.bold)),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      l10n.evacuationRoute,
+                      style: const TextStyle(
+                        color: HazardColors.text,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _toggleReading(
+                        readAloudScript,
+                        Localizations.localeOf(context),
+                      ),
+                      icon: Icon(_reading ? Icons.stop : Icons.volume_up),
+                      label: Text(_reading ? l10n.stopReading : l10n.readAloud),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: HazardColors.text,
+                        side: const BorderSide(color: HazardColors.routeLine),
+                        minimumSize: const Size(48, 48),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 routeState.when(
                   loading: () => const Center(child: CircularProgressIndicator()),

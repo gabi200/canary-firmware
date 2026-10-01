@@ -308,6 +308,24 @@ abstract class AppLocalizations {
   /// **'Evacuation route'**
   String get evacuationRoute;
 
+  /// No description provided for @readAloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Read aloud'**
+  String get readAloud;
+
+  /// No description provided for @stopReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stopReading;
+
+  /// No description provided for @spokenAssembly.
+  ///
+  /// In en, this message translates to:
+  /// **'Then go to the assembly point: {name}.'**
+  String spokenAssembly(Object name);
+
   /// No description provided for @fallbackLeave.
   ///
   /// In en, this message translates to:

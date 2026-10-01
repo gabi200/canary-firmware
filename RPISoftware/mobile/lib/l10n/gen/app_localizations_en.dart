@@ -120,6 +120,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get evacuationRoute => 'Evacuation route';
 
   @override
+  String get readAloud => 'Read aloud';
+
+  @override
+  String get stopReading => 'Stop';
+
+  @override
+  String spokenAssembly(Object name) {
+    return 'Then go to the assembly point: $name.';
+  }
+
+  @override
   String get fallbackLeave =>
       'Leave by the nearest safe exit. Do not use the lift.';
 

@@ -20,6 +20,7 @@ dependencies:
   intl: ^0.20.2
   url_launcher: ^6.3.2
   wakelock_plus: ^1.5.2
+  flutter_tts: ^4.2.5
   # Remote push. Optional at runtime (see Config.enableFirebasePush); requires
   # Firebase project config to actually deliver. The app runs fully without it
   # via WebSocket (foreground) + local notifications.

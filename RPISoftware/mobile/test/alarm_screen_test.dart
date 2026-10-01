@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:canary_resident/src/models/check_in.dart';
 import 'package:canary_resident/src/models/evacuation.dart';
 import 'package:canary_resident/src/models/incident.dart';
 import 'package:canary_resident/src/services/storage.dart';
+import 'package:canary_resident/src/services/speech.dart';
 import 'package:canary_resident/src/state/dashboard_providers.dart';
 import 'package:canary_resident/src/state/incident_controller.dart';
 import 'package:canary_resident/src/state/providers.dart';
@@ -181,6 +184,23 @@ void main() {
     expect(find.text('Leave by the nearest safe exit. Do not use the lift.'), findsOneWidget);
   });
 
+  testWidgets('reads the selected route aloud and stops when tapped again', (tester) async {
+    _usePhoneSurface(tester);
+    final speech = FakeSpeech();
+    await _pumpAlarm(tester, speech: speech);
+
+    await tester.tap(find.text('Read aloud'));
+    await tester.pump();
+
+    expect(speech.spoken, hasLength(1));
+    expect(speech.spoken.single.text, contains('Lobby'));
+
+    await tester.tap(find.text('Stop'));
+    await tester.pump();
+
+    expect(speech.stopCalls, 1);
+  });
+
   testWidgets('golden: gas incident with a clear route while live', (tester) async {
     _usePhoneSurface(tester);
     await _pumpAlarm(
@@ -232,6 +252,7 @@ Future<FakeIncidentController> _pumpAlarm(
   DateTime? lastMessageAt,
   TextScaler textScaler = TextScaler.noScaling,
   Locale locale = const Locale('en'),
+  FakeSpeech? speech,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final storage = Storage(await SharedPreferences.getInstance());
@@ -243,6 +264,7 @@ Future<FakeIncidentController> _pumpAlarm(
       lastMessageAt: lastMessageAt,
     ),
   );
+  final fakeSpeech = speech ?? FakeSpeech();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -250,6 +272,7 @@ Future<FakeIncidentController> _pumpAlarm(
         incidentControllerProvider.overrideWith((ref) => controller),
         evacuationProvider.overrideWith((ref) async => evacuation ?? evacuationForSafety('clear')),
         zoneLabelsProvider.overrideWith((ref) async => const {hazardZoneId: 'Kitchen'}),
+        speechProvider.overrideWithValue(fakeSpeech),
       ],
       child: MediaQuery(
         data: MediaQueryData.fromView(tester.view).copyWith(textScaler: textScaler),
@@ -264,4 +287,26 @@ Future<FakeIncidentController> _pumpAlarm(
   );
   await tester.pump();
   return controller;
+}
+
+class FakeSpeech implements Speech {
+  final List<({String text, Locale locale})> spoken = [];
+  var stopCalls = 0;
+
+  Completer<void>? _speaking;
+
+  /// Like the real engine, speak() completes only when reading ends or is stopped.
+  @override
+  Future<void> speak(String text, Locale locale) {
+    spoken.add((text: text, locale: locale));
+    return (_speaking = Completer<void>()).future;
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCalls++;
+    final speaking = _speaking;
+    _speaking = null;
+    if (speaking != null && !speaking.isCompleted) speaking.complete();
+  }
 }

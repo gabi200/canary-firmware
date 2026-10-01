@@ -122,6 +122,17 @@ class AppLocalizationsRo extends AppLocalizations {
   String get evacuationRoute => 'Rută de evacuare';
 
   @override
+  String get readAloud => 'Citiți cu voce tare';
+
+  @override
+  String get stopReading => 'Opriți';
+
+  @override
+  String spokenAssembly(Object name) {
+    return 'Apoi mergeți la punctul de adunare: $name.';
+  }
+
+  @override
   String get fallbackLeave =>
       'Ieșiți pe cea mai apropiată ieșire sigură. Nu folosiți liftul.';
 
