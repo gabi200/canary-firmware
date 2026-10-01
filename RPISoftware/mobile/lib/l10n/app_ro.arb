@@ -1,0 +1,240 @@
+{
+  "@@locale": "ro",
+  "appTitle": "Canary",
+  "evacuateNow": "EVACUAȚI ACUM",
+  "minimize": "Minimizează",
+  "call112": "Sunați la 112",
+  "dial112": "Sunați la 112 de pe telefon",
+  "allClear": "Pericol înlăturat",
+  "hazardCleared": "Pericolul a fost înlăturat.",
+  "returnLabel": "Înapoi",
+  "gasLeak": "Scurgere de gaz",
+  "carbonMonoxide": "Monoxid de carbon",
+  "waterLeak": "Scurgere de apă",
+  "smokeParticulates": "Fum / particule",
+  "hazardGasDont": "Nu folosiți liftul sau întrerupătoarele și nu aprindeți flăcări.",
+  "hazardCoDont": "Nu rămâneți înăuntru. Ieșiți imediat la aer curat.",
+  "hazardSmokeDont": "Deplasați-vă aplecat, sub nivelul fumului. Nu folosiți liftul.",
+  "hazardWaterDont": "Nu atingeți aparate electrice sau întrerupătoare lângă apă.",
+  "hazardDefaultDont": "Nu folosiți liftul.",
+  "stateDetection": "Detectat",
+  "stateVerification": "Se verifică",
+  "stateAlarm": "Alarmă",
+  "stateEvacuation": "Evacuați acum",
+  "stateEscalation": "Intervenție de urgență",
+  "stateResolution": "Rezolvat",
+  "stateFalseAlarm": "Alarmă falsă",
+  "stateNormal": "Fără pericol",
+  "safeOutside": "Sunt afară, în siguranță",
+  "safeInside": "Sunt în siguranță, dar încă înăuntru",
+  "needsHelp": "Am nevoie de ajutor",
+  "liveJustNow": "Conectat · actualizat chiar acum",
+  "liveUpdated": "Conectat · actualizat acum {seconds} s",
+  "@liveUpdated": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "offlineSavedRoute": "Fără conexiune · se afișează ruta salvată",
+  "offlineNoRoute": "Fără conexiune · nu există rută disponibilă",
+  "routeCrossesHazard": "Această rută trece pe lângă pericol. Folosiți o altă ieșire marcată dacă puteți și sunați la 112.",
+  "routeSafetyUnknown": "Nu am putut verifica această rută față de pericol. Urmați ieșirile marcate, stați departe de pericol și sunați la 112 în caz de dubiu.",
+  "evacuationRoute": "Rută de evacuare",
+  "fallbackLeave": "Ieșiți pe cea mai apropiată ieșire sigură. Nu folosiți liftul.",
+  "fallbackAssembly": "Mergeți la punctul exterior de adunare și nu vă întoarceți înăuntru.",
+  "checkInSent": "Confirmare trimisă: {status}",
+  "@checkInSent": {
+    "placeholders": {
+      "status": {}
+    }
+  },
+  "checkInQueued": "Fără conexiune — confirmarea va fi trimisă automat",
+  "checkedIn": "Confirmat: {status}",
+  "@checkedIn": {
+    "placeholders": {
+      "status": {}
+    }
+  },
+  "change": "Modifică",
+  "outAndSafe": "Sunt afară, în siguranță",
+  "safeStillInside": "Sunt în siguranță, dar încă înăuntru",
+  "savedRoute": "Rută salvată la {time} — este posibil să nu reflecte blocajele actuale",
+  "@savedRoute": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "startHere": "Porniți de aici",
+  "avoid": "Evitați: {name}",
+  "@avoid": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "routeStep": "Pasul {step} din {total}: {label}.{hint}",
+  "@routeStep": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "label": {},
+      "hint": {}
+    }
+  },
+  "live": "Conectat",
+  "reconnecting": "Se reconectează…",
+  "checkInsQueued": "{count, plural, =0{Nicio confirmare în așteptare} one{O confirmare în așteptare} few{{count} confirmări în așteptare} other{{count} de confirmări în așteptare}}",
+  "@checkInsQueued": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openEvacuationGuidance": "Deschideți ghidul de evacuare",
+  "activeIncidents": "Incidente active",
+  "noActiveIncidents": "Nu există incidente active",
+  "buildingMonitored": "Clădirea dumneavoastră este monitorizată.",
+  "noActiveHazard": "Nu există pericol activ. Vă vom alerta imediat dacă se detectează ceva.",
+  "settings": "Setări",
+  "account": "Cont",
+  "presenceContribution": "Contribuție la prezență",
+  "sharePresence": "Partajați prezența în timpul incidentelor",
+  "sharePresenceDescription": "Ajută echipele de intervenție să știe mai bine cine este înăuntru. Date anonime, folosite numai la un incident activ.",
+  "about": "Despre",
+  "canaryResident": "Canary pentru rezidenți",
+  "appVersion": "v0.1.0 — aplicație de siguranță informativă. Nu înlocuiește alarmele certificate.",
+  "server": "Server",
+  "signOut": "Deconectare",
+  "residentSafety": "Siguranța clădirii pentru rezidenți",
+  "username": "Nume utilizator",
+  "buildingId": "ID clădire",
+  "linkUnit": "Conectează locuința",
+  "serverValue": "Server: {server}",
+  "@serverValue": {
+    "placeholders": {
+      "server": {}
+    }
+  },
+  "orderEvacuation": "Dispune evacuarea",
+  "resolve": "Rezolvă",
+  "dismiss": "Închide",
+  "doneAction": "Finalizat: {action}",
+  "@doneAction": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "victimAccounting": "Evidența persoanelor",
+  "couldNotLoadAccounting": "Nu s-a putut încărca evidența",
+  "occupants": "Persoane",
+  "accounted": "Confirmate",
+  "unaccounted": "Neconfirmate",
+  "needHelp": "Au nevoie de ajutor",
+  "residentAccountability": "Evidența rezidenților",
+  "couldNotLoadRoster": "Nu s-a putut încărca lista",
+  "noResidents": "Nu există rezidenți înregistrați.",
+  "needsHelpUpper": "AU NEVOIE DE AJUTOR",
+  "safeOut": "În siguranță — afară",
+  "safeIn": "În siguranță — înăuntru",
+  "noResponse": "Fără răspuns",
+  "awaiting": "În așteptare",
+  "buildingSensors": "Senzorii clădirii",
+  "homeStatus": "Starea locuinței",
+  "sensorsOnline": "{online} din {total} senzori online",
+  "@sensorsOnline": {
+    "placeholders": {
+      "online": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "activeIncidentCount": "{count, plural, one{1 incident activ} few{{count} incidente active} other{{count} de incidente active}}",
+  "@activeIncidentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "occupied": "ocupat",
+  "empty": "liber",
+  "noData": "fără date",
+  "noRecentData": "Fără date recente",
+  "offline": "Fără conexiune",
+  "lastSeen": "{what} · văzut ultima dată {time}",
+  "@lastSeen": {
+    "placeholders": {
+      "what": {},
+      "time": {}
+    }
+  },
+  "whatToDo": "Ce aveți de făcut",
+  "loadingSensorStatus": "Se încarcă starea senzorilor…",
+  "sensorStatusUnavailable": "Starea senzorilor nu este disponibilă",
+  "cannotReachHub": "Nu se poate contacta hub-ul acum. Trageți în jos pentru reîncercare.",
+  "noSensors": "Nu sunt conectați senzori",
+  "sensorStatusAppears": "Starea senzorilor apare aici după ce un dispozitiv Canary se conectează la hub.",
+  "couldNotRefresh": "Nu s-a putut actualiza starea senzorilor",
+  "couldNotRefreshFrom": "Nu s-a putut actualiza · se afișează starea de la {time}",
+  "@couldNotRefreshFrom": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "needsAttention": "Necesită atenție",
+  "danger": "Pericol",
+  "statusUnknown": "Stare necunoscută",
+  "airSensor": "Senzor de aer",
+  "waterSensor": "Senzor de apă",
+  "sensor": "Senzor",
+  "airQuality": "Calitatea aerului",
+  "gas": "Gaz",
+  "comfort": "Confort",
+  "occupancy": "Ocupare",
+  "waterValve": "Valvă de apă",
+  "justNow": "chiar acum",
+  "minutesAgo": "acum {count} min",
+  "@minutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "acum {count} h",
+  "@hoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysAgo": "{count, plural, one{acum o zi} few{acum {count} zile} other{acum {count} de zile}}",
+  "@daysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationChannelName": "Alerte de urgență",
+  "notificationChannelDescription": "Alarme critice pentru siguranța clădirii (gaz, CO, evacuare).",
+  "alertNotificationTitle": "Alertă: {hazard}",
+  "@alertNotificationTitle": {
+    "placeholders": {
+      "hazard": {}
+    }
+  },
+  "openAppForGuidance": "Deschideți Canary pentru instrucțiuni.",
+  "loginFailed": "Autentificarea nu a reușit. Încercați din nou.",
+  "actionFailed": "Acțiunea nu a putut fi finalizată. Încercați din nou."
+}

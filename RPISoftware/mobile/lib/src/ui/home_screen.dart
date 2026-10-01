@@ -12,6 +12,7 @@ import 'settings_screen.dart';
 import 'widgets/hazard_banner.dart';
 import 'widgets/home_status_section.dart';
 import 'widgets/status_pill.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(incidentControllerProvider);
     final summary = ref.watch(summaryProvider).summary;
     final labels = ref.watch(zoneLabelsProvider).valueOrNull;
@@ -57,7 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(summary?.buildingName ?? 'Canary'),
+        title: Text(summary?.buildingName ?? l10n.appTitle),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -92,7 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 16),
               FilledButton.icon(
                 icon: const Icon(Icons.directions_run),
-                label: const Text('Open evacuation guidance'),
+                label: Text(l10n.openEvacuationGuidance),
                 onPressed: () => _openAlarm(context, alarm.id),
               ),
             ] else
@@ -100,14 +102,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 24),
             const HomeStatusSection(),
             const SizedBox(height: 24),
-            Text('Active incidents', style: Theme.of(context).textTheme.titleMedium),
+            Text(l10n.activeIncidents, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             if (state.incidents.isEmpty)
-              const Card(
+              Card(
                 child: ListTile(
-                  leading: Icon(Icons.check_circle, color: HazardColors.normal),
-                  title: Text('No active incidents'),
-                  subtitle: Text('Your building is being monitored.'),
+                  leading: const Icon(Icons.check_circle, color: HazardColors.normal),
+                  title: Text(l10n.noActiveIncidents),
+                  subtitle: Text(l10n.buildingMonitored),
                 ),
               )
             else
@@ -115,8 +117,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Card(
                   child: ListTile(
                     leading: Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error),
-                    title: Text(inc.hazardLabel),
-                    subtitle: Text('${incidentStateLabel(inc.state)} · ${prettyZone(labels, inc.primaryZoneId)}'),
+                    title: Text(inc.hazardLabel(l10n)),
+                    subtitle: Text('${incidentStateLabel(l10n, inc.state)} · ${prettyZone(labels, inc.primaryZoneId)}'),
                     trailing: StatusPill(state: inc.state),
                     onTap: inc.isAlarming ? () => _openAlarm(context, inc.id) : null,
                   ),
@@ -140,13 +142,13 @@ class _ConnectivityRow extends StatelessWidget {
         Icon(connected ? Icons.wifi : Icons.wifi_off,
             size: 18, color: connected ? HazardColors.normal : HazardColors.unknown),
         const SizedBox(width: 6),
-        Text(connected ? 'Live' : 'Reconnecting…', style: const TextStyle(color: HazardColors.onSurfaceMuted)),
+        Text(connected ? AppLocalizations.of(context).live : AppLocalizations.of(context).reconnecting, style: const TextStyle(color: HazardColors.onSurfaceMuted)),
         const Spacer(),
         if (pending > 0)
           Row(children: [
             const Icon(Icons.cloud_upload, size: 18, color: HazardColors.warning),
             const SizedBox(width: 6),
-            Text('$pending check-in${pending == 1 ? '' : 's'} queued', style: const TextStyle(color: HazardColors.warning)),
+            Text(AppLocalizations.of(context).checkInsQueued(pending), style: const TextStyle(color: HazardColors.warning)),
           ]),
       ],
     );
@@ -159,19 +161,19 @@ class _AllClearCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: HazardColors.normal.withOpacity(0.08),
-      child: const Padding(
-        padding: EdgeInsets.all(24),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Row(
           children: [
-            Icon(Icons.verified_user, color: HazardColors.normal, size: 40),
-            SizedBox(width: 16),
+            const Icon(Icons.verified_user, color: HazardColors.normal, size: 40),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('All clear', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 4),
-                  Text('No active hazard. You will be alerted immediately if anything is detected.'),
+                  Text(AppLocalizations.of(context).allClear, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(AppLocalizations.of(context).noActiveHazard),
                 ],
               ),
             ),

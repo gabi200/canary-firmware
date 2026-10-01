@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/incident.dart';
 import '../../logic/display_labels.dart';
 import '../../theme.dart';
+import '../../../l10n/gen/app_localizations.dart';
 
 /// High-urgency EVACUATE NOW banner that flashes (~1 Hz) to grab attention on the
 /// phone. Falls back to a static red banner when the OS requests reduced motion.
@@ -34,6 +35,7 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     Widget banner(double t) {
@@ -82,7 +84,7 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${widget.incident.hazardLabel} · '
+                          '${widget.incident.hazardLabel(l10n)} · '
                           '${widget.zoneLabel.trim().isEmpty ? humanizeId(widget.incident.primaryZoneId) : widget.zoneLabel}',
                           style: const TextStyle(color: HazardColors.onHazard, fontSize: 14),
                         ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/incident.dart';
 import '../../logic/display_labels.dart';
 import '../../theme.dart';
+import '../../../l10n/gen/app_localizations.dart';
 
 class HazardBanner extends StatelessWidget {
   const HazardBanner({super.key, required this.incident, required this.zoneLabel, this.onTap});
@@ -27,6 +28,7 @@ class HazardBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final color = HazardColors.forState(incident.state);
     return Material(
       color: color,
@@ -45,12 +47,12 @@ class HazardBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      incident.isEvacuation ? 'EVACUATE NOW' : incident.hazardLabel.toUpperCase(),
+                      incident.isEvacuation ? l10n.evacuateNow : incident.hazardLabel(l10n).toUpperCase(),
                       style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${incident.hazardLabel} · ${incidentStateLabel(incident.state)} · $zoneLabel',
+                      '${incident.hazardLabel(l10n)} · ${incidentStateLabel(l10n, incident.state)} · $zoneLabel',
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],

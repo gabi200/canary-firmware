@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:canary_resident/l10n/gen/app_localizations.dart';
 
 import 'helpers/alarm_fixtures.dart';
 
@@ -157,6 +158,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('renders in Romanian at 2x text scale without overflow', (tester) async {
+    _usePhoneSurface(tester);
+    await _pumpAlarm(tester,
+        textScaler: const TextScaler.linear(2), locale: const Locale('ro'));
+
+    expect(find.text('EVACUAȚI ACUM'), findsOneWidget);
+    expect(find.text('Sunt afară, în siguranță'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('uses an actionable fallback when no evacuation routes are available',
       (tester) async {
     _usePhoneSurface(tester);
@@ -220,6 +231,7 @@ Future<FakeIncidentController> _pumpAlarm(
   bool connected = true,
   DateTime? lastMessageAt,
   TextScaler textScaler = TextScaler.noScaling,
+  Locale locale = const Locale('en'),
 }) async {
   SharedPreferences.setMockInitialValues({});
   final storage = Storage(await SharedPreferences.getInstance());
@@ -241,7 +253,12 @@ Future<FakeIncidentController> _pumpAlarm(
       ],
       child: MediaQuery(
         data: MediaQueryData.fromView(tester.view).copyWith(textScaler: textScaler),
-        child: const MaterialApp(home: AlarmScreen(incidentId: incidentId)),
+        child: MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const AlarmScreen(incidentId: incidentId),
+        ),
       ),
     ),
   );

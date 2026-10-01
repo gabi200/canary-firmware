@@ -5,14 +5,15 @@ import '../../logic/display_labels.dart';
 import '../../models/summary.dart';
 import '../../state/providers.dart';
 import '../../theme.dart';
+import '../../../l10n/gen/app_localizations.dart';
 import 'status_pill.dart';
 
 /// "Home status": the hub's analysis of the building's sensors — an overall
 /// card, then one card per zone with each sensor's headline and indicators.
 /// Analysis only (HARDWARE.md §3): never raw measurements.
 class HomeStatusSection extends ConsumerWidget {
-  const HomeStatusSection({super.key, this.title = 'Home status'});
-  final String title;
+  const HomeStatusSection({super.key, this.title});
+  final String? title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,7 +22,7 @@ class HomeStatusSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        Text(title ?? AppLocalizations.of(context).homeStatus, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         if (summary != null && state.error != null) _RefreshFailedNote(updatedAt: state.updatedAt),
         if (summary == null)
@@ -62,14 +63,14 @@ class _OverallCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    summary.headline.isNotEmpty ? summary.headline : _statusText(summary.status),
+                    summary.headline.isNotEmpty ? summary.headline : _statusText(AppLocalizations.of(context), summary.status),
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     [
-                      '${summary.nodesOnline} of ${summary.nodesTotal} sensors online',
-                      if (incidents > 0) '$incidents active incident${incidents == 1 ? '' : 's'}',
+                      AppLocalizations.of(context).sensorsOnline(summary.nodesOnline, summary.nodesTotal),
+                      if (incidents > 0) AppLocalizations.of(context).activeIncidentCount(incidents),
                     ].join(' · '),
                     style: const TextStyle(color: HazardColors.onSurfaceMuted),
                   ),
@@ -108,7 +109,7 @@ class _ZoneCard extends StatelessWidget {
                 if (occupied != null)
                   StatusPill(
                     state: 'occupancy',
-                    label: occupied ? 'occupied' : 'empty',
+                    label: occupied ? AppLocalizations.of(context).occupied : AppLocalizations.of(context).empty,
                     color: occupied ? HazardColors.info : HazardColors.unknown,
                   ),
               ],
@@ -160,7 +161,7 @@ class _NodeTile extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if (!node.isLive) ...[_NotReporting(node: node), const SizedBox(height: 6)],
-            Text(_headline(node), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text(_headline(AppLocalizations.of(context), node), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             _Indicators(node: node),
           ],
@@ -195,15 +196,15 @@ class _NodeSheet extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text('$zoneLabel · ${_kindLabel(node.kind)}', style: const TextStyle(color: HazardColors.onSurfaceMuted)),
+          Text('$zoneLabel · ${_kindLabel(AppLocalizations.of(context), node.kind)}', style: const TextStyle(color: HazardColors.onSurfaceMuted)),
           const SizedBox(height: 12),
           if (!node.isLive) ...[_NotReporting(node: node), const SizedBox(height: 12)],
-          Text(_headline(node), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(_headline(AppLocalizations.of(context), node), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           _Indicators(node: node),
           if (node.advice.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('What to do', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(AppLocalizations.of(context).whatToDo, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             for (final a in node.advice)
               Padding(
@@ -229,8 +230,8 @@ class _NodeStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!node.online) return const StatusPill(state: 'offline', color: HazardColors.unknown);
-    if (node.stale) return const StatusPill(state: 'stale', label: 'no data', color: HazardColors.unknown);
+    if (!node.online) return StatusPill(state: 'offline', label: AppLocalizations.of(context).offline, color: HazardColors.unknown);
+    if (node.stale) return StatusPill(state: 'stale', label: AppLocalizations.of(context).noData, color: HazardColors.unknown);
     return StatusPill(state: node.status, color: HazardColors.forLevel(node.status));
   }
 }
@@ -242,7 +243,8 @@ class _NotReporting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final what = node.online ? 'No recent data' : 'Offline';
+    final l10n = AppLocalizations.of(context);
+    final what = node.online ? l10n.noRecentData : l10n.offline;
     final seen = node.lastSeenTs;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -256,7 +258,7 @@ class _NotReporting extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              seen == null ? what : '$what · last seen ${_ago(seen)}',
+              seen == null ? what : l10n.lastSeen(what, _ago(l10n, seen)),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
@@ -288,7 +290,7 @@ class _IndicatorRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final i = indicator;
     final color = HazardColors.forLevel(i.level);
-    final meta = _indicatorMeta(i.key);
+    final meta = _indicatorMeta(AppLocalizations.of(context), i.key);
     final trend = _trendIcon(i.trend);
     final flagged = i.level == 'attention' || i.level == 'danger';
     return Container(
@@ -348,14 +350,14 @@ class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-            SizedBox(width: 12),
-            Expanded(child: Text('Loading sensor status…', style: TextStyle(color: HazardColors.onSurfaceMuted))),
+            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(AppLocalizations.of(context).loadingSensorStatus, style: const TextStyle(color: HazardColors.onSurfaceMuted))),
           ],
         ),
       ),
@@ -367,11 +369,11 @@ class _UnavailableCard extends StatelessWidget {
   const _UnavailableCard();
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: ListTile(
-        leading: Icon(Icons.cloud_off, color: HazardColors.unknown),
-        title: Text('Sensor status unavailable'),
-        subtitle: Text("Can't reach the hub right now. Pull down to retry."),
+        leading: const Icon(Icons.cloud_off, color: HazardColors.unknown),
+        title: Text(AppLocalizations.of(context).sensorStatusUnavailable),
+        subtitle: Text(AppLocalizations.of(context).cannotReachHub),
       ),
     );
   }
@@ -381,11 +383,11 @@ class _NoSensorsCard extends StatelessWidget {
   const _NoSensorsCard();
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: ListTile(
-        leading: Icon(Icons.sensors_off, color: HazardColors.unknown),
-        title: Text('No sensors connected'),
-        subtitle: Text('Sensor status appears here once a Canary device joins the hub.'),
+        leading: const Icon(Icons.sensors_off, color: HazardColors.unknown),
+        title: Text(AppLocalizations.of(context).noSensors),
+        subtitle: Text(AppLocalizations.of(context).sensorStatusAppears),
       ),
     );
   }
@@ -406,7 +408,7 @@ class _RefreshFailedNote extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              at == null ? "Couldn't refresh sensor status" : "Couldn't refresh · showing status from ${_ago(at)}",
+              at == null ? AppLocalizations.of(context).couldNotRefresh : AppLocalizations.of(context).couldNotRefreshFrom(_ago(AppLocalizations.of(context), at)),
               style: const TextStyle(fontSize: 12, color: HazardColors.onSurfaceMuted),
             ),
           ),
@@ -416,13 +418,13 @@ class _RefreshFailedNote extends StatelessWidget {
   }
 }
 
-String _headline(NodeAnalysis node) => node.headline.isNotEmpty ? node.headline : _statusText(node.status);
+String _headline(AppLocalizations l10n, NodeAnalysis node) => node.headline.isNotEmpty ? node.headline : _statusText(l10n, node.status);
 
-String _statusText(String status) => switch (status) {
-      'ok' => 'All clear',
-      'attention' => 'Needs attention',
-      'danger' => 'Danger',
-      _ => 'Status unknown',
+String _statusText(AppLocalizations l10n, String status) => switch (status) {
+      'ok' => l10n.allClear,
+      'attention' => l10n.needsAttention,
+      'danger' => l10n.danger,
+      _ => l10n.statusUnknown,
     };
 
 IconData _statusIcon(String status) => switch (status) {
@@ -438,22 +440,22 @@ IconData _kindIcon(String kind) => switch (kind) {
       _ => Icons.sensors,
     };
 
-String _kindLabel(String kind) => switch (kind) {
-      'air' => 'Air sensor',
-      'water' => 'Water sensor',
-      _ => 'Sensor',
+String _kindLabel(AppLocalizations l10n, String kind) => switch (kind) {
+      'air' => l10n.airSensor,
+      'water' => l10n.waterSensor,
+      _ => l10n.sensor,
     };
 
 /// Icon + fallback label per indicator key (HARDWARE.md §3).
-({IconData icon, String label}) _indicatorMeta(String key) => switch (key) {
-      'air_quality' => (icon: Icons.grain, label: 'Air quality'),
-      'co' => (icon: Icons.cloud, label: 'Carbon monoxide'),
-      'gas' => (icon: Icons.local_fire_department, label: 'Gas'),
-      'comfort' => (icon: Icons.thermostat, label: 'Comfort'),
-      'occupancy' => (icon: Icons.person, label: 'Occupancy'),
-      'leak' => (icon: Icons.water_drop, label: 'Water leak'),
-      'valve' => (icon: Icons.plumbing, label: 'Water valve'),
-      'health' => (icon: Icons.sensors, label: 'Sensor'),
+({IconData icon, String label}) _indicatorMeta(AppLocalizations l10n, String key) => switch (key) {
+      'air_quality' => (icon: Icons.grain, label: l10n.airQuality),
+      'co' => (icon: Icons.cloud, label: l10n.carbonMonoxide),
+      'gas' => (icon: Icons.local_fire_department, label: l10n.gas),
+      'comfort' => (icon: Icons.thermostat, label: l10n.comfort),
+      'occupancy' => (icon: Icons.person, label: l10n.occupancy),
+      'leak' => (icon: Icons.water_drop, label: l10n.waterLeak),
+      'valve' => (icon: Icons.plumbing, label: l10n.waterValve),
+      'health' => (icon: Icons.sensors, label: l10n.sensor),
       _ => (icon: Icons.info_outline, label: key),
     };
 
@@ -464,10 +466,10 @@ IconData? _trendIcon(String? trend) => switch (trend) {
       _ => null,
     };
 
-String _ago(DateTime ts) {
+String _ago(AppLocalizations l10n, DateTime ts) {
   final d = DateTime.now().difference(ts);
-  if (d.inMinutes < 1) return 'just now';
-  if (d.inHours < 1) return '${d.inMinutes} min ago';
-  if (d.inDays < 1) return '${d.inHours} h ago';
-  return '${d.inDays} d ago';
+  if (d.inMinutes < 1) return l10n.justNow;
+  if (d.inHours < 1) return l10n.minutesAgo(d.inMinutes);
+  if (d.inDays < 1) return l10n.hoursAgo(d.inHours);
+  return l10n.daysAgo(d.inDays);
 }

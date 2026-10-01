@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/evacuation.dart';
 import '../../theme.dart';
+import '../../../l10n/gen/app_localizations.dart';
 
 /// Ordered, text-first evacuation directions with a visible route spine.
 class RouteLine extends StatelessWidget {
@@ -57,7 +58,7 @@ class _Stop extends StatelessWidget {
         : (isFirst ? HazardColors.start : HazardColors.routeLine);
     return Semantics(
       container: true,
-      label: 'Step ${index + 1} of $total: ${waypoint.label}.${hint.isEmpty ? '' : ' $hint'}',
+      label: AppLocalizations.of(context).routeStep(index + 1, total, waypoint.label, hint.isEmpty ? '' : ' $hint'),
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20),
@@ -91,8 +92,8 @@ class _Stop extends StatelessWidget {
                           color: HazardColors.start,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Text('Start here',
-                            style: TextStyle(color: HazardColors.onHazard, fontSize: 14,
+                        child: Text(AppLocalizations.of(context).startHere,
+                            style: const TextStyle(color: HazardColors.onHazard, fontSize: 14,
                                 fontWeight: FontWeight.bold)),
                       ),
                     if (isFirst) const SizedBox(height: 6),
@@ -131,7 +132,8 @@ class _AvoidRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(label: 'Avoid: $name', child: ExcludeSemantics(child: Padding(
+    final label = AppLocalizations.of(context).avoid(name);
+    return Semantics(label: label, child: ExcludeSemantics(child: Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -147,7 +149,7 @@ class _AvoidRow extends StatelessWidget {
                 const Icon(Icons.block, color: HazardColors.alarm, size: 24),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text('Avoid: $name',
+                  child: Text(label,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
                           color: HazardColors.alarm)),
                 ),

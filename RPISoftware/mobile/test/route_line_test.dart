@@ -1,3 +1,4 @@
+import 'package:canary_resident/l10n/gen/app_localizations.dart';
 import 'package:canary_resident/src/models/evacuation.dart';
 import 'package:canary_resident/src/ui/widgets/route_line.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,9 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
+        locale: Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: RouteLine(
             avoidZoneName: 'Kitchen',
@@ -30,7 +34,12 @@ void main() {
 
   testWidgets('has no visual directions for an empty route', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: RouteLine(waypoints: []))),
+      const MaterialApp(
+        locale: Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: RouteLine(waypoints: [])),
+      ),
     );
 
     expect(find.text('Start here'), findsNothing);

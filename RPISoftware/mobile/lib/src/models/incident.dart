@@ -1,4 +1,5 @@
 import '../config.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 class Incident {
   const Incident({
@@ -31,16 +32,16 @@ class Incident {
         ...affectedZoneIds,
       };
 
-  String get hazardLabel {
+  String hazardLabel(AppLocalizations l10n) {
     switch (hazardType) {
       case 'combustible_gas':
-        return 'Gas leak';
+        return l10n.gasLeak;
       case 'co':
-        return 'Carbon monoxide';
+        return l10n.carbonMonoxide;
       case 'water_leak':
-        return 'Water leak';
+        return l10n.waterLeak;
       case 'particulate':
-        return 'Smoke / particulates';
+        return l10n.smokeParticulates;
       default:
         return hazardType;
     }

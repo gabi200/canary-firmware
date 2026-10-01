@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
 import '../state/providers.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -13,43 +14,41 @@ class SettingsScreen extends ConsumerWidget {
     final consent = ref.watch(consentProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context).settings)),
       body: ListView(
         children: [
-          const _SectionHeader('Account'),
+          _SectionHeader(AppLocalizations.of(context).account),
           ListTile(
             leading: const Icon(Icons.person),
             title: Text(session?.username ?? '—'),
             subtitle: Text('${session?.role ?? ''} · ${session?.buildingId ?? ''}'),
           ),
           const Divider(),
-          const _SectionHeader('Presence contribution'),
+          _SectionHeader(AppLocalizations.of(context).presenceContribution),
           SwitchListTile(
-            title: const Text('Share my presence during incidents'),
-            subtitle: const Text(
-              'Lets responders better account for who is inside. Anonymous; used only during an active incident.',
-            ),
+            title: Text(AppLocalizations.of(context).sharePresence),
+            subtitle: Text(AppLocalizations.of(context).sharePresenceDescription),
             value: consent,
             onChanged: (v) => ref.read(consentProvider.notifier).set(v),
           ),
           const Divider(),
-          const _SectionHeader('About'),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('Canary resident'),
-            subtitle: Text('v0.1.0 — advisory safety app. Not a substitute for certified alarms.'),
+          _SectionHeader(AppLocalizations.of(context).about),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: Text(AppLocalizations.of(context).canaryResident),
+            subtitle: Text(AppLocalizations.of(context).appVersion),
           ),
           ListTile(
             leading: const Icon(Icons.dns),
-            title: const Text('Server'),
-            subtitle: Text(Config.apiBase),
+            title: Text(AppLocalizations.of(context).server),
+            subtitle: const Text(Config.apiBase),
           ),
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: OutlinedButton.icon(
               icon: const Icon(Icons.logout),
-              label: const Text('Sign out'),
+              label: Text(AppLocalizations.of(context).signOut),
               onPressed: () async {
                 await ref.read(sessionProvider.notifier).logout();
                 if (context.mounted) Navigator.of(context).maybePop();

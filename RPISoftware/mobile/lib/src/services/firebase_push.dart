@@ -1,6 +1,10 @@
+import 'dart:ui' show Locale, PlatformDispatcher;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+
+import '../../l10n/gen/app_localizations.dart';
 
 typedef PushHandler = void Function(String title, String body);
 
@@ -31,7 +35,8 @@ Future<void> firebaseInitAndSubscribe({required PushHandler onMessage}) async {
   debugPrint('Canary FCM token: $token');
 
   FirebaseMessaging.onMessage.listen((m) {
-    final n = m.notification;
-    onMessage(n?.title ?? 'Canary alert', n?.body ?? '');
+    final locale = PlatformDispatcher.instance.locale;
+    final l10n = lookupAppLocalizations(locale.languageCode == 'en' ? const Locale('en') : const Locale('ro'));
+    onMessage(l10n.alertNotificationTitle(l10n.appTitle), l10n.openAppForGuidance);
   });
 }

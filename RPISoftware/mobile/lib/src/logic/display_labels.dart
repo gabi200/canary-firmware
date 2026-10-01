@@ -1,3 +1,5 @@
+import '../../l10n/gen/app_localizations.dart';
+
 /// Human-readable text for internal identifiers and canonical incident states.
 String humanizeId(String? id) {
   if (id == null || id.trim().isEmpty) return '—';
@@ -18,14 +20,14 @@ String prettyZone(Map<String, String>? labels, String? id) {
   return label == null || label.isEmpty ? humanizeId(id) : label;
 }
 
-String incidentStateLabel(String state) => switch (state) {
-      'detection' => 'Detected',
-      'verification' => 'Verifying',
-      'alarm' => 'Alarm',
-      'evacuation' => 'Evacuate now',
-      'escalation' => 'Emergency response',
-      'resolution' => 'Resolved',
-      'false_alarm' => 'False alarm',
-      'normal' => 'All clear',
+String incidentStateLabel(AppLocalizations l10n, String state) => switch (state) {
+      'detection' => l10n.stateDetection,
+      'verification' => l10n.stateVerification,
+      'alarm' => l10n.stateAlarm,
+      'evacuation' => l10n.stateEvacuation,
+      'escalation' => l10n.stateEscalation,
+      'resolution' => l10n.stateResolution,
+      'false_alarm' => l10n.stateFalseAlarm,
+      'normal' => l10n.stateNormal,
       _ => humanizeId(state),
     };

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:intl/intl.dart';
 
 import '../logic/hazard_advice.dart';
 import '../logic/connection_status.dart';
@@ -16,6 +17,7 @@ import '../state/incident_controller.dart';
 import '../state/providers.dart';
 import '../theme.dart';
 import 'widgets/route_line.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 class AlarmScreen extends ConsumerStatefulWidget {
   const AlarmScreen({super.key, required this.incidentId});
@@ -62,8 +64,8 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(result == CheckInResult.sent
-          ? 'Check-in sent: ${status.label}'
-          : 'Offline — check-in queued, will send automatically'),
+          ? AppLocalizations.of(context).checkInSent(status.label(AppLocalizations.of(context)))
+          : AppLocalizations.of(context).checkInQueued),
       backgroundColor: result == CheckInResult.sent
           ? HazardColors.normal : HazardColors.warning,
     ));
@@ -77,12 +79,13 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dial 112 on your phone')),
+      SnackBar(content: Text(AppLocalizations.of(context).dial112)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(incidentControllerProvider);
     final incident = _find(state);
     if (incident == null || incident.isClosed) {
@@ -127,7 +130,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                 TextButton.icon(
                   onPressed: () => Navigator.of(context).maybePop(),
                   icon: const Icon(Icons.expand_more),
-                  label: const Text('Minimize'),
+                  label: Text(l10n.minimize),
                   style: TextButton.styleFrom(
                     foregroundColor: HazardColors.onHazard,
                     minimumSize: const Size(48, 48),
@@ -135,13 +138,13 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                 ),
               ]),
               const SizedBox(height: 12),
-              Text(incident.isEvacuation ? 'EVACUATE NOW'
-                    : incident.hazardLabel.toUpperCase(),
+              Text(incident.isEvacuation ? l10n.evacuateNow
+                    : incident.hazardLabel(l10n).toUpperCase(),
                 style: const TextStyle(color: HazardColors.onHazard,
                   fontSize: 32, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
-              Text(zoneName == null || zoneName.isEmpty ? incident.hazardLabel
-                    : '${incident.hazardLabel} · $zoneName',
+              Text(zoneName == null || zoneName.isEmpty ? incident.hazardLabel(l10n)
+                    : '${incident.hazardLabel(l10n)} · $zoneName',
                 style: const TextStyle(color: HazardColors.onHazard, fontSize: 18)),
             ]),
           )),
@@ -151,7 +154,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Icon(Icons.warning_amber_rounded, color: HazardColors.warnFg),
               const SizedBox(width: 10),
-              Expanded(child: Text(hazardDont(incident.hazardType),
+              Expanded(child: Text(hazardDont(l10n, incident.hazardType),
                 style: const TextStyle(color: HazardColors.warnFg,
                   fontSize: 16, fontWeight: FontWeight.bold))),
             ]),
@@ -167,13 +170,13 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                     decoration: BoxDecoration(
                       border: Border.all(color: HazardColors.alarm, width: 2),
                       borderRadius: BorderRadius.circular(12)),
-                    child: const Row(crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.warning_rounded, color: HazardColors.alarm),
-                        SizedBox(width: 10),
+                        const Icon(Icons.warning_rounded, color: HazardColors.alarm),
+                        const SizedBox(width: 10),
                         Expanded(child: Text(
-                          'This route passes near the hazard. Use another marked exit if you can, and call 112.',
-                          style: TextStyle(color: HazardColors.text,
+                          l10n.routeCrossesHazard,
+                          style: const TextStyle(color: HazardColors.text,
                             fontSize: 16, fontWeight: FontWeight.bold))),
                       ]),
                   ),
@@ -186,13 +189,13 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                       color: HazardColors.warnBg,
                       border: Border.all(color: HazardColors.warning, width: 2),
                       borderRadius: BorderRadius.circular(12)),
-                    child: const Row(crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.warning_amber_rounded, color: HazardColors.warnFg),
-                        SizedBox(width: 10),
+                        const Icon(Icons.warning_amber_rounded, color: HazardColors.warnFg),
+                        const SizedBox(width: 10),
                         Expanded(child: Text(
-                          "We couldn't check this route against the hazard. Follow the marked exits, stay away from the hazard, and call 112 if unsure.",
-                          style: TextStyle(color: HazardColors.warnFg,
+                          l10n.routeSafetyUnknown,
+                          style: const TextStyle(color: HazardColors.warnFg,
                             fontSize: 16, fontWeight: FontWeight.bold))),
                       ]),
                   ),
@@ -202,8 +205,8 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   _SavedRouteNotice(savedAt: savedAt),
                   const SizedBox(height: 16),
                 ],
-                const Text('Evacuation route',
-                  style: TextStyle(color: HazardColors.text,
+                Text(l10n.evacuationRoute,
+                  style: const TextStyle(color: HazardColors.text,
                     fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 routeState.when(
@@ -234,16 +237,17 @@ class _StaticFallback extends StatelessWidget {
   const _StaticFallback();
   @override
   Widget build(BuildContext context) {
-    return const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(Icons.map, color: HazardColors.muted),
-      SizedBox(width: 10),
+    final l10n = AppLocalizations.of(context);
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Icon(Icons.map, color: HazardColors.muted),
+      const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Leave by the nearest safe exit. Do not use the lift.',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          SizedBox(height: 4),
-          Text('Go to the outdoor assembly point and do not return inside.',
-            style: TextStyle(fontSize: 16)),
+          Text(l10n.fallbackLeave,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(l10n.fallbackAssembly,
+            style: const TextStyle(fontSize: 16)),
         ])),
     ]);
   }
@@ -260,6 +264,7 @@ class _CheckInBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return SafeArea(top: false, child: Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.48),
       decoration: const BoxDecoration(color: HazardColors.surface,
@@ -270,12 +275,12 @@ class _CheckInBar extends StatelessWidget {
           ? Row(children: [
               const Icon(Icons.check_circle, color: HazardColors.normal),
               const SizedBox(width: 8),
-              Expanded(child: Text('Checked in: ${checkedInAs!.label}',
+              Expanded(child: Text(l10n.checkedIn(checkedInAs!.label(l10n)),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
               TextButton(onPressed: submitting ? null : onChange,
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48),
                   textStyle: const TextStyle(fontSize: 16)),
-                child: const Text('Change')),
+                child: Text(l10n.change)),
             ])
           : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               FilledButton.icon(
@@ -286,7 +291,7 @@ class _CheckInBar extends StatelessWidget {
                   minimumSize: const Size.fromHeight(56),
                   textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 icon: const Icon(Icons.verified),
-                label: const Text("I'm out and safe")),
+                label: Text(l10n.outAndSafe)),
               const SizedBox(height: 8),
               LayoutBuilder(builder: (context, constraints) {
                 final narrow = constraints.maxWidth < 380 ||
@@ -298,14 +303,14 @@ class _CheckInBar extends StatelessWidget {
                     foregroundColor: HazardColors.onHazard,
                     minimumSize: const Size.fromHeight(48),
                     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  icon: const Icon(Icons.sos), label: const Text('I need help'));
+                  icon: const Icon(Icons.sos), label: Text(l10n.needsHelp));
                 final call = OutlinedButton.icon(
                   onPressed: onCall,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: HazardColors.text,
                     minimumSize: const Size.fromHeight(48),
                     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  icon: const Icon(Icons.phone), label: const Text('Call 112'));
+                  icon: const Icon(Icons.phone), label: Text(l10n.call112));
                 if (narrow) {
                   return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [help, const SizedBox(height: 8), call]);
@@ -321,7 +326,7 @@ class _CheckInBar extends StatelessWidget {
                   minimumSize: const Size.fromHeight(48),
                   textStyle: const TextStyle(fontSize: 16)),
                 icon: const Icon(Icons.home_outlined),
-                label: const Text("I'm safe but still inside")),
+                label: Text(l10n.safeStillInside)),
             ]),
       ),
     ));
@@ -342,14 +347,14 @@ class _AllClear extends StatelessWidget {
             children: [
               const Icon(Icons.verified_user, color: HazardColors.onHazard, size: 96),
               const SizedBox(height: 16),
-              const Text('All clear', style: TextStyle(color: HazardColors.onHazard, fontSize: 28, fontWeight: FontWeight.w800)),
+              Text(AppLocalizations.of(context).allClear, style: const TextStyle(color: HazardColors.onHazard, fontSize: 28, fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
-              const Text('The hazard has cleared.', style: TextStyle(color: HazardColors.onHazardMuted)),
+              Text(AppLocalizations.of(context).hazardCleared, style: const TextStyle(color: HazardColors.onHazardMuted)),
               const SizedBox(height: 24),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: HazardColors.surface, foregroundColor: HazardColors.normal),
                 onPressed: onClose,
-                child: const Text('Return'),
+                child: Text(AppLocalizations.of(context).returnLabel),
               ),
             ],
           ),
@@ -395,8 +400,8 @@ class _ConnectionChipState extends State<_ConnectionChip> {
   Widget build(BuildContext context) {
     if (!widget.connected) {
       final offlineText = widget.hasRoute
-          ? 'Offline · showing saved route'
-          : 'Offline · no route available';
+          ? AppLocalizations.of(context).offlineSavedRoute
+          : AppLocalizations.of(context).offlineNoRoute;
       return Row(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.wifi_off, color: HazardColors.onHazard, size: 18),
         const SizedBox(width: 6),
@@ -404,7 +409,7 @@ class _ConnectionChipState extends State<_ConnectionChip> {
             fontSize: 14, fontWeight: FontWeight.bold))),
       ]);
     }
-    final text = liveConnectionLabel(lastMessageAt: widget.lastMessageAt, now: DateTime.now());
+    final text = liveConnectionLabel(AppLocalizations.of(context), lastMessageAt: widget.lastMessageAt, now: DateTime.now());
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(widget.connected ? Icons.wifi : Icons.wifi_off,
           color: HazardColors.onHazard, size: 18),
@@ -423,8 +428,9 @@ class _SavedRouteNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localSavedAt = savedAt.toLocal();
-    final time = '${localSavedAt.hour.toString().padLeft(2, '0')}:'
-        '${localSavedAt.minute.toString().padLeft(2, '0')}';
+    final time = DateFormat('HH:mm', Localizations.localeOf(context).toLanguageTag())
+        .format(localSavedAt);
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -437,7 +443,7 @@ class _SavedRouteNotice extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'Saved route from $time — it may not reflect current blockages',
+            l10n.savedRoute(time),
             style: const TextStyle(
               color: HazardColors.warnFg,
               fontSize: 16,

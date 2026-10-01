@@ -11,6 +11,7 @@ import 'settings_screen.dart';
 import 'widgets/flashing_evacuate_banner.dart';
 import 'widgets/home_status_section.dart';
 import 'widgets/status_pill.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 /// Operations dashboard for managers / dispatchers / admins — the mobile counterpart
 /// of the web console: active incidents, victim-accounting, named resident roster and
@@ -42,12 +43,18 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
   Future<void> _action(Incident incident, String action) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     try {
       await ref.read(apiClientProvider).incidentAction(incident.id, action);
       await _refresh();
-      messenger.showSnackBar(SnackBar(content: Text('Done: ${action.replaceAll('-', ' ')}')));
+      final actionLabel = switch (action) {
+        'order-evacuation' => l10n.orderEvacuation,
+        'resolve' => l10n.resolve,
+        _ => l10n.dismiss,
+      };
+      messenger.showSnackBar(SnackBar(content: Text(l10n.doneAction(actionLabel))));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: HazardColors.alarm));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.actionFailed), backgroundColor: HazardColors.alarm));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -55,6 +62,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(incidentControllerProvider);
     final summary = ref.watch(summaryProvider).summary;
     final labels = ref.watch(zoneLabelsProvider).valueOrNull;
@@ -73,7 +81,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(summary?.buildingName ?? 'Canary'),
+        title: Text(summary?.buildingName ?? l10n.appTitle),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -108,16 +116,16 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
             ] else
               const _AllClearCard(),
             const SizedBox(height: 16),
-            const HomeStatusSection(title: 'Building sensors'),
+            HomeStatusSection(title: l10n.buildingSensors),
             const SizedBox(height: 24),
-            Text('Active incidents', style: Theme.of(context).textTheme.titleMedium),
+            Text(l10n.activeIncidents, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             if (state.incidents.isEmpty)
-              const Card(
+              Card(
                 child: ListTile(
-                  leading: Icon(Icons.check_circle, color: HazardColors.normal),
-                  title: Text('No active incidents'),
-                  subtitle: Text('Building is being monitored.'),
+                  leading: const Icon(Icons.check_circle, color: HazardColors.normal),
+                  title: Text(l10n.noActiveIncidents),
+                  subtitle: Text(l10n.buildingMonitored),
                 ),
               )
             else
@@ -125,8 +133,8 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
                 Card(
                   child: ListTile(
                     leading: Icon(Icons.warning_amber_rounded, color: HazardColors.forState(inc.state)),
-                    title: Text(inc.hazardLabel),
-                    subtitle: Text('${incidentStateLabel(inc.state)} · ${prettyZone(labels, inc.primaryZoneId)}'),
+                    title: Text(inc.hazardLabel(l10n)),
+                    subtitle: Text('${incidentStateLabel(l10n, inc.state)} · ${prettyZone(labels, inc.primaryZoneId)}'),
                     trailing: StatusPill(state: inc.state),
                   ),
                 ),
@@ -147,7 +155,7 @@ class _ConnectivityRow extends StatelessWidget {
         Icon(connected ? Icons.wifi : Icons.wifi_off,
             size: 18, color: connected ? HazardColors.normal : HazardColors.unknown),
         const SizedBox(width: 6),
-        Text(connected ? 'Live' : 'Reconnecting…', style: const TextStyle(color: HazardColors.onSurfaceMuted)),
+        Text(connected ? AppLocalizations.of(context).live : AppLocalizations.of(context).reconnecting, style: const TextStyle(color: HazardColors.onSurfaceMuted)),
       ],
     );
   }
@@ -166,17 +174,17 @@ class _AccountingCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Victim accounting', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(AppLocalizations.of(context).victimAccounting, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             acc.when(
               loading: () => const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())),
-              error: (e, _) => const Text('Could not load accounting', style: TextStyle(color: HazardColors.alarm)),
+              error: (e, _) => Text(AppLocalizations.of(context).couldNotLoadAccounting, style: const TextStyle(color: HazardColors.alarm)),
               data: (a) => Row(
                 children: [
-                  _Metric(value: a.occupancyTotal.round().toString(), label: 'Occupants'),
-                  _Metric(value: a.accounted.toString(), label: 'Accounted', color: HazardColors.normal),
-                  _Metric(value: a.unaccounted.toString(), label: 'Unaccounted', color: a.unaccounted > 0 ? HazardColors.alarm : HazardColors.normal),
-                  _Metric(value: a.needsHelp.toString(), label: 'Need help', color: a.needsHelp > 0 ? HazardColors.alarm : null),
+                  _Metric(value: a.occupancyTotal.round().toString(), label: AppLocalizations.of(context).occupants),
+                  _Metric(value: a.accounted.toString(), label: AppLocalizations.of(context).accounted, color: HazardColors.normal),
+                  _Metric(value: a.unaccounted.toString(), label: AppLocalizations.of(context).unaccounted, color: a.unaccounted > 0 ? HazardColors.alarm : HazardColors.normal),
+                  _Metric(value: a.needsHelp.toString(), label: AppLocalizations.of(context).needHelp, color: a.needsHelp > 0 ? HazardColors.alarm : null),
                 ],
               ),
             ),
@@ -219,13 +227,13 @@ class _RosterCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Resident accountability', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(AppLocalizations.of(context).residentAccountability, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             roster.when(
               loading: () => const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())),
-              error: (e, _) => const Text('Could not load roster', style: TextStyle(color: HazardColors.alarm)),
+              error: (e, _) => Text(AppLocalizations.of(context).couldNotLoadRoster, style: const TextStyle(color: HazardColors.alarm)),
               data: (r) => r.entries.isEmpty
-                  ? const Text('No residents registered.', style: TextStyle(color: HazardColors.onSurfaceMuted))
+                  ? Text(AppLocalizations.of(context).noResidents, style: const TextStyle(color: HazardColors.onSurfaceMuted))
                   : Column(
                       children: [
                         for (final e in r.entries)
@@ -253,24 +261,24 @@ class _RosterStatusChip extends StatelessWidget {
   const _RosterStatusChip({required this.status});
   final String status;
 
-  ({String label, Color color}) get _meta {
+  ({String label, Color color}) _meta(AppLocalizations l10n) {
     switch (status) {
       case 'needs_help':
-        return (label: 'NEEDS HELP', color: HazardColors.alarm);
+        return (label: l10n.needsHelpUpper, color: HazardColors.alarm);
       case 'safe_outside':
-        return (label: 'Safe — out', color: HazardColors.normal);
+        return (label: l10n.safeOut, color: HazardColors.normal);
       case 'safe_inside':
-        return (label: 'Safe — in', color: HazardColors.normal);
+        return (label: l10n.safeIn, color: HazardColors.normal);
       case 'no_response':
-        return (label: 'No response', color: HazardColors.warning);
+        return (label: l10n.noResponse, color: HazardColors.warning);
       default:
-        return (label: 'Awaiting', color: HazardColors.warning);
+        return (label: l10n.awaiting, color: HazardColors.warning);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final m = _meta;
+    final m = _meta(AppLocalizations.of(context));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -302,19 +310,19 @@ class _ManagerActions extends StatelessWidget {
             FilledButton.icon(
               style: FilledButton.styleFrom(backgroundColor: HazardColors.warning, minimumSize: const Size(0, 44)),
               icon: const Icon(Icons.directions_run),
-              label: const Text('Order evacuation'),
+              label: Text(AppLocalizations.of(context).orderEvacuation),
               onPressed: busy || incident.isEvacuation ? null : () => onAction(incident, 'order-evacuation'),
             ),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
               icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Resolve'),
+              label: Text(AppLocalizations.of(context).resolve),
               onPressed: busy || !alarming ? null : () => onAction(incident, 'resolve'),
             ),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44), foregroundColor: HazardColors.alarm),
               icon: const Icon(Icons.cancel_outlined),
-              label: const Text('Dismiss'),
+              label: Text(AppLocalizations.of(context).dismiss),
               // Once residents are alarmed a false-alarm dismissal is illegal (backend 409).
               onPressed: busy || alarming ? null : () => onAction(incident, 'dismiss'),
             ),
@@ -331,19 +339,19 @@ class _AllClearCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: HazardColors.normal.withOpacity(0.08),
-      child: const Padding(
-        padding: EdgeInsets.all(24),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Row(
           children: [
-            Icon(Icons.verified_user, color: HazardColors.normal, size: 40),
-            SizedBox(width: 16),
+            const Icon(Icons.verified_user, color: HazardColors.normal, size: 40),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('All clear', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 4),
-                  Text('No active hazard in this building.'),
+                  Text(AppLocalizations.of(context).allClear, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(AppLocalizations.of(context).noActiveHazard),
                 ],
               ),
             ),

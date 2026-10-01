@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
 import '../state/providers.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -31,7 +32,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       await ref.read(sessionProvider.notifier).login(_username.text.trim(), _building.text.trim());
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = AppLocalizations.of(context).loginFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -52,19 +53,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: [
                   const Icon(Icons.shield_moon, size: 72, color: Color(0xFF1565C0)),
                   const SizedBox(height: 8),
-                  const Text('Canary', textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
-                  const Text('Building safety for residents',
-                      textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+                  Text(AppLocalizations.of(context).appTitle, textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                  Text(AppLocalizations.of(context).residentSafety,
+                      textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
                   const SizedBox(height: 32),
                   TextField(
                     controller: _username,
-                    decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: AppLocalizations.of(context).username, border: const OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _building,
-                    decoration: const InputDecoration(labelText: 'Building ID', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: AppLocalizations.of(context).buildingId, border: const OutlineInputBorder()),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -84,10 +85,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     onPressed: _busy ? null : _login,
                     child: _busy
                         ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Link my unit'),
+                        : Text(AppLocalizations.of(context).linkUnit),
                   ),
                   const SizedBox(height: 12),
-                  Text('Server: ${Config.apiBase}',
+                  Text(AppLocalizations.of(context).serverValue(Config.apiBase),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.black38, fontSize: 12)),
                 ],

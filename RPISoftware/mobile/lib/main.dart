@@ -8,6 +8,7 @@ import 'src/theme.dart';
 import 'src/ui/home_screen.dart';
 import 'src/ui/manager_dashboard_screen.dart';
 import 'src/ui/onboarding_screen.dart';
+import 'l10n/gen/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,10 @@ class CanaryApp extends ConsumerWidget {
       title: 'Canary',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeResolutionCallback: (locale, supportedLocales) =>
+          locale?.languageCode == 'en' ? const Locale('en') : const Locale('ro'),
       home: home,
     );
   }

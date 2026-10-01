@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import '../services/api_client.dart';
 import '../services/notifications.dart';
 import '../services/storage.dart';
 import '../services/ws_client.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 enum CheckInResult { sent, queued }
 
@@ -158,9 +160,11 @@ class IncidentController extends StateNotifier<IncidentsState> {
 
     if (incident.isAlarming && !_alarmed.contains(incident.id + incident.state)) {
       _alarmed.add(incident.id + incident.state);
+      final locale = PlatformDispatcher.instance.locale;
+      final l10n = lookupAppLocalizations(locale.languageCode == 'en' ? const Locale('en') : const Locale('ro'));
       Notifications.instance.showAlarm(
-        (ev['title'] as String?) ?? '${incident.hazardLabel} alert',
-        (ev['body'] as String?) ?? 'Open Canary for guidance.',
+        l10n.alertNotificationTitle(incident.hazardLabel(l10n)),
+        l10n.openAppForGuidance,
         critical: incident.severity == 'critical' || incident.isEvacuation,
       );
     }

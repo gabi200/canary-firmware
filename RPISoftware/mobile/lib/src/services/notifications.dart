@@ -1,7 +1,10 @@
+import 'dart:ui' show Locale, PlatformDispatcher;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../config.dart';
+import '../../l10n/gen/app_localizations.dart';
 import 'firebase_push.dart';
 
 /// Local + (optional) remote notifications.
@@ -18,17 +21,24 @@ class Notifications {
   bool _ready = false;
 
   /// High-importance channel for life-safety alerts (Android).
-  static const AndroidNotificationChannel _alarmChannel = AndroidNotificationChannel(
-    'canary_alarm',
-    'Emergency alerts',
-    description: 'Critical building safety alarms (gas, CO, evacuation).',
-    importance: Importance.max,
-    playSound: true,
-    enableVibration: true,
-  );
+  late final AndroidNotificationChannel _alarmChannel;
+
+  AppLocalizations get _l10n {
+    final locale = PlatformDispatcher.instance.locale;
+    return lookupAppLocalizations(locale.languageCode == 'en' ? const Locale('en') : const Locale('ro'));
+  }
 
   Future<void> init() async {
     if (_ready) return;
+    final l10n = _l10n;
+    _alarmChannel = AndroidNotificationChannel(
+      'canary_alarm',
+      l10n.notificationChannelName,
+      description: l10n.notificationChannelDescription,
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings(
       requestAlertPermission: true,

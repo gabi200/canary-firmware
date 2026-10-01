@@ -1,12 +1,18 @@
+import '../../l10n/gen/app_localizations.dart';
+
 /// Resident check-in statuses (must match backend app.enums.CheckInStatus tokens).
 enum CheckInStatus {
-  safeOutside('safe_outside', "I'm safe / evacuated"),
-  safeInside('safe_inside', "Safe but still inside"),
-  needsHelp('needs_help', 'I need help');
+  safeOutside('safe_outside'),
+  safeInside('safe_inside'),
+  needsHelp('needs_help');
 
-  const CheckInStatus(this.token, this.label);
+  const CheckInStatus(this.token);
   final String token;
-  final String label;
+  String label(AppLocalizations l10n) => switch (this) {
+        CheckInStatus.safeOutside => l10n.safeOutside,
+        CheckInStatus.safeInside => l10n.safeInside,
+        CheckInStatus.needsHelp => l10n.needsHelp,
+      };
 }
 
 /// A check-in queued locally while offline, replayed on reconnect.

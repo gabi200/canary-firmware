@@ -1,5 +1,6 @@
 /// Manager/dispatcher dashboard models: victim-accounting + named resident roster.
 /// Mirrors the web dashboard payloads (AccountingOut / RosterOut / ResidentOut).
+library;
 
 class ZoneOccupancy {
   const ZoneOccupancy({required this.zoneId, required this.personsEst});
