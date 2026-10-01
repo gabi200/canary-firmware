@@ -104,9 +104,15 @@ class EvacuationRoute {
 }
 
 class EvacuationInfo {
-  const EvacuationInfo({required this.routes, required this.assemblyPoints});
+  const EvacuationInfo({
+    required this.routes,
+    required this.assemblyPoints,
+    this.savedAt,
+  });
   final List<EvacuationRoute> routes;
   final List<AssemblyPoint> assemblyPoints;
+  /// Null for a route fetched from the hub; non-null for an offline saved route.
+  final DateTime? savedAt;
 
   factory EvacuationInfo.fromJson(Map<String, dynamic> j) {
     final rawAssemblyPoints = j['assembly_points'];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../logic/display_labels.dart';
+import '../models/evacuation.dart';
 import '../state/dashboard_providers.dart';
 import '../state/incident_controller.dart';
 import '../state/providers.dart';
@@ -12,8 +13,15 @@ import 'widgets/hazard_banner.dart';
 import 'widgets/home_status_section.dart';
 import 'widgets/status_pill.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _prefetchedEvacuation = false;
 
   void _openAlarm(BuildContext context, String incidentId) {
     Navigator.of(context).push(
@@ -22,10 +30,19 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(incidentControllerProvider);
     final summary = ref.watch(summaryProvider).summary;
     final labels = ref.watch(zoneLabelsProvider).valueOrNull;
+
+    // Warm the offline route cache before an incident. A later alarm screen
+    // reads the same provider and can use the last successful response.
+    if (!_prefetchedEvacuation && ref.watch(sessionProvider) != null) {
+      _prefetchedEvacuation = true;
+      ref.read(evacuationProvider.future).catchError(
+        (_) => const EvacuationInfo(routes: [], assemblyPoints: []),
+      );
+    }
 
     // Auto-surface the emergency screen when the building enters an alarming state.
     ref.listen<IncidentsState>(incidentControllerProvider, (prev, next) {

@@ -48,7 +48,35 @@ final evacuationProvider = FutureProvider.autoDispose<EvacuationInfo>((ref) asyn
   if (session == null) {
     return const EvacuationInfo(routes: [], assemblyPoints: []);
   }
-  return ref.watch(apiClientProvider).evacuation(session.buildingId);
+  // Read dependencies before the first await: the home-screen prefetch reads this
+  // provider without listening, so it may be disposed before the fetch completes.
+  final api = ref.watch(apiClientProvider);
+  final storage = ref.watch(storageProvider);
+  try {
+    final raw = await api.evacuationJson(session.buildingId);
+    final info = EvacuationInfo.fromJson(raw);
+    try {
+      await storage.saveEvacuation(session.buildingId, raw);
+    } catch (_) {
+      // A fresh hub route is still safe to show if local persistence is unavailable.
+    }
+    return info;
+  } catch (error, stackTrace) {
+    final cached = storage.loadEvacuation(session.buildingId);
+    if (cached != null) {
+      try {
+        final info = EvacuationInfo.fromJson(cached.json);
+        return EvacuationInfo(
+          routes: info.routes,
+          assemblyPoints: info.assemblyPoints,
+          savedAt: cached.savedAt,
+        );
+      } catch (_) {
+        // A malformed route cache is not safe to show.
+      }
+    }
+    Error.throwWithStackTrace(error, stackTrace);
+  }
 });
 
 /// Presence-contribution consent (explicit opt-in; off by default).

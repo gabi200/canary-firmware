@@ -71,9 +71,17 @@ class ApiClient {
   }
 
   Future<EvacuationInfo> evacuation(String buildingId) async {
+    return EvacuationInfo.fromJson(await evacuationJson(buildingId));
+  }
+
+  Future<Map<String, dynamic>> evacuationJson(String buildingId) async {
     try {
       final res = await _dio.get('/api/v1/buildings/$buildingId/evacuation');
-      return EvacuationInfo.fromJson(res.data as Map<String, dynamic>);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException('Unexpected evacuation route response', statusCode: res.statusCode);
+      }
+      return data;
     } on DioException catch (e) {
       throw _wrap(e, 'Could not load evacuation routes');
     }

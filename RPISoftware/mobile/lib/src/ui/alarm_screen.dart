@@ -104,21 +104,26 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
             color: HazardColors.forState(incident.state),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: HazardColors.onHazard),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: _ConnectionChip(
-                      connected: state.connected,
-                      lastMessageAt: state.lastMessageAt,
-                    ),
+              // Wrap, not Row: at large text sizes Minimize drops to its own line
+              // instead of squeezing the connection chip into a narrow column.
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: HazardColors.onHazard),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                )),
+                  child: _ConnectionChip(
+                    connected: state.connected,
+                    lastMessageAt: state.lastMessageAt,
+                    hasRoute: choice?.route.waypoints.isNotEmpty == true,
+                  ),
+                ),
                 TextButton.icon(
                   onPressed: () => Navigator.of(context).maybePop(),
                   icon: const Icon(Icons.expand_more),
@@ -193,6 +198,10 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   ),
                   const SizedBox(height: 20),
                 ],
+                if (info?.savedAt case final DateTime savedAt) ...[
+                  _SavedRouteNotice(savedAt: savedAt),
+                  const SizedBox(height: 16),
+                ],
                 const Text('Evacuation route',
                   style: TextStyle(color: HazardColors.text,
                     fontSize: 20, fontWeight: FontWeight.bold)),
@@ -230,10 +239,10 @@ class _StaticFallback extends StatelessWidget {
       SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Use the nearest marked exit',
+          Text('Leave by the nearest safe exit. Do not use the lift.',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           SizedBox(height: 4),
-          Text('Take the stairs (not the lift) to the outdoor assembly point. Do not return inside.',
+          Text('Go to the outdoor assembly point and do not return inside.',
             style: TextStyle(fontSize: 16)),
         ])),
     ]);
@@ -351,10 +360,15 @@ class _AllClear extends StatelessWidget {
 }
 
 class _ConnectionChip extends StatefulWidget {
-  const _ConnectionChip({required this.connected, required this.lastMessageAt});
+  const _ConnectionChip({
+    required this.connected,
+    required this.lastMessageAt,
+    required this.hasRoute,
+  });
 
   final bool connected;
   final DateTime? lastMessageAt;
+  final bool hasRoute;
 
   @override
   State<_ConnectionChip> createState() => _ConnectionChipState();
@@ -379,15 +393,59 @@ class _ConnectionChipState extends State<_ConnectionChip> {
 
   @override
   Widget build(BuildContext context) {
-    final text = widget.connected
-        ? liveConnectionLabel(lastMessageAt: widget.lastMessageAt, now: DateTime.now())
-        : 'Offline · showing saved route';
+    if (!widget.connected) {
+      final offlineText = widget.hasRoute
+          ? 'Offline · showing saved route'
+          : 'Offline · no route available';
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.wifi_off, color: HazardColors.onHazard, size: 18),
+        const SizedBox(width: 6),
+        Flexible(child: Text(offlineText, style: const TextStyle(color: HazardColors.onHazard,
+            fontSize: 14, fontWeight: FontWeight.bold))),
+      ]);
+    }
+    final text = liveConnectionLabel(lastMessageAt: widget.lastMessageAt, now: DateTime.now());
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(widget.connected ? Icons.wifi : Icons.wifi_off,
           color: HazardColors.onHazard, size: 18),
       const SizedBox(width: 6),
-      Text(text, style: const TextStyle(color: HazardColors.onHazard,
-          fontSize: 14, fontWeight: FontWeight.bold)),
+      Flexible(child: Text(text, style: const TextStyle(color: HazardColors.onHazard,
+          fontSize: 14, fontWeight: FontWeight.bold))),
     ]);
+  }
+}
+
+class _SavedRouteNotice extends StatelessWidget {
+  const _SavedRouteNotice({required this.savedAt});
+
+  final DateTime savedAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final localSavedAt = savedAt.toLocal();
+    final time = '${localSavedAt.hour.toString().padLeft(2, '0')}:'
+        '${localSavedAt.minute.toString().padLeft(2, '0')}';
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HazardColors.warnBg,
+        border: Border.all(color: HazardColors.warning),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.history, color: HazardColors.warnFg),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Saved route from $time — it may not reflect current blockages',
+            style: const TextStyle(
+              color: HazardColors.warnFg,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ]),
+    );
   }
 }
