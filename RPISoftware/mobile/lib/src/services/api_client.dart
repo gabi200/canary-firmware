@@ -7,6 +7,7 @@ import '../models/dashboard.dart';
 import '../models/evacuation.dart';
 import '../models/incident.dart';
 import '../models/summary.dart';
+import '../models/zone.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
@@ -133,6 +134,23 @@ class ApiClient {
   }
 
   /// id -> human zone label (e.g. "zone_kitchen" -> "Bucătărie").
+  /// Zones with their schematic positions (`pos_x`/`pos_y`), for the floor-plan view.
+  Future<List<ZoneInfo>> zones(String buildingId) async {
+    try {
+      final res = await _dio.get('/api/v1/buildings/$buildingId/zones');
+      final data = res.data;
+      if (data is! List) {
+        throw ApiException('Unexpected zones response', statusCode: res.statusCode);
+      }
+      return [
+        for (final entry in data)
+          if (entry is Map<String, dynamic>) ZoneInfo.fromJson(entry),
+      ];
+    } on DioException catch (e) {
+      throw _wrap(e, 'Could not load zones');
+    }
+  }
+
   Future<Map<String, String>> zoneLabels(String buildingId) async {
     try {
       final res = await _dio.get('/api/v1/buildings/$buildingId/zones');

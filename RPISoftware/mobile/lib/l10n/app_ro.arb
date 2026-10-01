@@ -45,7 +45,11 @@
   "readAloud": "Citiți cu voce tare",
   "stopReading": "Opriți",
   "spokenAssembly": "Apoi mergeți la punctul de adunare: {name}.",
-  "@spokenAssembly": {"placeholders": {"name": {}}},
+  "@spokenAssembly": {
+    "placeholders": {
+      "name": {}
+    }
+  },
   "fallbackLeave": "Ieșiți pe cea mai apropiată ieșire sigură. Nu folosiți liftul.",
   "fallbackAssembly": "Mergeți la punctul exterior de adunare și nu vă întoarceți înăuntru.",
   "checkInSent": "Confirmare trimisă: {status}",
@@ -240,5 +244,10 @@
   },
   "openAppForGuidance": "Deschideți Canary pentru instrucțiuni.",
   "loginFailed": "Autentificarea nu a reușit. Încercați din nou.",
-  "actionFailed": "Acțiunea nu a putut fi finalizată. Încercați din nou."
+  "actionFailed": "Acțiunea nu a putut fi finalizată. Încercați din nou.",
+  "seeFloorPlan": "Vedeți pe schiță",
+  "hideFloorPlan": "Ascundeți schița",
+  "floorPlanNotToScale": "Schemă orientativă · nu la scară",
+  "assemblyPoint": "Punct de adunare",
+  "floorPlanSemantics": "Schiță orientativă, nu la scară. Traseu de la {start} până la {end}."
 }

@@ -10,14 +10,17 @@ import 'package:intl/intl.dart';
 import '../logic/hazard_advice.dart';
 import '../logic/connection_status.dart';
 import '../logic/evacuation_script.dart';
+import '../logic/floor_plan_layout.dart';
 import '../logic/route_selection.dart';
 import '../models/check_in.dart';
 import '../models/incident.dart';
 import '../state/dashboard_providers.dart';
+import '../state/floor_plan_providers.dart';
 import '../state/incident_controller.dart';
 import '../state/providers.dart';
 import '../services/speech.dart';
 import '../theme.dart';
+import 'widgets/floor_plan_schematic.dart';
 import 'widgets/route_line.dart';
 import '../../l10n/gen/app_localizations.dart';
 
@@ -33,6 +36,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
   CheckInStatus? _checkedInAs;
   bool _submitting = false;
   bool _reading = false;
+  bool _showPlan = false;
   // Captured in initState: ref must not be used from dispose().
   late final Speech _speech;
 
@@ -285,8 +289,41 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   error: (_, __) => const _StaticFallback(),
                   data: (_) => choice == null || choice.route.waypoints.isEmpty
                     ? const _StaticFallback()
-                    : RouteLine(waypoints: choice.route.waypoints,
-                        avoidZoneName: zoneName),
+                    : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        // Optional schematic above the route line; the step list
+                        // below always stays visible.
+                        OutlinedButton.icon(
+                          onPressed: () => setState(() => _showPlan = !_showPlan),
+                          icon: Icon(_showPlan ? Icons.map_outlined : Icons.map),
+                          label: Text(_showPlan ? l10n.hideFloorPlan : l10n.seeFloorPlan),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: HazardColors.text,
+                            side: const BorderSide(color: HazardColors.divider),
+                            minimumSize: const Size(48, 48),
+                            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (_showPlan) ...[
+                          const SizedBox(height: 12),
+                          FloorPlanSchematic(
+                            layout: buildFloorPlanLayout(
+                              ref.watch(zonesProvider).valueOrNull ?? const [],
+                              choice.route.waypoints,
+                              incident.hazardZoneIds,
+                            ),
+                            startLabel: l10n.startHere,
+                            notToScaleLabel: l10n.floorPlanNotToScale,
+                            assemblyLabel: l10n.assemblyPoint,
+                            semanticsLabel: l10n.floorPlanSemantics(
+                              choice.route.waypoints.first.label,
+                              assemblyPointName ?? l10n.assemblyPoint,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        RouteLine(waypoints: choice.route.waypoints,
+                          avoidZoneName: zoneName),
+                      ]),
                 ),
               ],
             )),

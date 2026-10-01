@@ -877,6 +877,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not complete the action. Please try again.'**
   String get actionFailed;
+
+  /// No description provided for @seeFloorPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'See on floor plan'**
+  String get seeFloorPlan;
+
+  /// No description provided for @hideFloorPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide floor plan'**
+  String get hideFloorPlan;
+
+  /// No description provided for @floorPlanNotToScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Schematic · not to scale'**
+  String get floorPlanNotToScale;
+
+  /// No description provided for @assemblyPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Assembly point'**
+  String get assemblyPoint;
+
+  /// No description provided for @floorPlanSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Schematic floor plan, not to scale. Route from {start} to {end}.'**
+  String floorPlanSemantics(Object start, Object end);
 }
 
 class _AppLocalizationsDelegate

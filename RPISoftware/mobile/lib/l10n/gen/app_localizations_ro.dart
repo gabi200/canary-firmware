@@ -471,4 +471,21 @@ class AppLocalizationsRo extends AppLocalizations {
   @override
   String get actionFailed =>
       'Acțiunea nu a putut fi finalizată. Încercați din nou.';
+
+  @override
+  String get seeFloorPlan => 'Vedeți pe schiță';
+
+  @override
+  String get hideFloorPlan => 'Ascundeți schița';
+
+  @override
+  String get floorPlanNotToScale => 'Schemă orientativă · nu la scară';
+
+  @override
+  String get assemblyPoint => 'Punct de adunare';
+
+  @override
+  String floorPlanSemantics(Object start, Object end) {
+    return 'Schiță orientativă, nu la scară. Traseu de la $start până la $end.';
+  }
 }

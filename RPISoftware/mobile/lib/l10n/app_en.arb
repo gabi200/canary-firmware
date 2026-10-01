@@ -17,37 +17,243 @@
   "hazardSmokeDont": "Stay low under smoke. Don't use the lift.",
   "hazardWaterDont": "Don't touch electrical devices or switches near water.",
   "hazardDefaultDont": "Don't use the lift.",
-  "stateDetection": "Detected", "stateVerification": "Verifying", "stateAlarm": "Alarm", "stateEvacuation": "Evacuate now", "stateEscalation": "Emergency response", "stateResolution": "Resolved", "stateFalseAlarm": "False alarm", "stateNormal": "All clear",
-  "safeOutside": "I'm safe / evacuated", "safeInside": "Safe but still inside", "needsHelp": "I need help",
+  "stateDetection": "Detected",
+  "stateVerification": "Verifying",
+  "stateAlarm": "Alarm",
+  "stateEvacuation": "Evacuate now",
+  "stateEscalation": "Emergency response",
+  "stateResolution": "Resolved",
+  "stateFalseAlarm": "False alarm",
+  "stateNormal": "All clear",
+  "safeOutside": "I'm safe / evacuated",
+  "safeInside": "Safe but still inside",
+  "needsHelp": "I need help",
   "liveJustNow": "Live · updated just now",
   "liveUpdated": "Live · updated {seconds} s ago",
-  "@liveUpdated": {"placeholders": {"seconds": {"type": "int"}}},
-  "offlineSavedRoute": "Offline · showing saved route", "offlineNoRoute": "Offline · no route available",
+  "@liveUpdated": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "offlineSavedRoute": "Offline · showing saved route",
+  "offlineNoRoute": "Offline · no route available",
   "routeCrossesHazard": "This route passes near the hazard. Use another marked exit if you can, and call 112.",
   "routeSafetyUnknown": "We couldn't check this route against the hazard. Follow the marked exits, stay away from the hazard, and call 112 if unsure.",
   "evacuationRoute": "Evacuation route",
   "readAloud": "Read aloud",
   "stopReading": "Stop",
-  "spokenAssembly": "Then go to the assembly point: {name}.", "@spokenAssembly": {"placeholders": {"name": {}}},
+  "spokenAssembly": "Then go to the assembly point: {name}.",
+  "@spokenAssembly": {
+    "placeholders": {
+      "name": {}
+    }
+  },
   "fallbackLeave": "Leave by the nearest safe exit. Do not use the lift.",
   "fallbackAssembly": "Go to the outdoor assembly point and do not return inside.",
-  "checkInSent": "Check-in sent: {status}", "@checkInSent": {"placeholders": {"status": {}}},
+  "checkInSent": "Check-in sent: {status}",
+  "@checkInSent": {
+    "placeholders": {
+      "status": {}
+    }
+  },
   "checkInQueued": "Offline — check-in queued, will send automatically",
-  "checkedIn": "Checked in: {status}", "@checkedIn": {"placeholders": {"status": {}}},
-  "change": "Change", "outAndSafe": "I'm out and safe", "safeStillInside": "I'm safe but still inside",
-  "savedRoute": "Saved route from {time} — it may not reflect current blockages", "@savedRoute": {"placeholders": {"time": {}}},
-  "startHere": "Start here", "avoid": "Avoid: {name}", "@avoid": {"placeholders": {"name": {}}},
-  "routeStep": "Step {step} of {total}: {label}.{hint}", "@routeStep": {"placeholders": {"step": {"type":"int"}, "total": {"type":"int"}, "label": {}, "hint": {}}},
-  "live": "Live", "reconnecting": "Reconnecting…",
-  "checkInsQueued": "{count, plural, =0{No check-ins queued} one{1 check-in queued} other{{count} check-ins queued}}", "@checkInsQueued": {"placeholders": {"count": {"type":"int"}}},
-  "openEvacuationGuidance": "Open evacuation guidance", "activeIncidents": "Active incidents", "noActiveIncidents": "No active incidents", "buildingMonitored": "Your building is being monitored.", "noActiveHazard": "No active hazard. You will be alerted immediately if anything is detected.",
-  "settings": "Settings", "account": "Account", "presenceContribution": "Presence contribution", "sharePresence": "Share my presence during incidents", "sharePresenceDescription": "Lets responders better account for who is inside. Anonymous; used only during an active incident.", "about": "About", "canaryResident": "Canary resident", "appVersion": "v0.1.0 — advisory safety app. Not a substitute for certified alarms.", "server": "Server", "signOut": "Sign out",
-  "residentSafety": "Building safety for residents", "username": "Username", "buildingId": "Building ID", "linkUnit": "Link my unit", "serverValue": "Server: {server}", "@serverValue": {"placeholders": {"server": {}}},
-  "orderEvacuation": "Order evacuation", "resolve": "Resolve", "dismiss": "Dismiss", "doneAction": "Done: {action}", "@doneAction": {"placeholders": {"action": {}}},
-  "victimAccounting": "Victim accounting", "couldNotLoadAccounting": "Could not load accounting", "occupants": "Occupants", "accounted": "Accounted", "unaccounted": "Unaccounted", "needHelp": "Need help", "residentAccountability": "Resident accountability", "couldNotLoadRoster": "Could not load roster", "noResidents": "No residents registered.", "needsHelpUpper": "NEEDS HELP", "safeOut": "Safe — out", "safeIn": "Safe — in", "noResponse": "No response", "awaiting": "Awaiting", "buildingSensors": "Building sensors",
-  "homeStatus": "Home status", "sensorsOnline": "{online} of {total} sensors online", "@sensorsOnline": {"placeholders":{"online":{"type":"int"},"total":{"type":"int"}}}, "activeIncidentCount": "{count, plural, one{1 active incident} other{{count} active incidents}}", "@activeIncidentCount":{"placeholders":{"count":{"type":"int"}}},
-  "occupied": "occupied", "empty": "empty", "noData": "no data", "noRecentData": "No recent data", "offline": "Offline", "lastSeen": "{what} · last seen {time}", "@lastSeen":{"placeholders":{"what":{},"time":{}}}, "whatToDo": "What to do", "loadingSensorStatus": "Loading sensor status…", "sensorStatusUnavailable": "Sensor status unavailable", "cannotReachHub": "Can't reach the hub right now. Pull down to retry.", "noSensors": "No sensors connected", "sensorStatusAppears": "Sensor status appears here once a Canary device joins the hub.", "couldNotRefresh": "Couldn't refresh sensor status", "couldNotRefreshFrom": "Couldn't refresh · showing status from {time}", "@couldNotRefreshFrom":{"placeholders":{"time":{}}},
-  "needsAttention": "Needs attention", "danger": "Danger", "statusUnknown": "Status unknown", "airSensor": "Air sensor", "waterSensor": "Water sensor", "sensor": "Sensor", "airQuality": "Air quality", "gas": "Gas", "comfort": "Comfort", "occupancy": "Occupancy", "waterValve": "Water valve", "justNow": "just now", "minutesAgo": "{count} min ago", "@minutesAgo":{"placeholders":{"count":{"type":"int"}}}, "hoursAgo": "{count} h ago", "@hoursAgo":{"placeholders":{"count":{"type":"int"}}}, "daysAgo": "{count} d ago", "@daysAgo":{"placeholders":{"count":{"type":"int"}}}
-, 
-  "notificationChannelName": "Emergency alerts", "notificationChannelDescription": "Critical building safety alarms (gas, CO, evacuation).", "alertNotificationTitle": "{hazard} alert", "@alertNotificationTitle": {"placeholders": {"hazard": {}}}, "openAppForGuidance": "Open Canary for guidance.", "loginFailed": "Could not sign in. Please try again.", "actionFailed": "Could not complete the action. Please try again."
+  "checkedIn": "Checked in: {status}",
+  "@checkedIn": {
+    "placeholders": {
+      "status": {}
+    }
+  },
+  "change": "Change",
+  "outAndSafe": "I'm out and safe",
+  "safeStillInside": "I'm safe but still inside",
+  "savedRoute": "Saved route from {time} — it may not reflect current blockages",
+  "@savedRoute": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "startHere": "Start here",
+  "avoid": "Avoid: {name}",
+  "@avoid": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "routeStep": "Step {step} of {total}: {label}.{hint}",
+  "@routeStep": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "label": {},
+      "hint": {}
+    }
+  },
+  "live": "Live",
+  "reconnecting": "Reconnecting…",
+  "checkInsQueued": "{count, plural, =0{No check-ins queued} one{1 check-in queued} other{{count} check-ins queued}}",
+  "@checkInsQueued": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openEvacuationGuidance": "Open evacuation guidance",
+  "activeIncidents": "Active incidents",
+  "noActiveIncidents": "No active incidents",
+  "buildingMonitored": "Your building is being monitored.",
+  "noActiveHazard": "No active hazard. You will be alerted immediately if anything is detected.",
+  "settings": "Settings",
+  "account": "Account",
+  "presenceContribution": "Presence contribution",
+  "sharePresence": "Share my presence during incidents",
+  "sharePresenceDescription": "Lets responders better account for who is inside. Anonymous; used only during an active incident.",
+  "about": "About",
+  "canaryResident": "Canary resident",
+  "appVersion": "v0.1.0 — advisory safety app. Not a substitute for certified alarms.",
+  "server": "Server",
+  "signOut": "Sign out",
+  "residentSafety": "Building safety for residents",
+  "username": "Username",
+  "buildingId": "Building ID",
+  "linkUnit": "Link my unit",
+  "serverValue": "Server: {server}",
+  "@serverValue": {
+    "placeholders": {
+      "server": {}
+    }
+  },
+  "orderEvacuation": "Order evacuation",
+  "resolve": "Resolve",
+  "dismiss": "Dismiss",
+  "doneAction": "Done: {action}",
+  "@doneAction": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "victimAccounting": "Victim accounting",
+  "couldNotLoadAccounting": "Could not load accounting",
+  "occupants": "Occupants",
+  "accounted": "Accounted",
+  "unaccounted": "Unaccounted",
+  "needHelp": "Need help",
+  "residentAccountability": "Resident accountability",
+  "couldNotLoadRoster": "Could not load roster",
+  "noResidents": "No residents registered.",
+  "needsHelpUpper": "NEEDS HELP",
+  "safeOut": "Safe — out",
+  "safeIn": "Safe — in",
+  "noResponse": "No response",
+  "awaiting": "Awaiting",
+  "buildingSensors": "Building sensors",
+  "homeStatus": "Home status",
+  "sensorsOnline": "{online} of {total} sensors online",
+  "@sensorsOnline": {
+    "placeholders": {
+      "online": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "activeIncidentCount": "{count, plural, one{1 active incident} other{{count} active incidents}}",
+  "@activeIncidentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "occupied": "occupied",
+  "empty": "empty",
+  "noData": "no data",
+  "noRecentData": "No recent data",
+  "offline": "Offline",
+  "lastSeen": "{what} · last seen {time}",
+  "@lastSeen": {
+    "placeholders": {
+      "what": {},
+      "time": {}
+    }
+  },
+  "whatToDo": "What to do",
+  "loadingSensorStatus": "Loading sensor status…",
+  "sensorStatusUnavailable": "Sensor status unavailable",
+  "cannotReachHub": "Can't reach the hub right now. Pull down to retry.",
+  "noSensors": "No sensors connected",
+  "sensorStatusAppears": "Sensor status appears here once a Canary device joins the hub.",
+  "couldNotRefresh": "Couldn't refresh sensor status",
+  "couldNotRefreshFrom": "Couldn't refresh · showing status from {time}",
+  "@couldNotRefreshFrom": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "needsAttention": "Needs attention",
+  "danger": "Danger",
+  "statusUnknown": "Status unknown",
+  "airSensor": "Air sensor",
+  "waterSensor": "Water sensor",
+  "sensor": "Sensor",
+  "airQuality": "Air quality",
+  "gas": "Gas",
+  "comfort": "Comfort",
+  "occupancy": "Occupancy",
+  "waterValve": "Water valve",
+  "justNow": "just now",
+  "minutesAgo": "{count} min ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{count} h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysAgo": "{count} d ago",
+  "@daysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationChannelName": "Emergency alerts",
+  "notificationChannelDescription": "Critical building safety alarms (gas, CO, evacuation).",
+  "alertNotificationTitle": "{hazard} alert",
+  "@alertNotificationTitle": {
+    "placeholders": {
+      "hazard": {}
+    }
+  },
+  "openAppForGuidance": "Open Canary for guidance.",
+  "loginFailed": "Could not sign in. Please try again.",
+  "actionFailed": "Could not complete the action. Please try again.",
+  "seeFloorPlan": "See on floor plan",
+  "hideFloorPlan": "Hide floor plan",
+  "floorPlanNotToScale": "Schematic · not to scale",
+  "assemblyPoint": "Assembly point",
+  "floorPlanSemantics": "Schematic floor plan, not to scale. Route from {start} to {end}.",
+  "@floorPlanSemantics": {
+    "placeholders": {
+      "start": {},
+      "end": {}
+    }
+  }
 }

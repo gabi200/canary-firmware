@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:canary_resident/src/models/check_in.dart';
 import 'package:canary_resident/src/models/evacuation.dart';
 import 'package:canary_resident/src/models/incident.dart';
+import 'package:canary_resident/src/models/zone.dart';
 import 'package:canary_resident/src/services/storage.dart';
 import 'package:canary_resident/src/services/speech.dart';
 import 'package:canary_resident/src/state/dashboard_providers.dart';
+import 'package:canary_resident/src/state/floor_plan_providers.dart';
 import 'package:canary_resident/src/state/incident_controller.dart';
 import 'package:canary_resident/src/state/providers.dart';
 import 'package:canary_resident/src/ui/alarm_screen.dart';
+import 'package:canary_resident/src/ui/widgets/floor_plan_schematic.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -184,6 +187,21 @@ void main() {
     expect(find.text('Leave by the nearest safe exit. Do not use the lift.'), findsOneWidget);
   });
 
+  testWidgets('shows the not-to-scale floor plan on request and keeps the step list', (tester) async {
+    _usePhoneSurface(tester);
+    await _pumpAlarm(tester);
+
+    expect(find.byType(FloorPlanSchematic), findsNothing);
+    await tester.tap(find.text('See on floor plan'));
+    await tester.pump();
+
+    expect(find.byType(FloorPlanSchematic), findsOneWidget);
+    expect(find.text('Schematic · not to scale'), findsOneWidget);
+    expect(find.text('Hide floor plan'), findsOneWidget);
+    expect(find.text('Start here'), findsOneWidget); // route line still shown
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reads the selected route aloud and stops when tapped again', (tester) async {
     _usePhoneSurface(tester);
     final speech = FakeSpeech();
@@ -272,6 +290,9 @@ Future<FakeIncidentController> _pumpAlarm(
         incidentControllerProvider.overrideWith((ref) => controller),
         evacuationProvider.overrideWith((ref) async => evacuation ?? evacuationForSafety('clear')),
         zoneLabelsProvider.overrideWith((ref) async => const {hazardZoneId: 'Kitchen'}),
+        zonesProvider.overrideWith((ref) async => const [
+          ZoneInfo(id: hazardZoneId, floorId: 'flr_1', unitId: 'u1', label: 'Kitchen', kind: 'kitchen', x: 2, y: 2),
+        ]),
         speechProvider.overrideWithValue(fakeSpeech),
       ],
       child: MediaQuery(

@@ -459,4 +459,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionFailed => 'Could not complete the action. Please try again.';
+
+  @override
+  String get seeFloorPlan => 'See on floor plan';
+
+  @override
+  String get hideFloorPlan => 'Hide floor plan';
+
+  @override
+  String get floorPlanNotToScale => 'Schematic · not to scale';
+
+  @override
+  String get assemblyPoint => 'Assembly point';
+
+  @override
+  String floorPlanSemantics(Object start, Object end) {
+    return 'Schematic floor plan, not to scale. Route from $start to $end.';
+  }
 }
