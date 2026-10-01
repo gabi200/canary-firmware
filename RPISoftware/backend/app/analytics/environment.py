@@ -141,6 +141,7 @@ class ZoneSummary:
 @dataclass(frozen=True)
 class BuildingSummary:
     building_id: str
+    building_name: str
     generated_ts: datetime
     status: str
     headline: str
@@ -534,6 +535,7 @@ def summarize_building(
     nodes: Sequence[NodeAnalysis],
     zone_labels: Mapping[str, str],
     incidents: Sequence[OpenIncident],
+    building_name: str | None = None,
 ) -> BuildingSummary:
     """Roll node analyses up into zones and a building status.
 
@@ -585,6 +587,7 @@ def summarize_building(
 
     return BuildingSummary(
         building_id=building_id,
+        building_name=building_name.strip() if building_name and building_name.strip() else building_id,
         generated_ts=utc(generated_ts),
         status=status,
         headline=headline,

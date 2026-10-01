@@ -242,8 +242,9 @@ async def test_summary_for_resident_is_analysis_only(client):
     resp = await client.get("/api/v1/buildings/bld_007/summary", headers=await _hdr(client, "ana"))
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert set(body) == {"building_id", "generated_ts", "status", "headline", "nodes_total", "nodes_online",
+    assert set(body) == {"building_id", "building_name", "generated_ts", "status", "headline", "nodes_total", "nodes_online",
                          "active_incidents", "zones"}
+    assert body["building_name"] == "Bloc A1"
     assert (body["status"], body["headline"], body["nodes_total"], body["nodes_online"]) == ("ok", "All clear", 2, 2)
     [zone] = body["zones"]
     # Who is home is manager/dispatcher-only (like /occupancy): hidden from residents.

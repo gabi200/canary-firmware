@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 // Shaped like docs/HARDWARE.md §4 `BuildingSummary`.
 const _contractJson = '''
 {
-  "building_id": "bld_007", "generated_ts": "2026-09-23T12:00:00Z",
+  "building_id": "bld_007", "building_name": "Bloc A1", "generated_ts": "2026-09-23T12:00:00Z",
   "status": "attention", "headline": "Leak cleared — inspect",
   "nodes_total": 2, "nodes_online": 1, "active_incidents": 0,
   "zones": [
@@ -39,6 +39,7 @@ void main() {
     final s = BuildingSummary.fromJson(jsonDecode(_contractJson) as Map<String, dynamic>);
 
     expect(s.buildingId, 'bld_007');
+    expect(s.buildingName, 'Bloc A1');
     expect(s.generatedTs, DateTime.utc(2026, 9, 23, 12));
     expect(s.status, 'attention');
     expect(s.headline, 'Leak cleared — inspect');
@@ -70,6 +71,7 @@ void main() {
     expect(empty.zones, isEmpty);
     expect(empty.hasNodes, isFalse);
     expect(empty.status, 'unknown');
+    expect(empty.buildingName, isEmpty);
 
     final s = BuildingSummary.fromJson(const {
       'nodes_total': 'two',
@@ -93,5 +95,6 @@ void main() {
     expect(n1.indicators.single.level, 'unknown');
     expect(n1.indicators.single.value, '—');
     expect(s.node('n2')!.online, isFalse);
+    expect(s.buildingName, s.buildingId);
   });
 }

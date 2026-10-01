@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../logic/hazard_advice.dart';
+import '../logic/connection_status.dart';
 import '../logic/route_selection.dart';
 import '../models/check_in.dart';
 import '../models/incident.dart';
@@ -110,9 +113,10 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                       border: Border.all(color: HazardColors.onHazard),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(state.connected ? 'Live' : 'Offline · showing saved route',
-                      style: const TextStyle(color: HazardColors.onHazard,
-                        fontSize: 14, fontWeight: FontWeight.bold)),
+                    child: _ConnectionChip(
+                      connected: state.connected,
+                      lastMessageAt: state.lastMessageAt,
+                    ),
                   ),
                 )),
                 TextButton.icon(
@@ -343,5 +347,47 @@ class _AllClear extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ConnectionChip extends StatefulWidget {
+  const _ConnectionChip({required this.connected, required this.lastMessageAt});
+
+  final bool connected;
+  final DateTime? lastMessageAt;
+
+  @override
+  State<_ConnectionChip> createState() => _ConnectionChipState();
+}
+
+class _ConnectionChipState extends State<_ConnectionChip> {
+  late final Timer _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.connected
+        ? liveConnectionLabel(lastMessageAt: widget.lastMessageAt, now: DateTime.now())
+        : 'Offline · showing saved route';
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(widget.connected ? Icons.wifi : Icons.wifi_off,
+          color: HazardColors.onHazard, size: 18),
+      const SizedBox(width: 6),
+      Text(text, style: const TextStyle(color: HazardColors.onHazard,
+          fontSize: 14, fontWeight: FontWeight.bold)),
+    ]);
   }
 }

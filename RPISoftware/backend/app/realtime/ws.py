@@ -8,11 +8,17 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import WebSocket
 
 SEND_TIMEOUT_S = 2.0
+HEARTBEAT_INTERVAL_S = 15.0
+
+
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class ConnectionManager:
@@ -29,6 +35,21 @@ class ConnectionManager:
         async with self._lock:
             self._rooms[building_id].discard(ws)
 
+    async def send(self, ws: WebSocket, message: dict[str, Any]) -> bool:
+        """Send one frame without allowing a stalled client to block safety traffic."""
+        try:
+            await asyncio.wait_for(ws.send_json(message), timeout=SEND_TIMEOUT_S)
+        except Exception:  # noqa: BLE001 - broken sockets are expected
+            return False
+        return True
+
+    async def heartbeat(self, ws: WebSocket) -> None:
+        """Keep a single accepted socket observable; the route owns cancellation."""
+        while True:
+            await asyncio.sleep(HEARTBEAT_INTERVAL_S)
+            if not await self.send(ws, {"type": "ping", "ts": utc_timestamp()}):
+                return
+
     async def broadcast(self, building_id: str, message: dict[str, Any]) -> None:
         # Snapshot under lock, send outside it; drop dead sockets. Sends run concurrently and
         # are time-boxed: callers broadcast mid-transaction, so one stalled phone must not
@@ -40,6 +61,8 @@ class ConnectionManager:
             try:
                 await asyncio.wait_for(ws.send_json(message), timeout=SEND_TIMEOUT_S)
             except asyncio.TimeoutError:
+                # Preserve the existing behavior: a slow client misses this frame but is
+                # not presumed dead just because it exceeded the broadcast deadline.
                 return None
             except Exception:  # noqa: BLE001 - socket closed/broken
                 return ws

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
@@ -29,7 +31,7 @@ from app.models import (
 )
 from app.notify.service import NotificationService
 from app.occupancy.service import OccupancyService
-from app.realtime.ws import manager
+from app.realtime.ws import manager, utc_timestamp
 from app.schemas import (
     AccountingOut,
     AssemblyPointOut,
@@ -586,9 +588,18 @@ async def ws_incidents(ws: WebSocket, building_id: str = Query(...), token: str 
         await ws.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     await manager.connect(building_id, ws)
+    if not await manager.send(ws, {"type": "hello", "ts": utc_timestamp()}):
+        await manager.disconnect(building_id, ws)
+        return
+    heartbeat = asyncio.create_task(manager.heartbeat(ws))
     try:
         while True:
             # We don't expect client messages; this keeps the socket open.
             await ws.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
+        heartbeat.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat
         await manager.disconnect(building_id, ws)

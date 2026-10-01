@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../models/incident.dart';
+import '../../logic/display_labels.dart';
 import '../../theme.dart';
 
 /// High-urgency EVACUATE NOW banner that flashes (~1 Hz) to grab attention on the
 /// phone. Falls back to a static red banner when the OS requests reduced motion.
 class FlashingEvacuateBanner extends StatefulWidget {
-  const FlashingEvacuateBanner({super.key, required this.incident, this.zoneLabel, this.onTap});
+  const FlashingEvacuateBanner({
+    super.key,
+    required this.incident,
+    required this.zoneLabel,
+    this.onTap,
+  });
   final Incident incident;
-  final String? zoneLabel;
+  final String zoneLabel;
   final VoidCallback? onTap;
 
   @override
@@ -31,20 +37,20 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     Widget banner(double t) {
-      final bg = Color.lerp(HazardColors.evacuation, const Color(0xFFF44336), t)!;
+      final bg = Color.lerp(HazardColors.evacuation, HazardColors.evacuationPulse, t)!;
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFF44336).withOpacity(0.55 * t),
+              color: HazardColors.evacuationPulse.withOpacity(0.55 * t),
               blurRadius: 24 * t,
               spreadRadius: 2 * t,
             ),
           ],
           border: const Border.symmetric(
-            horizontal: BorderSide(color: Color(0xFFF5C518), width: 4),
+            horizontal: BorderSide(color: HazardColors.evacuationBorder, width: 4),
           ),
         ),
         child: Material(
@@ -58,7 +64,7 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
                 children: [
                   Transform.scale(
                     scale: 1 + 0.12 * t,
-                    child: const Icon(Icons.directions_run, color: Colors.white, size: 46),
+                    child: const Icon(Icons.directions_run, color: HazardColors.onHazard, size: 46),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -67,17 +73,23 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
                       children: [
                         const Text(
                           'EVACUATE NOW',
-                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                          style: TextStyle(
+                            color: HazardColors.onHazard,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${widget.incident.hazardLabel} · ${widget.zoneLabel ?? widget.incident.primaryZoneId ?? ''}',
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          '${widget.incident.hazardLabel} · '
+                          '${widget.zoneLabel.trim().isEmpty ? humanizeId(widget.incident.primaryZoneId) : widget.zoneLabel}',
+                          style: const TextStyle(color: HazardColors.onHazard, fontSize: 14),
                         ),
                       ],
                     ),
                   ),
-                  if (widget.onTap != null) const Icon(Icons.chevron_right, color: Colors.white),
+                  if (widget.onTap != null) const Icon(Icons.chevron_right, color: HazardColors.onHazard),
                 ],
               ),
             ),

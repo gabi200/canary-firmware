@@ -21,16 +21,3 @@ final zoneLabelsProvider = FutureProvider.autoDispose<Map<String, String>>((ref)
   if (session == null) return const {};
   return ref.watch(apiClientProvider).zoneLabels(session.buildingId);
 });
-
-/// Friendly zone name from a label map, with a prettified fallback.
-String prettyZone(Map<String, String>? labels, String? id) {
-  if (id == null || id.isEmpty) return '—';
-  final label = labels?[id];
-  if (label != null && label.isNotEmpty) return label;
-  return id
-      .replaceFirst(RegExp(r'^(zone|unit|flr|floor|bld|dev)_', caseSensitive: false), '')
-      .replaceAll(RegExp(r'[_-]+'), ' ')
-      .split(' ')
-      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-      .join(' ');
-}

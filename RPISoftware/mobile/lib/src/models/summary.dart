@@ -115,6 +115,7 @@ class ZoneSummary {
 class BuildingSummary {
   const BuildingSummary({
     required this.buildingId,
+    required this.buildingName,
     required this.status,
     required this.headline,
     required this.nodesTotal,
@@ -125,6 +126,7 @@ class BuildingSummary {
   });
 
   final String buildingId;
+  final String buildingName;
   final DateTime? generatedTs;
   final String status; // ok | attention | danger
   final String headline;
@@ -145,10 +147,13 @@ class BuildingSummary {
   }
 
   factory BuildingSummary.fromJson(Map<String, dynamic> j) {
+    final buildingId = _str(j['building_id']);
+    final buildingName = _str(j['building_name']).trim();
     final zones = _maps(j['zones']).map(ZoneSummary.fromJson).toList();
     final nodes = [for (final z in zones) ...z.nodes];
     return BuildingSummary(
-      buildingId: _str(j['building_id']),
+      buildingId: buildingId,
+      buildingName: buildingName.isEmpty ? buildingId : buildingName,
       generatedTs: _ts(j['generated_ts']),
       status: _str(j['status'], 'unknown'),
       headline: _str(j['headline']),

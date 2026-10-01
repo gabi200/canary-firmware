@@ -27,7 +27,7 @@ from app.analytics.environment import (
     utc,
 )
 from app.enums import NODE_CHANNELS, OPEN_INCIDENT_STATES, NodeKind
-from app.models import Device, Incident, Node, NodeStatus, SensorReading, Zone
+from app.models import Building, Device, Incident, Node, NodeStatus, SensorReading, Zone
 from app.notify.service import incident_title
 from app.realtime.ws import manager
 from app.schemas import BuildingSummaryOut, HistoryPoint, NodeAnalysisOut, NodeOut
@@ -195,6 +195,7 @@ class NodeService:
 
     async def building_summary(self, building_id: str) -> BuildingSummaryOut:
         now = datetime.now(timezone.utc)
+        building_name = await self.session.scalar(select(Building.name).where(Building.id == building_id))
         nodes = await self.building_nodes(building_id)
         analyses = await self.analyses(nodes, now)
         rows = await self.session.execute(select(Zone.id, Zone.label).where(Zone.building_id == building_id))
@@ -209,6 +210,7 @@ class NodeService:
         ).all()
         summary = summarize_building(
             building_id=building_id,
+            building_name=building_name,
             generated_ts=now,
             nodes=list(analyses.values()),
             zone_labels=zone_labels,

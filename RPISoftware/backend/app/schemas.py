@@ -329,6 +329,7 @@ class BuildingSummaryOut(BaseModel):
     """Analysis-only building view (residents included): no raw measurements."""
 
     building_id: str
+    building_name: str
     generated_ts: datetime
     status: str
     headline: str

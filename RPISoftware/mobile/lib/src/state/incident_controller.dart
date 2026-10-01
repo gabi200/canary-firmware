@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
+import '../logic/connection_status.dart';
 import '../models/auth.dart';
 import '../models/check_in.dart';
 import '../models/incident.dart';
@@ -19,11 +20,13 @@ class IncidentsState {
   const IncidentsState({
     this.incidents = const [],
     this.connected = false,
+    this.lastMessageAt,
     this.pending = 0,
     this.eventSeq = 0,
   });
   final List<Incident> incidents;
   final bool connected;
+  final DateTime? lastMessageAt;
   final int pending;
 
   /// Monotonic counter bumped on every live WebSocket frame (incident transition or
@@ -37,10 +40,17 @@ class IncidentsState {
     return null;
   }
 
-  IncidentsState copyWith({List<Incident>? incidents, bool? connected, int? pending, int? eventSeq}) =>
+  IncidentsState copyWith({
+    List<Incident>? incidents,
+    bool? connected,
+    DateTime? lastMessageAt,
+    int? pending,
+    int? eventSeq,
+  }) =>
       IncidentsState(
         incidents: incidents ?? this.incidents,
         connected: connected ?? this.connected,
+        lastMessageAt: lastMessageAt ?? this.lastMessageAt,
         pending: pending ?? this.pending,
         eventSeq: eventSeq ?? this.eventSeq,
       );
@@ -59,6 +69,10 @@ class IncidentController extends StateNotifier<IncidentsState> {
   final Storage _storage;
   final AuthSession? _session;
   WsClient? _ws;
+  StreamSubscription<bool>? _connectionSub;
+  StreamSubscription<DateTime>? _messageSub;
+  Timer? _freshnessTimer;
+  bool _flushing = false;
   final Set<String> _alarmed = {};
   final _live = StreamController<Map<String, dynamic>>.broadcast();
 
@@ -69,6 +83,7 @@ class IncidentController extends StateNotifier<IncidentsState> {
   Future<void> _init() async {
     await refresh();
     _connectWs();
+    _freshnessTimer = Timer.periodic(const Duration(seconds: 5), (_) => _checkFreshness());
   }
 
   Future<void> refresh() async {
@@ -87,16 +102,41 @@ class IncidentController extends StateNotifier<IncidentsState> {
     if (session == null) return;
     final ws = WsClient(buildingId: session.buildingId, token: session.token);
     _ws = ws;
-    ws.events.listen(_onEvent, onDone: () => _setConnected(false));
+    ws.events.listen(_onEvent);
+    _messageSub = ws.messages.listen(_onMessage);
+    _connectionSub = ws.connection.listen(_onConnection);
     ws.connect();
-    _setConnected(true);
-    // socket up -> try to drain any queued check-ins
-    flushQueue();
   }
 
   // The socket's onDone fires after dispose (logout); don't touch state then.
   void _setConnected(bool v) {
     if (mounted) state = state.copyWith(connected: v);
+  }
+
+  void _onMessage(DateTime receivedAt) {
+    if (!mounted) return;
+    state = state.copyWith(lastMessageAt: receivedAt);
+    // Any frame (including the 15 s ping) proves the hub is reachable; retry queued check-ins.
+    if (state.pending > 0) flushQueue();
+  }
+
+  void _onConnection(bool connected) {
+    if (!mounted) return;
+    if (connected) {
+      // The signal follows the first frame. Set a timestamp here too so stream delivery
+      // ordering can never display Live without a recent server frame.
+      final wasConnected = state.connected;
+      state = state.copyWith(connected: true, lastMessageAt: DateTime.now());
+      if (!wasConnected) flushQueue();
+    } else {
+      _setConnected(false);
+    }
+  }
+
+  void _checkFreshness() {
+    if (mounted && state.connected && !isConnectionFresh(state.lastMessageAt, DateTime.now())) {
+      _setConnected(false);
+    }
   }
 
   void _onEvent(Map<String, dynamic> ev) {
@@ -111,7 +151,6 @@ class IncidentController extends StateNotifier<IncidentsState> {
     state = state.copyWith(eventSeq: state.eventSeq + 1);
     if (type != 'incident') {
       // e.g. "checkin" — no incident upsert, but the bump above drives a roster refresh.
-      flushQueue();
       return;
     }
     final incident = Incident.fromWsEvent(ev);
@@ -125,8 +164,6 @@ class IncidentController extends StateNotifier<IncidentsState> {
         critical: incident.severity == 'critical' || incident.isEvacuation,
       );
     }
-    // any inbound event implies connectivity; opportunistically flush the queue
-    flushQueue();
   }
 
   void _upsert(Incident incident) {
@@ -156,8 +193,18 @@ class IncidentController extends StateNotifier<IncidentsState> {
   }
 
   Future<void> flushQueue() async {
+    if (_flushing) return;
     final pending = _storage.pendingCheckIns();
     if (pending.isEmpty) return;
+    _flushing = true;
+    try {
+      await _flush(pending);
+    } finally {
+      _flushing = false;
+    }
+  }
+
+  Future<void> _flush(List<PendingCheckIn> pending) async {
     final stillPending = <PendingCheckIn>[];
     for (final p in pending) {
       final status = CheckInStatus.values.firstWhere(
@@ -170,12 +217,18 @@ class IncidentController extends StateNotifier<IncidentsState> {
         stillPending.add(p);
       }
     }
-    await _storage.replaceQueue(stillPending);
-    state = state.copyWith(pending: stillPending.length);
+    // Keep check-ins queued while this flush was in flight (after the snapshot, in order).
+    final queuedMeanwhile = _storage.pendingCheckIns().skip(pending.length);
+    final remaining = [...stillPending, ...queuedMeanwhile];
+    await _storage.replaceQueue(remaining);
+    if (mounted) state = state.copyWith(pending: remaining.length);
   }
 
   @override
   void dispose() {
+    _freshnessTimer?.cancel();
+    _connectionSub?.cancel();
+    _messageSub?.cancel();
     _ws?.dispose();
     _live.close();
     super.dispose();

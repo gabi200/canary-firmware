@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../logic/display_labels.dart';
 import '../../models/summary.dart';
-import '../../state/dashboard_providers.dart';
 import '../../state/providers.dart';
 import '../../theme.dart';
 import 'status_pill.dart';
@@ -71,7 +71,7 @@ class _OverallCard extends StatelessWidget {
                       '${summary.nodesOnline} of ${summary.nodesTotal} sensors online',
                       if (incidents > 0) '$incidents active incident${incidents == 1 ? '' : 's'}',
                     ].join(' · '),
-                    style: const TextStyle(color: Colors.black54),
+                    style: const TextStyle(color: HazardColors.onSurfaceMuted),
                   ),
                 ],
               ),
@@ -145,7 +145,7 @@ class _NodeTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(_kindIcon(node.kind), size: 20, color: Colors.black54),
+                Icon(_kindIcon(node.kind), size: 20, color: HazardColors.onSurfaceMuted),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -155,7 +155,7 @@ class _NodeTile extends StatelessWidget {
                   ),
                 ),
                 _NodeStatusPill(node: node),
-                const Icon(Icons.chevron_right, color: Colors.black38),
+                const Icon(Icons.chevron_right, color: HazardColors.onSurfaceFaint),
               ],
             ),
             const SizedBox(height: 6),
@@ -188,14 +188,14 @@ class _NodeSheet extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(_kindIcon(node.kind), color: Colors.black54),
+              Icon(_kindIcon(node.kind), color: HazardColors.onSurfaceMuted),
               const SizedBox(width: 10),
               Expanded(child: Text(node.name, style: Theme.of(context).textTheme.titleLarge)),
               _NodeStatusPill(node: node),
             ],
           ),
           const SizedBox(height: 4),
-          Text('$zoneLabel · ${_kindLabel(node.kind)}', style: const TextStyle(color: Colors.black54)),
+          Text('$zoneLabel · ${_kindLabel(node.kind)}', style: const TextStyle(color: HazardColors.onSurfaceMuted)),
           const SizedBox(height: 12),
           if (!node.isLive) ...[_NotReporting(node: node), const SizedBox(height: 12)],
           Text(_headline(node), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -305,7 +305,7 @@ class _IndicatorRow extends StatelessWidget {
           Expanded(
             child: Text(
               i.label.isNotEmpty ? i.label : meta.label,
-              style: const TextStyle(color: Colors.black54),
+              style: const TextStyle(color: HazardColors.onSurfaceMuted),
             ),
           ),
           const SizedBox(width: 8),
@@ -321,7 +321,7 @@ class _IndicatorRow extends StatelessWidget {
                     color: switch (i.level) {
                       'danger' => HazardColors.alarm,
                       'ok' || 'attention' => null,
-                      _ => Colors.black45,
+                      _ => HazardColors.onSurfaceDisabled,
                     },
                   ),
                 ),
@@ -329,14 +329,14 @@ class _IndicatorRow extends StatelessWidget {
                   Text(
                     i.detail!,
                     textAlign: TextAlign.end,
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    style: const TextStyle(fontSize: 12, color: HazardColors.onSurfaceMuted),
                   ),
               ],
             ),
           ),
           if (trend != null) ...[
             const SizedBox(width: 4),
-            Icon(trend, size: 16, color: Colors.black45, semanticLabel: i.trend),
+            Icon(trend, size: 16, color: HazardColors.onSurfaceDisabled, semanticLabel: i.trend),
           ],
         ],
       ),
@@ -355,7 +355,7 @@ class _LoadingCard extends StatelessWidget {
           children: [
             SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
             SizedBox(width: 12),
-            Expanded(child: Text('Loading sensor status…', style: TextStyle(color: Colors.black54))),
+            Expanded(child: Text('Loading sensor status…', style: TextStyle(color: HazardColors.onSurfaceMuted))),
           ],
         ),
       ),
@@ -407,7 +407,7 @@ class _RefreshFailedNote extends StatelessWidget {
           Expanded(
             child: Text(
               at == null ? "Couldn't refresh sensor status" : "Couldn't refresh · showing status from ${_ago(at)}",
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              style: const TextStyle(fontSize: 12, color: HazardColors.onSurfaceMuted),
             ),
           ),
         ],

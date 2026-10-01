@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/incident.dart';
+import '../logic/display_labels.dart';
 import '../state/dashboard_providers.dart';
 import '../state/incident_controller.dart';
 import '../state/providers.dart';
@@ -54,8 +55,8 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(sessionProvider);
     final state = ref.watch(incidentControllerProvider);
+    final summary = ref.watch(summaryProvider).summary;
     final labels = ref.watch(zoneLabelsProvider).valueOrNull;
     final primary = _primary(state);
 
@@ -72,7 +73,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(session?.buildingId ?? 'Canary'),
+        title: Text(summary?.buildingName ?? 'Canary'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -125,7 +126,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
                   child: ListTile(
                     leading: Icon(Icons.warning_amber_rounded, color: HazardColors.forState(inc.state)),
                     title: Text(inc.hazardLabel),
-                    subtitle: Text('${inc.state} · ${prettyZone(labels, inc.primaryZoneId)}'),
+                    subtitle: Text('${incidentStateLabel(inc.state)} · ${prettyZone(labels, inc.primaryZoneId)}'),
                     trailing: StatusPill(state: inc.state),
                   ),
                 ),
@@ -143,9 +144,10 @@ class _ConnectivityRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(connected ? Icons.wifi : Icons.wifi_off, size: 18, color: connected ? Colors.green : Colors.grey),
+        Icon(connected ? Icons.wifi : Icons.wifi_off,
+            size: 18, color: connected ? HazardColors.normal : HazardColors.unknown),
         const SizedBox(width: 6),
-        Text(connected ? 'Live' : 'Reconnecting…', style: const TextStyle(color: Colors.black54)),
+        Text(connected ? 'Live' : 'Reconnecting…', style: const TextStyle(color: HazardColors.onSurfaceMuted)),
       ],
     );
   }
@@ -197,7 +199,7 @@ class _Metric extends StatelessWidget {
         children: [
           Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: color)),
           const SizedBox(height: 2),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: HazardColors.onSurfaceMuted)),
         ],
       ),
     );
@@ -223,7 +225,7 @@ class _RosterCard extends ConsumerWidget {
               loading: () => const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())),
               error: (e, _) => const Text('Could not load roster', style: TextStyle(color: HazardColors.alarm)),
               data: (r) => r.entries.isEmpty
-                  ? const Text('No residents registered.', style: TextStyle(color: Colors.black54))
+                  ? const Text('No residents registered.', style: TextStyle(color: HazardColors.onSurfaceMuted))
                   : Column(
                       children: [
                         for (final e in r.entries)
@@ -232,7 +234,7 @@ class _RosterCard extends ConsumerWidget {
                             dense: true,
                             title: Text(e.displayName),
                             subtitle: Text([
-                              e.unitLabel ?? e.unitId ?? '—',
+                              e.unitLabel ?? humanizeId(e.unitId),
                               if (e.phone != null && e.phone!.isNotEmpty) e.phone!,
                             ].join(' · ')),
                             trailing: _RosterStatusChip(status: e.status),

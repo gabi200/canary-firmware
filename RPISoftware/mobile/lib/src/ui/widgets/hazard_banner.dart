@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../models/incident.dart';
+import '../../logic/display_labels.dart';
 import '../../theme.dart';
 
 class HazardBanner extends StatelessWidget {
-  const HazardBanner({super.key, required this.incident, this.onTap});
+  const HazardBanner({super.key, required this.incident, required this.zoneLabel, this.onTap});
   final Incident incident;
+  final String zoneLabel;
   final VoidCallback? onTap;
 
   IconData get _icon {
@@ -48,7 +50,7 @@ class HazardBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${incident.hazardLabel} · ${incident.state} · ${incident.primaryZoneId ?? ''}',
+                      '${incident.hazardLabel} · ${incidentStateLabel(incident.state)} · $zoneLabel',
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],

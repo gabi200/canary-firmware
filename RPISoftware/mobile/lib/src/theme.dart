@@ -13,11 +13,16 @@ class HazardColors {
   static const surface = Colors.white;
   static const text = Color(0xFF202124);
   static const muted = Color(0xFF5F6368);
+  static const onSurfaceMuted = Color(0x8A000000);
+  static const onSurfaceDisabled = Color(0x73000000);
+  static const onSurfaceFaint = Color(0x61000000);
   static const divider = Color(0xFFDADCE0);
   static const warnBg = Color(0xFFFFE082);
   static const warnFg = Color(0xFF292100);
   static const routeLine = normal;
   static const start = info;
+  static const evacuationPulse = alarm;
+  static const evacuationBorder = warning;
 
   /// Hub analysis level or status (HARDWARE.md §3): ok | attention | danger | unknown.
   static Color forLevel(String level) {
