@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,12 +55,14 @@ from app.schemas import (
     TokenRequest,
     TriangulationContributor,
     TriangulationOut,
+    WaypointOut,
     ZoneOccupancy,
     ZoneOut,
 )
 from app.security import Principal, create_access_token, decode_token, get_current_principal, require_roles
 
 router = APIRouter(prefix="/api/v1")
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
@@ -138,14 +142,82 @@ async def building_evacuation(
     session: AsyncSession = Depends(get_session),
 ) -> EvacuationOut:
     routes = (
-        await session.scalars(select(EvacuationRoute).where(EvacuationRoute.building_id == building_id))
+        await session.scalars(
+            select(EvacuationRoute)
+            .where(EvacuationRoute.building_id == building_id)
+            .order_by(EvacuationRoute.floor_id, EvacuationRoute.id)
+        )
     ).all()
     points = (
-        await session.scalars(select(AssemblyPoint).where(AssemblyPoint.building_id == building_id))
+        await session.scalars(
+            select(AssemblyPoint)
+            .where(AssemblyPoint.building_id == building_id)
+            .order_by(AssemblyPoint.id)
+        )
     ).all()
+    zones = (await session.scalars(select(Zone).where(Zone.building_id == building_id))).all()
+    zones_by_id = {zone.id: zone for zone in zones}
+    points_by_id = {point.id: point for point in points}
+
+    def humanize_waypoint_id(waypoint_id: str) -> str:
+        return waypoint_id.replace("_", " ").capitalize() or "Waypoint"
+
+    def route_out(route: EvacuationRoute) -> EvacuationRouteOut:
+        path: list[str] = []
+        waypoints: list[WaypointOut] = []
+        for stored_waypoint in route.path or []:
+            if isinstance(stored_waypoint, str):
+                details = {}
+                waypoint_id = stored_waypoint
+            elif isinstance(stored_waypoint, dict):
+                waypoint_id = stored_waypoint.get("id")
+                if not isinstance(waypoint_id, str):
+                    logger.warning(
+                        "Skipping invalid waypoint in evacuation route %s: dict is missing a string id",
+                        route.id,
+                    )
+                    continue
+                details = stored_waypoint
+            else:
+                logger.warning(
+                    "Skipping invalid waypoint in evacuation route %s: expected string or dict",
+                    route.id,
+                )
+                continue
+            path.append(waypoint_id)
+
+            zone = zones_by_id.get(waypoint_id)
+            point = points_by_id.get(waypoint_id)
+            if zone is not None:
+                label, kind = zone.label, zone.kind
+            elif point is not None:
+                label, kind = point.label, "assembly_point"
+            else:
+                label, kind = humanize_waypoint_id(waypoint_id), "waypoint"
+
+            waypoints.append(
+                WaypointOut(
+                    id=waypoint_id,
+                    label=details.get("label") or label or humanize_waypoint_id(waypoint_id),
+                    kind=details.get("kind") or kind,
+                    hint=details.get("hint") or "",
+                )
+            )
+
+        return EvacuationRouteOut(
+            id=route.id,
+            building_id=route.building_id,
+            floor_id=route.floor_id,
+            from_zone_id=route.from_zone_id,
+            to_assembly_point_id=route.to_assembly_point_id,
+            label=route.label,
+            path=path,
+            waypoints=waypoints,
+        )
+
     return EvacuationOut(
         building_id=building_id,
-        routes=[EvacuationRouteOut.model_validate(r) for r in routes],
+        routes=[route_out(route) for route in routes],
         assembly_points=[AssemblyPointOut.model_validate(p) for p in points],
     )
 

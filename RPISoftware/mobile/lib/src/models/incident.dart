@@ -8,6 +8,7 @@ class Incident {
     required this.severity,
     required this.state,
     this.primaryZoneId,
+    this.affectedZoneIds = const [],
     this.openedTs,
     this.updatedTs,
   });
@@ -18,12 +19,17 @@ class Incident {
   final String severity;
   final String state;
   final String? primaryZoneId;
+  final List<String> affectedZoneIds;
   final DateTime? openedTs;
   final DateTime? updatedTs;
 
   bool get isAlarming => Config.alarmingStates.contains(state);
   bool get isEvacuation => state == 'evacuation';
   bool get isClosed => state == 'resolution' || state == 'false_alarm' || state == 'normal';
+  Set<String> get hazardZoneIds => {
+        if (primaryZoneId != null) primaryZoneId!,
+        ...affectedZoneIds,
+      };
 
   String get hazardLabel {
     switch (hazardType) {
@@ -47,6 +53,7 @@ class Incident {
         severity: (j['severity'] ?? 'warning') as String,
         state: (j['state'] ?? 'detection') as String,
         primaryZoneId: j['primary_zone_id'] as String?,
+        affectedZoneIds: _zoneIds(j['affected_zone_ids']),
         openedTs: _ts(j['opened_ts']),
         updatedTs: _ts(j['updated_ts']),
       );
@@ -59,8 +66,11 @@ class Incident {
         severity: (j['severity'] ?? 'warning') as String,
         state: (j['state'] ?? 'detection') as String,
         primaryZoneId: j['primary_zone_id'] as String?,
+        affectedZoneIds: _zoneIds(j['affected_zone_ids']),
         updatedTs: _ts(j['ts']),
       );
 
   static DateTime? _ts(dynamic v) => v == null ? null : DateTime.tryParse(v as String);
+  static List<String> _zoneIds(dynamic value) =>
+      value is List ? value.whereType<String>().toList() : const [];
 }

@@ -103,8 +103,23 @@ async def seed(session: AsyncSession) -> None:
             floor_id="flr_03",
             from_zone_id="zone_hallway",
             to_assembly_point_id="ap_main",
-            label="Etaj 3 -> scara -> iesire fata",
-            path=["zone_hallway", "stairwell_main", "exit_front", "ap_main"],
+            label="Etaj 3 → scară → ieșire față",
+            path=[
+                {"id": "zone_hallway", "hint": "Mergeți spre scară, departe de centrală"},
+                {
+                    "id": "stairwell_main",
+                    "label": "Scara principală",
+                    "kind": "stairwell",
+                    "hint": "Coborâți până la parter. Nu folosiți liftul.",
+                },
+                {
+                    "id": "exit_front",
+                    "label": "Ieșirea din față",
+                    "kind": "exit",
+                    "hint": "Ieșiți din clădire",
+                },
+                "ap_main",
+            ],
         )
     )
 
