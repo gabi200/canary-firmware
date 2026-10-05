@@ -1,0 +1,28 @@
+{"level":"info","message":"Resources registered","timestamp":"2026-10-02 14:50:27","types":["design-table"]}
+{"byStatus":{},"byType":{},"level":"info","message":"State store loaded","timestamp":"2026-10-02 14:50:27","totalResources":0}
+{"features":{"macroRecording":true,"pdmIntegration":false,"sqlIntegration":false},"level":"info","message":"SolidWorks MCP Server started","timestamp":"2026-10-02 14:50:27","version":"3.1.3"}
+{"level":"info","message":"Resources registered","timestamp":"2026-10-02 14:51:38","types":["design-table"]}
+{"byStatus":{},"byType":{},"level":"info","message":"State store loaded","timestamp":"2026-10-02 14:51:38","totalResources":0}
+{"features":{"macroRecording":true,"pdmIntegration":false,"sqlIntegration":false},"level":"info","message":"SolidWorks MCP Server started","timestamp":"2026-10-02 14:51:38","version":"3.1.3"}
+{"level":"info","message":"Connected to SolidWorks","timestamp":"2026-10-02 14:51:46"}
+{"level":"info","message":"Operation capture_screenshot completed","result":"Screenshot saved as BMP (other formats failed): C:\\Users\\gabri\\AppData\\Local\\Temp\\claude\\C--Users-gabri-Desktop-canary-firmware-cad\\2e95a94b-ed82-448c-a23d-a0d8569459c7\\scratchpad\\before.bmp","timestamp":"2026-10-02 14:51:47"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 14:52:10"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 14:52:29"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Failed to execute macro: Error: RunMacro2 failed for Module1.main in C:\\Users\\gabri\\AppData\\Local\\Temp\\claude\\C--Users-gabri-Desktop-canary-firmware-cad\\2e95a94b-ed82-448c-a23d-a0d8569459c7\\scratchpad\\diag3.swb (swRunMacroError_e 0)","timestamp":"2026-10-02 15:01:47"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:01:47"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:02:43"}
+{"level":"info","message":"Operation exit_sketch completed","result":{"message":"Exited sketch edit mode","success":true},"timestamp":"2026-10-02 15:03:33"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:03:36"}
+{"level":"info","message":"Operation rebuild_model completed","result":"Model rebuilt successfully","timestamp":"2026-10-02 15:04:20"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:04:21"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:04:21"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:04:42"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:05:08"}
+{"level":"info","message":"Operation rebuild_model completed","result":"Model rebuilt successfully","timestamp":"2026-10-02 15:05:55"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:05:55"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:05:55"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:28:37"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:29:27"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:30:55"}
+{"level":"info","message":"Operation run_vba_macro completed","result":"Macro executed successfully. Result: true","timestamp":"2026-10-02 15:32:05"}
+{"level":"info","message":"Operation capture_screenshot completed","result":"Screenshot saved as BMP (other formats failed): C:\\Users\\gabri\\AppData\\Local\\Temp\\claude\\C--Users-gabri-Desktop-canary-firmware-cad\\2e95a94b-ed82-448c-a23d-a0d8569459c7\\scratchpad\\after.bmp","timestamp":"2026-10-02 15:32:13"}
