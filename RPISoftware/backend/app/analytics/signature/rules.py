@@ -91,9 +91,10 @@ SIGNATURES: dict[str, tuple[tuple[Condition, ...], tuple[Condition, ...]]] = {
         (below("temp_delta", 4), at_least("coarse_share", 1.5), at_least("presence_frac", 0.3)),
     ),
     "cooking": (
-        (at_least("rise_pm2_5", 0.3), below("rise_co", 0.6), at_least("presence_frac", 0.3)),
-        (within("temp_delta", 0.5, 6, high_inclusive=True), within("rh_delta", 3, 12),
-         at_least("fine_share", 0.6), at_least("decay_pm2_5", 0.3)),
+        (at_least("rise_pm2_5", 0.3), below("rise_co", 0.6), at_least("presence_frac", 0.3),
+         within("rh_delta", 3, 12)),
+        (within("temp_delta", 0.5, 6, high_inclusive=True), at_least("fine_share", 0.6),
+         at_least("decay_pm2_5", 0.3)),
     ),
     "aerosol": (
         (at_least("rise_pm2_5", 0.5), at_most("onset_s_pm2_5", 60), below("rise_co", 0.2)),

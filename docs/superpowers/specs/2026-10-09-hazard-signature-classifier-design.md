@@ -98,7 +98,7 @@ The label is the argmax and the confidence is its score.
 | `flaming_fire` | `temp_rate ≥ 2` or `temp_delta ≥ 8`; and `rise_pm2_5 ≥ 0.5` or `rise_co ≥ 0.3` | `decay_pm2_5 < 0.4`, `temp_delta ≥ 4`, `rise_co ≥ 0.3` |
 | `gas_leak` | `rise_gas ≥ 0.5`, `rise_pm2_5 < 0.3` (or PM absent) | `decay_gas < 0.3`, `rise_co < 0.3`, `temp_delta < 2` |
 | `steam` | `rh_delta ≥ 12`, `rise_pm2_5 ≥ 0.3`, `rise_co < 0.2` | `temp_delta < 4`, `coarse_share ≥ 1.5`, `presence_frac ≥ 0.3` |
-| `cooking` | `rise_pm2_5 ≥ 0.3`, `rise_co < 0.6`, `presence_frac ≥ 0.3` | `0.5 ≤ temp_delta ≤ 6`, `3 ≤ rh_delta < 12`, `fine_share ≥ 0.6`, `decay_pm2_5 ≥ 0.3` |
+| `cooking` | `rise_pm2_5 ≥ 0.3`, `rise_co < 0.6`, `presence_frac ≥ 0.3`, `3 ≤ rh_delta < 12` | `0.5 ≤ temp_delta ≤ 6`, `fine_share ≥ 0.6`, `decay_pm2_5 ≥ 0.3` |
 | `aerosol` | `rise_pm2_5 ≥ 0.5`, `onset_s_pm2_5 ≤ 60`, `rise_co < 0.2` | `decay_pm2_5 ≥ 0.5`, `rh_delta < 8`, `temp_delta < 1` |
 
 A condition on a `None` feature counts as not met. If that feature is in a core
@@ -179,9 +179,12 @@ Applied in `IncidentService` after the false-alarm assessment:
   hold is cancelled, including a false-alarm `held_*`. The decision's target and reason
   are used unchanged. This never adds an evacuation or escalation beyond what the
   detection engine decided.
-- **Benign hold:** if the decision reason is `corroborated`, the top label is `steam`,
-  `cooking` or `aerosol` with confidence ≥ 0.7, and both fire scores are < 0.4, the
-  target is held at `verification` with the reason `held_signature_<label>`.
+- **Benign hold:** applies only to a particulate escalation without cross-sensor
+  corroboration (one device, one zone); gas and CO escalations, and particulate
+  corroborated by a second device or zone, are never held by a signature. Within that
+  scope, if the decision reason is `corroborated`, the top label is `steam`, `cooking` or
+  `aerosol` with confidence ≥ 0.7, and both fire scores are < 0.4, the target is held at
+  `verification` with the reason `held_signature_<label>`.
 - `unknown`, `normal` and `gas_leak` never cause a hold.
 - The shadow prediction is never read by any of this.
 - Any exception in steps 2–4 is caught and logged, and the flow continues exactly as if

@@ -30,10 +30,16 @@ def test_scenarios_get_their_label(scenario, label, confidence):
     assert set(a.scores) == set(LABELS)
 
 
-def test_steam_also_partly_matches_cooking_but_steam_wins():
-    a = _assess("steam")
-    assert a.scores["cooking"] == pytest.approx(0.625)
+def test_steam_humidity_rules_out_cooking():
+    a = _assess("steam")  # rh_delta 28.5 is outside cooking's core 3..12
+    assert a.scores["cooking"] == 0.0
     assert a.scores["steam"] == pytest.approx(1.0)
+
+
+def test_occupied_early_smoulder_is_not_holdable_as_cooking():
+    a = _assess("occupied_early_smoulder")  # CO only 3 -> 9 ppm, humidity flat, someone home
+    assert not a.allows_hold
+    assert a.label != "cooking"
 
 
 def test_short_window_is_unknown():

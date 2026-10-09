@@ -65,6 +65,7 @@ SCENARIOS: dict[str, dict] = {
     "humidity_only": {"rh": ramp(41.5, 62)},
 }
 SCENARIOS["cooking_gas_leak"] = {**SCENARIOS["cooking"], "gas": ramp(640, 2000, 200, 450)}
+SCENARIOS["occupied_early_smoulder"] = {**SCENARIOS["smouldering_fire"], "co": ramp(3, 9, 200, 500), "presence": True}
 
 
 def _grade(value: float, warn: float, danger: float) -> str:
