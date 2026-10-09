@@ -16,6 +16,7 @@ import { IncidentActions } from "../components/IncidentActions";
 import { ResidentList, ResidentRoster } from "../components/ResidentRoster";
 import { HazardTriangle, RunningManExit } from "../components/SafetySigns";
 import { SignalBadge } from "../components/SignalBadge";
+import { SignatureBadge } from "../components/SignatureBadge";
 import { StatusPill } from "../components/StatusPill";
 import { TrendChart } from "../components/TrendChart";
 import { config } from "../config";
@@ -118,6 +119,7 @@ export function ManagerView() {
                       <div className="muted small">{zoneLabel(zoneNames, inc.primary_zone_id)}</div>
                     </div>
                     <SignalBadge cls={inc.false_alarm_class} />
+                    <SignatureBadge signature={inc.signature} />
                   </div>
                   <IncidentActions incident={inc} />
                 </div>

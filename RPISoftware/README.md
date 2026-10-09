@@ -205,6 +205,14 @@ Slow sub-threshold rises open a low-severity **advisory** incident (managers onl
 Assessment shown on the dashboard (signal badge); rule-based now, same features feed
 an ML upgrade later (ARCHITECTURE.md §B.3).
 
+Air nodes are also labelled by the hazard signature classifier
+(`backend/app/analytics/signature/`), which reads all of a node's channels together. A
+confident steam, cooking or aerosol label may hold a corroborated **particulate**
+escalation from a single sensor in `verification` (reason `held_signature_<label>`); a
+fire label cancels any hold. Gas and CO, critical readings, node alarms and real
+cross-sensor corroboration are never held by it. A shadow model's opinion is stored in
+`signature_assessments` but never used.
+
 ## Known limitations
 
 - Not yet validated on a physical Raspberry Pi with the real sensors: tests and the

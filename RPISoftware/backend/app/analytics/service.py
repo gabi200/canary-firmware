@@ -1,16 +1,25 @@
-"""Analytics service: runs triangulation for an incident from live DB state."""
+"""Analytics service: runs triangulation and the hazard signature classifier from live DB state."""
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.signature import model as signature_model
+from app.analytics.signature.features import extract_features, parse_snapshot
+from app.analytics.signature.rules import SignatureAssessment, assess
 from app.analytics.triangulation import SensorPoint, TriangulationResult, triangulate
 from app.detection.thresholds import thresholds_for
-from app.enums import SensorType
-from app.models import Incident, SensorReading, Zone
+from app.enums import NodeKind, SensorType
+from app.models import Incident, Node, NodeStatus, SensorReading, SignatureAssessmentRow, Zone
+
+log = logging.getLogger("canary.signature")
+
+# Seconds of an air node's status documents the signature classifier looks at.
+SIGNATURE_WINDOW_S = 600
 
 
 def _epoch(dt: datetime) -> float:
@@ -110,3 +119,51 @@ class AnalyticsService:
             ],
         }
         return result
+
+    async def classify_signature(self, node_id: str, incident_id: str) -> SignatureAssessment | None:
+        """Label an air node's recent window and store the assessment (with the shadow
+        model's opinion) for the incident. None for nodes that are not air nodes."""
+        node = await self.session.get(Node, node_id)
+        if node is None or node.kind != NodeKind.air.value:
+            return None
+        since = datetime.now(timezone.utc) - timedelta(seconds=SIGNATURE_WINDOW_S)
+        rows = (
+            await self.session.scalars(
+                select(NodeStatus)
+                .where(NodeStatus.node_id == node_id, NodeStatus.ts >= since)
+                .order_by(NodeStatus.ts.asc())
+            )
+        ).all()
+        features = extract_features([parse_snapshot(_epoch(r.ts), r.payload) for r in rows])
+        assessment = assess(features)
+        shadow = signature_model.predict(features)
+        if shadow is not None and shadow.label != assessment.label:
+            log.info("signature %s: rules %s (%.2f), shadow %s (%.2f)", node_id, assessment.label,
+                     assessment.confidence, shadow.label, shadow.confidence)
+        self.session.add(SignatureAssessmentRow(
+            incident_id=incident_id,
+            node_id=node_id,
+            label=assessment.label,
+            confidence=assessment.confidence,
+            scores=assessment.scores,
+            evidence=assessment.evidence,
+            shadow_label=shadow.label if shadow else None,
+            shadow_confidence=shadow.confidence if shadow else None,
+            model_version=shadow.model_version if shadow else None,
+        ))
+        await self.session.flush()  # insert inside the caller's savepoint, not at a later commit
+        return assessment
+
+    async def latest_signatures(self, incident_ids: list[str]) -> dict[str, SignatureAssessmentRow]:
+        """The newest assessment per incident, in one query (ids are monotonic)."""
+        if not incident_ids:
+            return {}
+        newest = (
+            select(func.max(SignatureAssessmentRow.id))
+            .where(SignatureAssessmentRow.incident_id.in_(incident_ids))
+            .group_by(SignatureAssessmentRow.incident_id)
+        )
+        rows = (await self.session.scalars(
+            select(SignatureAssessmentRow).where(SignatureAssessmentRow.id.in_(newest))
+        )).all()
+        return {r.incident_id: r for r in rows}

@@ -1,8 +1,8 @@
 """Hourly retention: prune time-series rows older than `settings.retention_days`.
 
 On the Pi the database lives on an SD card; raw status snapshots (one per status
-document), canonical readings and occupancy estimates would otherwise grow without
-bound. Incidents, events, check-ins and the audit log are never pruned.
+document), canonical readings, occupancy estimates and signature assessments would
+otherwise grow without bound. Incidents, events, check-ins and the audit log are never pruned.
 """
 
 from __future__ import annotations
@@ -15,14 +15,14 @@ from sqlalchemy import delete, select
 
 from app.config import settings
 from app.db import SessionLocal
-from app.models import NodeStatus, OccupancyEstimate, SensorReading
+from app.models import NodeStatus, OccupancyEstimate, SensorReading, SignatureAssessmentRow
 
 log = logging.getLogger("canary.retention")
 
 PRUNE_INTERVAL_S = 3600
 # Rows per transaction: keeps each write lock short so live ingestion never waits long.
 PRUNE_BATCH = 2000
-_PRUNED = (NodeStatus, SensorReading, OccupancyEstimate)
+_PRUNED = (NodeStatus, SensorReading, OccupancyEstimate, SignatureAssessmentRow)
 
 
 async def prune_old_rows(now: datetime | None = None) -> dict[str, int]:

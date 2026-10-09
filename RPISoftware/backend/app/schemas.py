@@ -94,6 +94,20 @@ class Token(BaseModel):
 # --------------------------------------------------------------------------- #
 # API responses
 # --------------------------------------------------------------------------- #
+class SignatureOut(BaseModel):
+    """Latest hazard signature assessment for an incident. shadow_* is the shadow
+    model's opinion only; it never affects the incident."""
+
+    model_config = ConfigDict(from_attributes=True)
+    label: str
+    confidence: float
+    evidence: list[str] = []
+    shadow_label: str | None = None
+    shadow_confidence: float | None = None
+    model_version: str | None = None
+    ts: datetime
+
+
 class IncidentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -116,6 +130,7 @@ class IncidentOut(BaseModel):
     false_alarm_class: str | None = None
     false_alarm_reason: str | None = None
     benign_score: float | None = None
+    signature: SignatureOut | None = None
 
 
 class IncidentEventOut(BaseModel):

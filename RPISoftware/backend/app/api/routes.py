@@ -50,6 +50,7 @@ from app.schemas import (
     ResidentOut,
     RosterEntry,
     RosterOut,
+    SignatureOut,
     TelemetryPayload,
     Token,
     TokenRequest,
@@ -335,18 +336,30 @@ async def update_node(
 # --------------------------------------------------------------------------- #
 # Incidents
 # --------------------------------------------------------------------------- #
+async def _incidents_out(session: AsyncSession, incidents: list[Incident]) -> list[IncidentOut]:
+    """Incidents with their latest hazard signature (one extra query for the batch)."""
+    latest = await AnalyticsService(session).latest_signatures([i.id for i in incidents])
+    out = []
+    for incident in incidents:
+        item = IncidentOut.model_validate(incident)
+        row = latest.get(incident.id)
+        item.signature = SignatureOut.model_validate(row) if row is not None else None
+        out.append(item)
+    return out
+
+
 @router.get("/buildings/{building_id}/incidents", response_model=list[IncidentOut], tags=["incidents"])
 async def list_incidents(
     building_id: str,
     active: bool = Query(default=False),
     _: Principal = Depends(get_current_principal),
     session: AsyncSession = Depends(get_session),
-) -> list[Incident]:
+) -> list[IncidentOut]:
     q = select(Incident).where(Incident.building_id == building_id)
     if active:
         q = q.where(Incident.state.in_([s.value for s in OPEN_INCIDENT_STATES]))
     q = q.order_by(Incident.opened_ts.desc())
-    return list((await session.scalars(q)).all())
+    return await _incidents_out(session, list((await session.scalars(q)).all()))
 
 
 @router.get("/incidents/{incident_id}", response_model=IncidentOut, tags=["incidents"])
@@ -354,11 +367,11 @@ async def get_incident(
     incident_id: str,
     _: Principal = Depends(get_current_principal),
     session: AsyncSession = Depends(get_session),
-) -> Incident:
+) -> IncidentOut:
     incident = await session.get(Incident, incident_id)
     if incident is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
-    return incident
+    return (await _incidents_out(session, [incident]))[0]
 
 
 @router.get("/incidents/{incident_id}/events", response_model=list[IncidentEventOut], tags=["incidents"])
@@ -516,7 +529,7 @@ async def dismiss_incident(
     incident_id: str,
     principal: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
     session: AsyncSession = Depends(get_session),
-) -> Incident:
+) -> IncidentOut:
     try:
         incident = await IncidentService(session).dismiss(incident_id, actor=principal.username)
     except ValueError as exc:
@@ -526,7 +539,7 @@ async def dismiss_incident(
     if incident is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
     await session.commit()
-    return incident
+    return (await _incidents_out(session, [incident]))[0]
 
 
 @router.post("/incidents/{incident_id}/order-evacuation", response_model=IncidentOut, tags=["incidents"])
@@ -534,7 +547,7 @@ async def order_evacuation(
     incident_id: str,
     principal: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
     session: AsyncSession = Depends(get_session),
-) -> Incident:
+) -> IncidentOut:
     try:
         incident = await IncidentService(session).order_evacuation(incident_id, actor=principal.username)
     except ValueError as exc:
@@ -542,7 +555,7 @@ async def order_evacuation(
     if incident is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
     await session.commit()
-    return incident
+    return (await _incidents_out(session, [incident]))[0]
 
 
 @router.post("/incidents/{incident_id}/resolve", response_model=IncidentOut, tags=["incidents"])
@@ -550,7 +563,7 @@ async def resolve_incident(
     incident_id: str,
     principal: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
     session: AsyncSession = Depends(get_session),
-) -> Incident:
+) -> IncidentOut:
     try:
         incident = await IncidentService(session).resolve(incident_id, actor=principal.username)
     except ValueError as exc:
@@ -558,7 +571,7 @@ async def resolve_incident(
     if incident is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
     await session.commit()
-    return incident
+    return (await _incidents_out(session, [incident]))[0]
 
 
 # --------------------------------------------------------------------------- #
