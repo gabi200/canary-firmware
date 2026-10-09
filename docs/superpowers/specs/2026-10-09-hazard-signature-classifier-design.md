@@ -73,8 +73,10 @@ Cross-channel and climate features:
 - `rh_delta`: peak minus base relative humidity, in percentage points.
 - `temp_delta`: peak minus base temperature, in °C.
 - `temp_rate`: the largest temperature change over any 60 s span, in °C per minute.
-- `fine_share = rise_pm1_0 / rise_pm2_5` and `coarse_share = rise_pm10 / rise_pm2_5`,
-  computed when `rise_pm2_5 ≥ 0.1`.
+- `fine_share = delta_pm1_0 / delta_pm2_5` and `coarse_share = delta_pm10 / delta_pm2_5`,
+  where `delta_c = max(0, peak_c − base_c)` in µg/m³ (raw increases, not scaled by
+  warn), computed when `rise_pm2_5 ≥ 0.1`. PM10 always reads at least PM2.5, so
+  `coarse_share ≥ 1` is normal and large droplets push it well above.
 - `presence_frac`: the share of snapshots with presence detected.
 - `n_samples`, `span_s`.
 
@@ -95,7 +97,7 @@ The label is the argmax and the confidence is its score.
 | `smouldering_fire` | `rise_pm2_5 ≥ 0.5`, `rise_co ≥ 0.3` | `decay_pm2_5 < 0.4`, `decay_co < 0.4`, `temp_rate < 2`, `rh_delta < 8` |
 | `flaming_fire` | `temp_rate ≥ 2` or `temp_delta ≥ 8`; and `rise_pm2_5 ≥ 0.5` or `rise_co ≥ 0.3` | `decay_pm2_5 < 0.4`, `temp_delta ≥ 4`, `rise_co ≥ 0.3` |
 | `gas_leak` | `rise_gas ≥ 0.5`, `rise_pm2_5 < 0.3` (or PM absent) | `decay_gas < 0.3`, `rise_co < 0.3`, `temp_delta < 2` |
-| `steam` | `rh_delta ≥ 12`, `rise_pm2_5 ≥ 0.3`, `rise_co < 0.2` | `temp_delta < 4`, `coarse_share ≥ 1.0`, `presence_frac ≥ 0.3` |
+| `steam` | `rh_delta ≥ 12`, `rise_pm2_5 ≥ 0.3`, `rise_co < 0.2` | `temp_delta < 4`, `coarse_share ≥ 1.5`, `presence_frac ≥ 0.3` |
 | `cooking` | `rise_pm2_5 ≥ 0.3`, `rise_co < 0.6`, `presence_frac ≥ 0.3` | `0.5 ≤ temp_delta ≤ 6`, `3 ≤ rh_delta < 12`, `fine_share ≥ 0.6`, `decay_pm2_5 ≥ 0.3` |
 | `aerosol` | `rise_pm2_5 ≥ 0.5`, `onset_s_pm2_5 ≤ 60`, `rise_co < 0.2` | `decay_pm2_5 ≥ 0.5`, `rh_delta < 8`, `temp_delta < 1` |
 
