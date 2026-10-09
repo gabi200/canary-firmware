@@ -342,3 +342,23 @@ class NodeStatus(Base):
     ts: Mapped[datetime] = _ts_col(index=True)  # hub receipt time (devices have no wall clock)
     uptime_ms: Mapped[int] = mapped_column(BigInteger)
     payload: Mapped[dict] = mapped_column(JSON)
+
+
+class SignatureAssessmentRow(Base):
+    """Hazard signature classifier output, one row per incident evaluation of an air node
+    (docs/superpowers/specs/2026-10-09-hazard-signature-classifier-design.md). The shadow_*
+    fields are the model's opinion only; no decision reads them."""
+
+    __tablename__ = "signature_assessments"
+    __table_args__ = (Index("ix_signature_incident_id", "incident_id", "id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    incident_id: Mapped[str] = mapped_column(String)  # indexed by ix_signature_incident_id
+    node_id: Mapped[str] = mapped_column(String)
+    label: Mapped[str] = mapped_column(String)
+    confidence: Mapped[float] = mapped_column(Float)
+    scores: Mapped[dict] = mapped_column(JSON, default=dict)
+    evidence: Mapped[list] = mapped_column(JSON, default=list)
+    shadow_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    shadow_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    ts: Mapped[datetime] = _ts_col(index=True)

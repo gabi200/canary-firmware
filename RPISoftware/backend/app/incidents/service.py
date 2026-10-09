@@ -9,6 +9,7 @@ and side-effects.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analytics.false_alarm import MICRO_LEAK_TREND, ReadingSample, classify
 from app.analytics.service import AnalyticsService, _epoch
+from app.analytics.signature.rules import SignatureAssessment
 from app.detection.engine import NORMAL, DetectionContext, evaluate, is_clearing, reading_level
 from app.detection.thresholds import Thresholds, effective_thresholds
 from app.enums import (
@@ -31,6 +33,8 @@ from app.incidents.state_machine import can_transition, closing_state, forward_c
 from app.models import Incident, IncidentEvent, SensorReading
 from app.notify.service import NotificationService
 from app.occupancy.service import OccupancyService
+
+log = logging.getLogger("canary.incidents")
 
 # Triangulation runs once an incident is corroborated (verification) and onward.
 _TRIANGULATION_STATES = {IncidentState.verification} | ALARMED_STATES
@@ -142,12 +146,24 @@ class IncidentService:
         incident.false_alarm_reason = assessment.reason
         incident.benign_score = assessment.benign_score
 
+        # Hazard signature (air nodes): a fire signature cancels every hold; a confident
+        # benign one may hold a corroborated escalation. Critical readings never reach
+        # these branches (their reason is never "corroborated").
+        signature = await self._classify_signature(incident, device_id)
+
         target = decision.target_state
         reason = decision.reason
         fast_path = decision.fast_path
-        if decision.reason == "corroborated" and assessment.suppress_escalation:
+        corroborated = decision.reason == "corroborated"
+        if signature is not None and signature.overrides_hold:
+            pass
+        elif corroborated and assessment.suppress_escalation:
             target = IncidentState.verification
             reason = f"held_{assessment.classification}"
+            fast_path = False
+        elif corroborated and signature is not None and signature.allows_hold:
+            target = IncidentState.verification
+            reason = f"held_signature_{signature.label}"
             fast_path = False
 
         chain = forward_chain(
@@ -215,6 +231,18 @@ class IncidentService:
             multi_sensor=multi_sensor,
             edge_alarm=(edge_state == EdgeState.alarm),
         )
+
+    async def _classify_signature(self, incident: Incident, device_id: str) -> SignatureAssessment | None:
+        """Signature of the device's node; None for devices without one. Best-effort: a
+        failure here must never change the safety path."""
+        node_id, sep, _ = device_id.partition(":")
+        if not sep:
+            return None
+        try:
+            return await AnalyticsService(self.session).classify_signature(node_id, incident.id)
+        except Exception:  # noqa: BLE001
+            log.exception("signature classification failed for %s", device_id)
+            return None
 
     async def _maybe_micro_leak(
         self,

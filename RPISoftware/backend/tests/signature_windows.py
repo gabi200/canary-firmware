@@ -4,9 +4,16 @@ Events start after the first third of the window so the baseline stays clean."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import delete
 
 from app.analytics.signature.features import AirSnapshot, parse_snapshot
+from app.db import SessionLocal
+from app.ingestion.hardware import handle_hardware_message
+from app.models import NodeStatus, SensorReading
 from tests.hardware_docs import air_doc
 
 STEP_S = 15.0
@@ -87,3 +94,30 @@ def scenario_docs(name: str, start_uptime_ms: int = 1_000_000) -> list[tuple[flo
 
 def scenario_snapshots(name: str) -> list[AirSnapshot]:
     return [parse_snapshot(t, doc) for t, doc in scenario_docs(name)]
+
+
+async def publish(base: str, doc: dict) -> None:
+    await handle_hardware_message(f"{base}/status", json.dumps(doc).encode())
+
+
+async def seed_history(name: str, *, live: int = 3, readings: bool = True) -> list[dict]:
+    """Register the `canary` air node, then store the scenario's documents except the
+    last `live` as if they had arrived over the past ~10 minutes: node_status rows and,
+    with `readings`, the PM2.5 sensor_readings the false-alarm layer looks at.
+    Returns the `live` documents, still to be published."""
+    docs = scenario_docs(name)
+    await publish("canary", docs[0][1])
+    now = datetime.now(timezone.utc)
+    async with SessionLocal() as s:
+        await s.execute(delete(NodeStatus).where(NodeStatus.node_id == "canary"))
+        await s.execute(delete(SensorReading).where(SensorReading.device_id.like("canary:%")))
+        for t, doc in docs[:-live]:
+            ts = now - timedelta(seconds=590 - t)
+            s.add(NodeStatus(node_id="canary", ts=ts, uptime_ms=doc["uptime_ms"], payload=doc))
+            if readings:
+                s.add(SensorReading(
+                    device_id="canary:particulate", building_id="bld_007", floor_id="flr_03", unit_id="common",
+                    zone_id="zone_hallway", sensor_type="particulate", value=doc["particulate"]["pm2_5"],
+                    units="ug/m3", epoch=1, seq=doc["uptime_ms"], ts=ts))
+        await s.commit()
+    return [doc for _, doc in docs[-live:]]
