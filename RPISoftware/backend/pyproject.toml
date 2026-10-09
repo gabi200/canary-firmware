@@ -23,6 +23,11 @@ dev = [
     "httpx>=0.27",
     "anyio>=4.4",
 ]
+# Offline training of the shadow signature model (tools/signature); never installed on the Pi.
+train = [
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
