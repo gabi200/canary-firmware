@@ -91,6 +91,38 @@ async def test_critical_reading_during_steam_is_not_held(client):
     assert inc["state"] == "alarm"
 
 
+async def test_gas_leak_during_cooking_reaches_alarm(client):
+    await _publish_all(await seed_history("cooking_gas_leak", reading_channels=("particulate", "gas")))
+    by_hazard = {inc["hazard_type"]: inc for inc in await _active(client)}
+    gas = by_hazard["combustible_gas"]
+    assert gas["false_alarm_class"] == "genuine"  # the false-alarm layer does not hold it
+    assert gas["state"] == "alarm"
+    assert (await _assessments(gas["id"]))[-1].label == "cooking"  # the benign label was there, and ignored
+
+
+async def test_two_zone_corroboration_during_steam_reaches_alarm(client):
+    live = await seed_history("steam")
+    r = await client.post("/api/v1/telemetry", json=telemetry(
+        "dev_pm_kitchen", "particulate", 60, zone_id="zone_kitchen", unit_id="unit_0312", units="ug/m3"))
+    assert r.status_code < 300, r.text
+    await _publish_all(live)
+    [inc] = await _active(client)
+    assert sorted(inc["affected_zone_ids"]) == ["zone_hallway", "zone_kitchen"]
+    assert inc["state"] == "alarm"
+    assert (await _assessments(inc["id"]))[-1].label == "steam"
+
+
+async def test_edge_alarm_during_steam_is_not_held(client):
+    live = await seed_history("steam")
+    await _publish_all(live)
+    [held] = await _active(client)
+    assert held["state"] == "verification"  # pm2_5 60 is under danger: only the node's flag differs below
+    await publish("canary", air_doc(uptime_ms=live[-1]["uptime_ms"] + 15000,
+                                    particulate={"pm2_5": 60, "pm10": 140, "state": "danger"}))
+    [inc] = await _active(client)
+    assert inc["state"] == "alarm"
+
+
 async def test_shadow_prediction_never_changes_the_outcome(client, monkeypatch):
     monkeypatch.setattr("app.analytics.signature.model.predict",
                         lambda features, path=None: ShadowPrediction("smouldering_fire", 0.99, "test"))

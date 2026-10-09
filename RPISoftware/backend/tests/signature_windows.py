@@ -64,6 +64,7 @@ SCENARIOS: dict[str, dict] = {
                      "co": ramp(3, 30, 200, 320), "rh": ramp(41.5, 35, 200, 320), "presence": False},
     "humidity_only": {"rh": ramp(41.5, 62)},
 }
+SCENARIOS["cooking_gas_leak"] = {**SCENARIOS["cooking"], "gas": ramp(640, 2000, 200, 450)}
 
 
 def _grade(value: float, warn: float, danger: float) -> str:
@@ -100,11 +101,17 @@ async def publish(base: str, doc: dict) -> None:
     await handle_hardware_message(f"{base}/status", json.dumps(doc).encode())
 
 
-async def seed_history(name: str, *, live: int = 3, readings: bool = True) -> list[dict]:
+# air channel -> (doc value key, units) for backdated sensor_readings
+_READING_KEYS = {"particulate": ("pm2_5", "ug/m3"), "gas": ("adc", "adc")}
+_READING_SENSOR = {"particulate": "particulate", "gas": "combustible_gas"}
+
+
+async def seed_history(name: str, *, live: int = 3, readings: bool = True,
+                       reading_channels: tuple[str, ...] = ("particulate",)) -> list[dict]:
     """Register the `canary` air node, then store the scenario's documents except the
     last `live` as if they had arrived over the past ~10 minutes: node_status rows and,
-    with `readings`, the PM2.5 sensor_readings the false-alarm layer looks at.
-    Returns the `live` documents, still to be published."""
+    with `readings`, the sensor_readings of `reading_channels` that the false-alarm
+    layer looks at. Returns the `live` documents, still to be published."""
     docs = scenario_docs(name)
     await publish("canary", docs[0][1])
     now = datetime.now(timezone.utc)
@@ -114,10 +121,11 @@ async def seed_history(name: str, *, live: int = 3, readings: bool = True) -> li
         for t, doc in docs[:-live]:
             ts = now - timedelta(seconds=590 - t)
             s.add(NodeStatus(node_id="canary", ts=ts, uptime_ms=doc["uptime_ms"], payload=doc))
-            if readings:
+            for channel in reading_channels if readings else ():
+                key, units = _READING_KEYS[channel]
                 s.add(SensorReading(
-                    device_id="canary:particulate", building_id="bld_007", floor_id="flr_03", unit_id="common",
-                    zone_id="zone_hallway", sensor_type="particulate", value=doc["particulate"]["pm2_5"],
-                    units="ug/m3", epoch=1, seq=doc["uptime_ms"], ts=ts))
+                    device_id=f"canary:{channel}", building_id="bld_007", floor_id="flr_03", unit_id="common",
+                    zone_id="zone_hallway", sensor_type=_READING_SENSOR[channel], value=doc[channel][key],
+                    units=units, epoch=1, seq=doc["uptime_ms"], ts=ts))
         await s.commit()
     return [doc for _, doc in docs[-live:]]

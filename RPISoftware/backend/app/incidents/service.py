@@ -25,6 +25,7 @@ from app.enums import (
     AUTO_EVAC_HAZARDS,
     OPEN_INCIDENT_STATES,
     EdgeState,
+    HazardType,
     IncidentState,
     SensorType,
     hazard_for_sensor,
@@ -146,9 +147,11 @@ class IncidentService:
         incident.false_alarm_reason = assessment.reason
         incident.benign_score = assessment.benign_score
 
-        # Hazard signature (air nodes): a fire signature cancels every hold; a confident
-        # benign one may hold a corroborated escalation. Critical readings never reach
-        # these branches (their reason is never "corroborated").
+        # Hazard signature (air nodes): a fire signature cancels every hold, for any hazard;
+        # a confident benign one may hold only a corroborated PARTICULATE escalation from a
+        # single sensor in a single zone. Gas / CO and real cross-sensor corroboration are
+        # never held by it. Critical readings and node alarms never reach these branches
+        # (their reason is never "corroborated").
         signature = await self._classify_signature(incident, device_id)
 
         target = decision.target_state
@@ -161,7 +164,13 @@ class IncidentService:
             target = IncidentState.verification
             reason = f"held_{assessment.classification}"
             fast_path = False
-        elif corroborated and signature is not None and signature.allows_hold:
+        elif (
+            corroborated
+            and hazard == HazardType.particulate
+            and not multi_sensor
+            and signature is not None
+            and signature.allows_hold
+        ):
             target = IncidentState.verification
             reason = f"held_signature_{signature.label}"
             fast_path = False
@@ -242,6 +251,7 @@ class IncidentService:
         # propagate), then isolate the classifier's reads and assessment INSERT in a savepoint.
         await self.session.flush()
         try:
+            # SAVEPOINT needs an open transaction; the flush above guarantees one (pysqlite/aiosqlite).
             async with self.session.begin_nested():
                 return await AnalyticsService(self.session).classify_signature(node_id, incident.id)
         except Exception:  # noqa: BLE001
