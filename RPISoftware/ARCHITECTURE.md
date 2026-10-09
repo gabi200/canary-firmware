@@ -17,7 +17,7 @@ Everything after this section is the design and delivery **plan**. What exists t
 | Tiers | Edge → per-building gateway (local panel, signage, LAN/BLE check-in, store-and-forward) → multi-AZ cloud | Edge → one Pi running broker, backend and dashboard with `docker compose`. No gateway panel or signage, no cloud |
 | Backend | Separate services over Redis Streams, Postgres-before-ack | One FastAPI process: MQTT consumer, detection, incident state machine, analysis, REST + WebSocket |
 | Storage | PostgreSQL 16 + TimescaleDB + Redis 7 | SQLite (WAL) on a Docker volume by default; Postgres optional (hypertables only if Timescale is installed). No Redis. Raw history pruned hourly after 14 days |
-| Detection / analytics | §7 machine with timers; learned triangulation, occupancy and false-alarm models (§B) | §7 states without timers; rule-based triangulation, occupancy and false-alarm reduction; device thresholds and alarms applied under explicit safety rules ([`docs/HARDWARE.md`](./docs/HARDWARE.md) §2) |
+| Detection / analytics | §7 machine with timers; learned triangulation, occupancy and false-alarm models (§B) | §7 states without timers; rule-based triangulation, occupancy and false-alarm reduction; a rule-based hazard signature classifier per air node (smouldering/flaming fire, gas leak, steam, cooking, aerosol) that can hold a benign escalation or cancel a hold for fire, with a synthetic-trained random forest in shadow mode only; device thresholds and alarms applied under explicit safety rules ([`docs/HARDWARE.md`](./docs/HARDWARE.md) §2) |
 | Notification / escalation | FCM/APNs, SMS, email, signed webhooks to ARC, ISU and the gas distributor | `Notification` rows + WebSocket only; FCM optional in the app and off by default; no external adapters |
 | Web / mobile | React with Zustand, Konva, ECharts, OIDC; Flutter with FCM and a gateway LAN/BLE path | React + TanStack Query + SVG + Recharts; Flutter + Riverpod over REST + WebSocket to the Pi; username-only dev login |
 | Security | TLS/mTLS everywhere, OIDC, per-device certificates, hash-chained audit | Plaintext MQTT/HTTP on a trusted LAN/VLAN; per-sensor MQTT passwords; plain append-only audit table |
@@ -1039,6 +1039,8 @@ Honest expected accuracy: ±1–2 persons per zone for small counts in a calibra
 ---
 
 ### Module 3 — False-Alarm Reduction / Anomaly Detection
+
+> **As built:** besides the single-channel shape classifier (`app/analytics/false_alarm.py`), each air node's 10-minute window is labelled by `app/analytics/signature/` using all of its channels: CO, gas, PM1/2.5/10, temperature, humidity and presence. A confident benign label (steam, cooking, aerosol) may hold a corroborated non-critical escalation in verification; a fire label cancels any hold; critical readings and node alarms are never held. A random forest trained on synthetic windows (`backend/tools/signature/`) runs in shadow mode, and its opinion is stored in `signature_assessments` next to the rules' label. Both encode untested assumptions: the thresholds need tuning against controlled tests on the real sensors. Design: [`docs/superpowers/specs/2026-10-09-hazard-signature-classifier-design.md`](../docs/superpowers/specs/2026-10-09-hazard-signature-classifier-design.md).
 
 **Goal.** Cut nuisance alarms (cooking fumes on a gas sensor, aerosol sprays, sensor drift, a single transient spike) without ever suppressing a genuine hazard, and additionally surface **slow micro-leak trends** *before* they breach the detection threshold.
 
