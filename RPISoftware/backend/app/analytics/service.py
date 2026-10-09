@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import models as _models
 from app.analytics.signature import model as signature_model
 from app.analytics.signature.features import extract_features, parse_snapshot
 from app.analytics.signature.rules import SignatureAssessment, assess
@@ -153,3 +154,17 @@ class AnalyticsService:
         ))
         await self.session.flush()  # insert inside the caller's savepoint, not at a later commit
         return assessment
+
+    async def latest_signatures(self, incident_ids: list[str]) -> dict[str, SignatureAssessmentRow]:
+        """The newest assessment per incident, in one query (ids are monotonic)."""
+        if not incident_ids:
+            return {}
+        newest = (
+            select(func.max(_models.SignatureAssessmentRow.id))
+            .where(_models.SignatureAssessmentRow.incident_id.in_(incident_ids))
+            .group_by(_models.SignatureAssessmentRow.incident_id)
+        )
+        rows = (await self.session.scalars(
+            select(_models.SignatureAssessmentRow).where(_models.SignatureAssessmentRow.id.in_(newest))
+        )).all()
+        return {r.incident_id: r for r in rows}

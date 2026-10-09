@@ -13,7 +13,7 @@ from app.db import SessionLocal
 from app.ingestion import hardware
 from app.models import SignatureAssessmentRow
 from app.retention import prune_old_rows
-from tests.conftest import auth_token
+from tests.conftest import auth_token, telemetry
 from tests.hardware_docs import air_doc, water_doc
 from tests.signature_windows import publish, seed_history
 
@@ -125,3 +125,32 @@ async def test_assessment_insert_failure_is_isolated(client, monkeypatch):
     [inc] = await _active(client)
     assert inc["state"] == "alarm"
     assert await _assessments(inc["id"]) == []
+
+
+async def test_incident_api_returns_the_latest_signature(client):
+    await _publish_all(await seed_history("steam"))
+    [inc] = await _active(client)
+    sig = inc["signature"]
+    assert set(sig) == {"label", "confidence", "evidence", "shadow_label", "shadow_confidence", "model_version", "ts"}
+    assert (sig["label"], sig["confidence"]) == ("steam", pytest.approx(1.0))
+    assert sig["evidence"][-1].endswith("→ steam")
+    headers = {"Authorization": f"Bearer {await auth_token(client, 'mihai')}"}
+    one = (await client.get(f"/api/v1/incidents/{inc['id']}", headers=headers)).json()
+    assert one["signature"] == sig
+
+
+async def test_incident_without_assessment_has_null_signature(client):
+    for seq in (1, 2):
+        await client.post("/api/v1/telemetry", json=telemetry(
+            "dev_gas_kitchen", "combustible_gas", 1200, zone_id="zone_kitchen", unit_id="unit_0312", seq=seq))
+    [inc] = await _active(client)
+    assert inc["signature"] is None
+
+
+async def test_dismiss_returns_the_signature_too(client):
+    await _publish_all(await seed_history("steam"))
+    [inc] = await _active(client)
+    headers = {"Authorization": f"Bearer {await auth_token(client, 'mihai')}"}
+    r = await client.post(f"/api/v1/incidents/{inc['id']}/dismiss", headers=headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["signature"]["label"] == "steam"
