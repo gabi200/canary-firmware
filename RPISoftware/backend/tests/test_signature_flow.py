@@ -115,3 +115,13 @@ async def test_old_assessments_are_pruned(client):
         await s.commit()
     deleted = await prune_old_rows()
     assert deleted["signature_assessments"] == 1
+
+
+async def test_assessment_insert_failure_is_isolated(client, monkeypatch):
+    def bad_row(**kw):
+        return SignatureAssessmentRow(**{**kw, "label": None})  # NOT NULL violation at flush
+    monkeypatch.setattr("app.analytics.service.SignatureAssessmentRow", bad_row)
+    await _publish_all(await seed_history("steam"))
+    [inc] = await _active(client)
+    assert inc["state"] == "alarm"
+    assert await _assessments(inc["id"]) == []

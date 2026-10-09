@@ -151,4 +151,5 @@ class AnalyticsService:
             shadow_confidence=shadow.confidence if shadow else None,
             model_version=shadow.model_version if shadow else None,
         ))
+        await self.session.flush()  # insert inside the caller's savepoint, not at a later commit
         return assessment
