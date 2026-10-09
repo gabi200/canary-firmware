@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import models as _models
 from app.analytics.signature import model as signature_model
 from app.analytics.signature.features import extract_features, parse_snapshot
 from app.analytics.signature.rules import SignatureAssessment, assess
@@ -160,11 +159,11 @@ class AnalyticsService:
         if not incident_ids:
             return {}
         newest = (
-            select(func.max(_models.SignatureAssessmentRow.id))
-            .where(_models.SignatureAssessmentRow.incident_id.in_(incident_ids))
-            .group_by(_models.SignatureAssessmentRow.incident_id)
+            select(func.max(SignatureAssessmentRow.id))
+            .where(SignatureAssessmentRow.incident_id.in_(incident_ids))
+            .group_by(SignatureAssessmentRow.incident_id)
         )
         rows = (await self.session.scalars(
-            select(_models.SignatureAssessmentRow).where(_models.SignatureAssessmentRow.id.in_(newest))
+            select(SignatureAssessmentRow).where(SignatureAssessmentRow.id.in_(newest))
         )).all()
         return {r.incident_id: r for r in rows}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -9,6 +10,7 @@ from sqlalchemy import select
 
 from app.analytics.service import AnalyticsService
 from app.analytics.signature.model import ShadowPrediction
+from app.analytics.signature.rules import assess
 from app.db import SessionLocal
 from app.ingestion import hardware
 from app.models import SignatureAssessmentRow
@@ -118,9 +120,11 @@ async def test_old_assessments_are_pruned(client):
 
 
 async def test_assessment_insert_failure_is_isolated(client, monkeypatch):
-    def bad_row(**kw):
-        return SignatureAssessmentRow(**{**kw, "label": None})  # NOT NULL violation at flush
-    monkeypatch.setattr("app.analytics.service.SignatureAssessmentRow", bad_row)
+    real_assess = assess
+
+    def bad_assess(features):
+        return dataclasses.replace(real_assess(features), label=None)  # NOT NULL violation at flush
+    monkeypatch.setattr("app.analytics.service.assess", bad_assess)
     await _publish_all(await seed_history("steam"))
     [inc] = await _active(client)
     assert inc["state"] == "alarm"
