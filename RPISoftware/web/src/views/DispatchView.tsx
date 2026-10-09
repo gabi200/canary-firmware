@@ -16,6 +16,7 @@ import { IncidentTimeline } from "../components/IncidentTimeline";
 import { ResidentRoster } from "../components/ResidentRoster";
 import { AssemblyPoint, HazardTriangle, RunningManExit } from "../components/SafetySigns";
 import { SignalBadge } from "../components/SignalBadge";
+import { SignatureBadge } from "../components/SignatureBadge";
 import { StatusPill } from "../components/StatusPill";
 import { latestByDevice } from "../lib/latest";
 import { buildZoneNames, hazardLabel, zoneLabel } from "../lib/labels";
@@ -90,6 +91,7 @@ export function DispatchView() {
         </div>
         <div style={{ marginTop: 10 }}>
           <SignalBadge cls={incident.false_alarm_class} />
+          <SignatureBadge signature={incident.signature} />
         </div>
       </div>
 

@@ -41,6 +41,16 @@ export interface Reading {
   ts: string;
 }
 
+export interface Signature {
+  label: string;
+  confidence: number;
+  evidence: string[];
+  shadow_label: string | null;
+  shadow_confidence: number | null;
+  model_version: string | null;
+  ts: string;
+}
+
 export interface Incident {
   id: string;
   building_id: string;
@@ -62,6 +72,7 @@ export interface Incident {
   false_alarm_class: string | null;
   false_alarm_reason: string | null;
   benign_score: number | null;
+  signature: Signature | null;
 }
 
 export interface TriangulationContributor {
