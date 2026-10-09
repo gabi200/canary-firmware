@@ -238,10 +238,10 @@ class IncidentService:
         node_id, sep, _ = device_id.partition(":")
         if not sep:
             return None
+        # Flush the incident's own pending state first (errors here are not the classifier's and
+        # propagate), then isolate the classifier's reads and assessment INSERT in a savepoint.
+        await self.session.flush()
         try:
-            # Flush the incident's own pending state first, then isolate the classifier (its
-            # reads and the assessment INSERT) in a savepoint so a DB error rolls back only that.
-            await self.session.flush()
             async with self.session.begin_nested():
                 return await AnalyticsService(self.session).classify_signature(node_id, incident.id)
         except Exception:  # noqa: BLE001
