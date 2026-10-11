@@ -1,25 +1,28 @@
 import type { Roster, RosterEntry } from "../api/types";
-import { parseTs } from "../lib/time";
+import { useT, type MsgKey, type TFn } from "../i18n";
+import { fmtClock } from "../lib/time";
 
 /** Maps a check-in status to a label + pill style. `unknown`/`no_response` mean "not yet
  *  confirmed safe" — the people a responder still has to account for. */
-function statusMeta(status: string): { label: string; cls: string } {
+function statusMeta(status: string, t: TFn): { label: string; cls: string } {
   switch (status) {
     case "needs_help":
-      return { label: "NEEDS HELP", cls: "alarm" };
+      return { label: t("roster.needsHelp"), cls: "alarm" };
     case "safe_outside":
-      return { label: "Safe — outside", cls: "normal" };
+      return { label: t("roster.safeOutside"), cls: "normal" };
     case "safe_inside":
-      return { label: "Safe — inside", cls: "normal" };
+      return { label: t("roster.safeInside"), cls: "normal" };
     case "no_response":
-      return { label: "No response", cls: "detection" };
+      return { label: t("roster.noResponse"), cls: "detection" };
     default:
-      return { label: "Awaiting", cls: "detection" };
+      return { label: t("roster.awaiting"), cls: "detection" };
   }
 }
 
+/** Names, unit labels and phone numbers are building data: shown verbatim. */
 function RosterRow({ entry }: { entry: RosterEntry }) {
-  const meta = statusMeta(entry.status);
+  const { t, lang } = useT();
+  const meta = statusMeta(entry.status, t);
   return (
     <div className="row">
       <div className="grow">
@@ -27,9 +30,10 @@ function RosterRow({ entry }: { entry: RosterEntry }) {
         <div className="muted small">
           {entry.unit_label ?? entry.unit_id ?? "—"}
           {entry.phone ? ` · ${entry.phone}` : ""}
-          {entry.ts ? ` · ${new Date(parseTs(entry.ts)).toLocaleTimeString()}` : ""}
+          {entry.ts ? ` · ${fmtClock(entry.ts, lang)}` : ""}
         </div>
       </div>
+      {entry.location && <span className="tag">{t(`where.${entry.location}` as MsgKey)}</span>}
       <span className={`pill ${meta.cls}`}>{meta.label}</span>
     </div>
   );
@@ -37,23 +41,24 @@ function RosterRow({ entry }: { entry: RosterEntry }) {
 
 /** Incident roster with a safe / needs-help / awaiting summary, needs-help surfaced first. */
 export function ResidentRoster({ roster }: { roster: Roster }) {
+  const { t } = useT();
   if (roster.entries.length === 0) {
-    return <div className="muted small">No residents registered for this building.</div>;
+    return <div className="muted small">{t("roster.empty")}</div>;
   }
   return (
     <div>
       <div className="grid cols-3" style={{ gap: 10, marginBottom: 12 }}>
         <div className={`metric ${roster.needs_help > 0 ? "danger" : ""}`}>
           <div className="n">{roster.needs_help}</div>
-          <div className="l">Need help</div>
+          <div className="l">{t("roster.metricNeedHelp")}</div>
         </div>
         <div className={`metric ${roster.awaiting > 0 ? "" : "good"}`}>
           <div className="n">{roster.awaiting}</div>
-          <div className="l">Awaiting</div>
+          <div className="l">{t("roster.awaiting")}</div>
         </div>
         <div className="metric good">
           <div className="n">{roster.safe}</div>
-          <div className="l">Safe</div>
+          <div className="l">{t("roster.metricSafe")}</div>
         </div>
       </div>
       {roster.entries.map((e) => (
@@ -65,8 +70,9 @@ export function ResidentRoster({ roster }: { roster: Roster }) {
 
 /** Plain named-resident list (no incident context) for the manager dashboard. */
 export function ResidentList({ entries }: { entries: RosterEntry[] }) {
+  const { t } = useT();
   if (entries.length === 0) {
-    return <div className="muted small">No residents registered for this building.</div>;
+    return <div className="muted small">{t("roster.empty")}</div>;
   }
   return (
     <div>

@@ -124,6 +124,39 @@ class CheckInStatus(str, Enum):
 ACCOUNTED_STATUSES: frozenset[CheckInStatus] = frozenset({CheckInStatus.safe_outside})
 
 
+class ZoneKind(str, Enum):
+    """Zone kinds (the seed uses kitchen, bedroom, hallway, boiler)."""
+
+    kitchen = "kitchen"
+    living_room = "living_room"
+    bedroom = "bedroom"
+    bathroom = "bathroom"
+    hallway = "hallway"
+    stairwell = "stairwell"
+    boiler = "boiler"
+    other = "other"
+
+
+# Device commands per node kind -> MQTT topic suffix (firmware: air_sensor / water_sensor README).
+NODE_COMMANDS: dict[str, dict[str, str]] = {
+    "air": {"TEST": "buzzer/set", "SILENCE": "buzzer/set"},
+    "water": {"OPEN": "valve/set", "CLOSE": "valve/set", "SILENCE": "buzzer/set"},
+}
+
+
+class CareNeed(str, Enum):
+    """Care-profile needs: fixed codes only, never diagnoses or medication."""
+
+    reduced_mobility = "reduced_mobility"
+    wheelchair = "wheelchair"
+    bedridden = "bedridden"
+    hearing_impaired = "hearing_impaired"
+    visually_impaired = "visually_impaired"
+    medical_device = "medical_device"  # oxygen / other equipment
+    young_child = "young_child"
+    pet = "pet"
+
+
 class CheckInSource(str, Enum):
     cloud = "cloud"
     gateway_lan = "gateway_lan"
@@ -134,6 +167,15 @@ class Role(str, Enum):
     hoa_manager = "hoa_manager"
     dispatcher_external = "dispatcher_external"
     system_admin = "system_admin"
+    technician = "technician"  # installer: rooms, sensors and tests; no accounts, no incident actions
+
+
+class Whereabouts(str, Enum):
+    """Where a resident says they are during an incident (alarm screen: "Where are you now?")."""
+
+    home = "home"
+    building = "building"  # elsewhere in the building
+    outside = "outside"
 
 
 class NotificationChannel(str, Enum):

@@ -9,6 +9,7 @@ import '../config.dart';
 ///
 /// Emits decoded JSON maps (events of type "incident" / "checkin"). On a dropped
 /// connection it reconnects with capped backoff; consumers stay subscribed.
+/// [connection] says whether the socket is actually open.
 class WsClient {
   WsClient({required this.buildingId, required this.token});
 
@@ -16,6 +17,7 @@ class WsClient {
   final String token;
 
   final _controller = StreamController<Map<String, dynamic>>.broadcast();
+  final _status = StreamController<bool>.broadcast();
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
   Timer? _retry;
@@ -24,12 +26,24 @@ class WsClient {
 
   Stream<Map<String, dynamic>> get events => _controller.stream;
 
+  /// true once the socket is open, false when it fails or drops (a retry follows).
+  Stream<bool> get connection => _status.stream;
+
   void connect() {
     if (_closed) return;
-    final uri = Uri.parse('${Config.wsBase}/api/v1/ws/incidents?building_id=$buildingId&token=$token');
+    final uri = Uri.parse('${Config.wsBase}/api/v1/ws/incidents')
+        .replace(queryParameters: {'building_id': buildingId, 'token': token});
     try {
       final channel = WebSocketChannel.connect(uri);
       _channel = channel;
+      // A refused or unreachable socket fails `ready` as well as the stream. The
+      // stream's error schedules the retry; `ready` only reports the state (left
+      // unhandled, every failed attempt was an uncaught error in the browser).
+      channel.ready.then((_) {
+        if (_closed || _channel != channel) return;
+        _backoff = const Duration(seconds: 1);
+        _status.add(true);
+      }, onError: (Object _) {});
       _sub = channel.stream.listen(
         (data) {
           _backoff = const Duration(seconds: 1);
@@ -51,6 +65,7 @@ class WsClient {
 
   void _scheduleReconnect() {
     if (_closed) return;
+    _status.add(false);
     _sub?.cancel();
     _channel = null;
     _retry?.cancel();
@@ -64,5 +79,6 @@ class WsClient {
     await _sub?.cancel();
     await _channel?.sink.close();
     await _controller.close();
+    await _status.close();
   }
 }

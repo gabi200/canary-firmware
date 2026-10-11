@@ -1,9 +1,8 @@
-import { useState } from "react";
 import {
   Area,
+  AreaChart,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ReferenceLine,
   ResponsiveContainer,
@@ -12,217 +11,166 @@ import {
   YAxis,
 } from "recharts";
 
-import { useNodeHistory } from "../api/hooks";
-import type { NodeHistory, NodeOut } from "../api/types";
-import { fmtNum, pickNum } from "../lib/nodes";
-import { fmtClock, parseTs } from "../lib/time";
+import type { NodeOut } from "../api/types";
+import { useT, type MsgKey } from "../i18n";
+import { fmtNumber } from "../lib/format";
+import { COLORS, METRICS, keyOf, stats, type Metric, type Ref, type Row } from "../lib/metrics";
+import { pickNum } from "../lib/nodes";
+import { fmtAxisTime, fmtTooltipTime, timeTicks } from "../lib/time";
 import { axisUnit, chartStyle } from "./TrendChart";
 
-const RANGES = [
-  { minutes: 15, label: "15 min" },
-  { minutes: 60, label: "1 h" },
-  { minutes: 360, label: "6 h" },
-  { minutes: 1440, label: "24 h" },
-];
-
-const C = {
-  blue: "#2f81f7",
-  purple: "#a371f7",
-  cyan: "#39c5cf",
-  orange: "#f0883e",
-  green: "#2ea043",
-  amber: "#d29922",
-  red: "#f85149",
-};
-
 interface Series {
-  field: string;
-  label: string;
-  color: string;
+  metric: Metric;
+  /** Short legend / tooltip name. */
+  name: MsgKey;
   right?: boolean;
 }
 
 interface ChartSpec {
-  title: string;
-  unit: string;
-  rightUnit?: string;
-  note?: string;
+  id: string;
+  title: MsgKey;
+  note?: MsgKey;
   series: Series[];
-  /** Device thresholds from the latest raw document, drawn as dashed lines. */
-  refs?: { label: string; path: string; color: string }[];
-  /** Stretch the axis so the thresholds are always visible (otherwise drawn only in range). */
-  showRefs?: boolean;
-  /** Axis fits the data instead of starting at 0. */
-  fit?: boolean;
-  /** 0/1 signal drawn as a step area. */
-  binary?: boolean;
+  /** Device thresholds (left axis), always kept in view. */
+  refs?: Ref[];
   wide?: boolean;
 }
 
+interface TimelineSpec {
+  id: string;
+  title: MsgKey;
+  note?: MsgKey;
+  items: { field: string; label: MsgKey; color: string }[];
+}
+
 const AIR_CHARTS: ChartSpec[] = [
+  { id: "co", title: "chart.co", series: [{ metric: METRICS.co, name: "metric.co" }], refs: METRICS.co.refs },
   {
-    title: "Carbon monoxide",
-    unit: "ppm",
-    series: [{ field: "co.ppm", label: "CO", color: C.blue }],
-    refs: [
-      { label: "warn", path: "co.warn_ppm", color: C.amber },
-      { label: "danger", path: "co.danger_ppm", color: C.red },
-    ],
-  },
-  {
-    title: "Combustible gas (MQ5)",
-    unit: "ADC",
-    note: "raw ADC count, not ppm",
-    series: [{ field: "gas.adc", label: "Gas", color: C.purple }],
-    refs: [
-      { label: "warn", path: "gas.warn_adc", color: C.amber },
-      { label: "danger", path: "gas.danger_adc", color: C.red },
-    ],
-  },
-  {
-    title: "Particulates",
-    unit: "µg/m³",
+    id: "fine",
+    title: "chart.fineParticles",
     series: [
-      { field: "particulate.pm1_0", label: "PM1.0", color: C.cyan },
-      { field: "particulate.pm2_5", label: "PM2.5", color: C.blue },
-      { field: "particulate.pm10", label: "PM10", color: C.purple },
+      { metric: METRICS.pm1, name: "metric.pm1" },
+      { metric: METRICS.pm25, name: "metric.pm25" },
     ],
-    refs: [
-      { label: "PM2.5 warn", path: "particulate.warn_pm2_5", color: C.amber },
-      { label: "PM2.5 danger", path: "particulate.danger_pm2_5", color: C.red },
-    ],
+    refs: METRICS.pm25.refs,
+  },
+  { id: "pm10", title: "tile.pm10", series: [{ metric: METRICS.pm10, name: "metric.pm10" }], refs: METRICS.pm10.refs },
+  {
+    id: "gas",
+    title: "tile.gas",
+    note: "chart.gasNote",
+    series: [{ metric: METRICS.gas, name: "metric.gas" }],
+    refs: METRICS.gas.refs,
   },
   {
-    title: "Temperature / humidity",
-    unit: "°C",
-    rightUnit: "%RH",
-    fit: true,
+    id: "climate",
+    title: "chart.climate",
+    note: "chart.climateNote",
     series: [
-      { field: "climate.temperature_c", label: "Temperature", color: C.orange },
-      { field: "climate.humidity_percent", label: "Humidity", color: C.blue, right: true },
+      { metric: METRICS.temperature, name: "metric.temperature" },
+      { metric: METRICS.humidity, name: "metric.humidity", right: true },
     ],
   },
-  {
-    title: "Presence (radar)",
-    unit: "",
-    binary: true,
-    wide: true,
-    series: [{ field: "presence.detected", label: "Presence", color: C.green }],
-  },
+  { id: "rssi", title: "tile.rssi", series: [{ metric: METRICS.rssi, name: "tile.rssi" }] },
 ];
+
+const AIR_TIMELINE: TimelineSpec = {
+  id: "presence",
+  title: "chart.presence",
+  note: "chart.presenceNote",
+  items: [
+    { field: "presence.detected", label: "timeline.detected", color: COLORS.green },
+    { field: "presence.moving", label: "raw.movingTarget", color: COLORS.cyan },
+    { field: "presence.stationary", label: "raw.stationaryTarget", color: COLORS.purple },
+  ],
+};
 
 const WATER_CHARTS: ChartSpec[] = [
   {
-    title: "Leak sensor",
-    unit: "ADC",
-    wide: true,
-    showRefs: true,
-    series: [{ field: "sensor.adc", label: "Sensor", color: C.blue }],
-    refs: [
-      { label: "wet ≥", path: "sensor.wet_threshold", color: C.red },
-      { label: "dry ≤", path: "sensor.dry_threshold", color: C.green },
-    ],
+    id: "probe",
+    title: "tile.probe",
+    series: [{ metric: METRICS.probe, name: "metric.sensor" }],
+    refs: METRICS.probe.refs,
   },
-  {
-    title: "Leak latch",
-    unit: "",
-    binary: true,
-    wide: true,
-    series: [{ field: "leak_latched", label: "Latched", color: C.red }],
-  },
+  { id: "rssi", title: "tile.rssi", series: [{ metric: METRICS.rssi, name: "tile.rssi" }] },
 ];
 
-/** Stale thresholds from the contract (3x heartbeat): longer silences are drawn as gaps. */
-const STALE_MS = { air: 45_000, water: 180_000 };
+const WATER_TIMELINE: TimelineSpec = {
+  id: "water",
+  title: "timeline.water",
+  items: [
+    { field: "sensor.state", label: "timeline.probeWet", color: COLORS.red },
+    { field: "leak_latched", label: "raw.leakLatched", color: COLORS.orange },
+    { field: "valve.applied", label: "timeline.valveClosed", color: COLORS.amber },
+  ],
+};
 
-const TICK_STEPS_MIN = [1, 2, 5, 10, 15, 30, 60, 120, 180, 240, 360];
+const REF_COLOR = { warn: COLORS.amber, danger: COLORS.red };
 
-/** At most ~5 axis ticks on round local clock times (recharts would space them by raw ms). */
-function timeTicks(from: number, to: number): number[] {
-  const stepMin = TICK_STEPS_MIN.find((m) => (to - from) / (m * 60_000) <= 5) ?? 360;
-  const step = stepMin * 60_000;
-  const tz = new Date(from).getTimezoneOffset() * 60_000;
-  const ticks: number[] = [];
-  for (let t = Math.ceil((from - tz) / step) * step + tz; t <= to; t += step) ticks.push(t);
-  return ticks;
-}
+/** 0-based for concentrations / counts, else the data plus the metric's margin. */
+const domainOf = (m: Metric): [number | string, number | string] =>
+  m.zeroBased ? [0, "auto"] : [`dataMin - ${m.pad ?? 0}`, `dataMax + ${m.pad ?? 0}`];
+const REBOOT_COLOR = "#a371f7";
 
-/** recharts reads dotted dataKeys as nested paths, so chart rows use flat keys. */
-const keyOf = (field: string) => field.replace(/\W/g, "_");
-
-type Row = Record<string, number | null>;
-
-/** Chart rows (t = epoch ms). A blank row is inserted wherever reports stop for longer than
- *  the stale threshold (or 3x the typical spacing of downsampled points), so outages show
- *  as gaps rather than straight lines. */
-function toRows(points: NodeHistory["points"], fields: string[], staleMs: number): Row[] {
-  const pts = points
-    .map((p) => ({ t: parseTs(p.ts), values: p.values ?? {} }))
-    .filter((p) => Number.isFinite(p.t));
-  const steps = pts
-    .slice(1)
-    .map((p, i) => p.t - pts[i].t)
-    .sort((a, b) => a - b);
-  const gapMs = Math.max(staleMs, 3 * (steps[Math.floor(steps.length / 2)] ?? 0));
-
-  const rows: Row[] = [];
-  let prev: number | null = null;
-  for (const p of pts) {
-    if (prev != null && p.t - prev > gapMs) {
-      const blank: Row = { t: prev + 1 };
-      for (const f of fields) blank[keyOf(f)] = null;
-      rows.push(blank);
-    }
-    const row: Row = { t: p.t };
-    for (const f of fields) {
-      const v = p.values[f];
-      row[keyOf(f)] = typeof v === "number" ? v : null;
-    }
-    rows.push(row);
-    prev = p.t;
-  }
-  return rows;
-}
-
-function HistoryChart({
-  spec,
-  rows,
-  from,
-  to,
-  doc,
-}: {
-  spec: ChartSpec;
+interface Window {
   rows: Row[];
   from: number;
   to: number;
-  doc: unknown;
-}) {
+  minutes: number;
+  reboots: number[];
+}
+
+function MetricChart({ spec, doc, win }: { spec: ChartSpec; doc: unknown; win: Window }) {
+  const { t, lang } = useT();
+  const { rows, from, to, minutes } = win;
   const refs = (spec.refs ?? []).flatMap((r) => {
     const value = pickNum(doc, r.path);
     return value == null ? [] : [{ ...r, value }];
   });
-  const hasData = rows.some((row) => spec.series.some((s) => row[keyOf(s.field)] != null));
-  const unitOf = new Map(
-    spec.series.map((s) => [keyOf(s.field), s.right ? spec.rightUnit : spec.unit]),
-  );
+  const left = spec.series.find((s) => !s.right)!.metric;
+  const right = spec.series.find((s) => s.right)?.metric;
+  const byKey = new Map(spec.series.map((s) => [keyOf(s.metric.field), s.metric]));
+  const summaries = spec.series.map((s) => ({ s, st: stats(rows, keyOf(s.metric.field)) }));
+  const hasData = summaries.some((x) => x.st);
+  const reboots = win.reboots.filter((r) => r >= from && r <= to);
+  const num = (m: Metric, v: number, extra = 0) => fmtNumber(v, lang, m.digits + extra, m.fixed);
 
   return (
     <div className={`chart ${spec.wide ? "wide" : ""}`}>
       <div className="chart-head">
-        <span className="chart-title">{spec.title}</span>
-        {spec.note && <span className="muted small">{spec.note}</span>}
+        <span className="chart-title">{t(spec.title)}</span>
+        {spec.note && <span className="muted small">{t(spec.note)}</span>}
         <span className="spacer" />
-        {refs.length > 0 && (
-          <span className="muted small">
-            {refs.map((r) => `${r.label} ${fmtNum(r.value)}`).join(" · ")}
+        {refs.map((r) => (
+          <span key={r.path} className="ref-key small" style={{ color: REF_COLOR[r.tone] }}>
+            <span className="ref-dash" style={{ borderColor: REF_COLOR[r.tone] }} />
+            {t(r.label)} {num(left, r.value)}
           </span>
-        )}
+        ))}
+      </div>
+      <div className="chart-stats">
+        {summaries.map(({ s, st }) => (
+          <span key={s.metric.field}>
+            <span className="sw" style={{ background: s.metric.color }} />
+            <b>{t(s.name)}</b>
+            {st ? (
+              <>
+                {" "}
+                {t("stats.min")} <b>{num(s.metric, st.min)}</b> · {t("stats.avg")}{" "}
+                <b>{num(s.metric, st.avg, s.metric.fixed ? 0 : 1)}</b> · {t("stats.max")}{" "}
+                <b>{num(s.metric, st.max)}</b> <span className="muted">{s.metric.unit}</span>
+              </>
+            ) : (
+              <span className="muted"> —</span>
+            )}
+          </span>
+        ))}
       </div>
       {!hasData ? (
-        <div className="chart-empty muted small">No data in this range.</div>
+        <div className="chart-empty muted small">{t("history.noData")}</div>
       ) : (
-        <ResponsiveContainer width="100%" height={spec.binary ? 80 : 180}>
-          <ComposedChart data={rows} margin={{ top: 8, right: spec.rightUnit ? 0 : 12, bottom: 0, left: 0 }}>
+        <ResponsiveContainer width="100%" height={170}>
+          <ComposedChart data={rows} margin={{ top: 10, right: right ? 0 : 12, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={chartStyle.grid} strokeDasharray="3 3" />
             <XAxis
               dataKey="t"
@@ -230,82 +178,75 @@ function HistoryChart({
               scale="time"
               domain={[from, to]}
               ticks={timeTicks(from, to)}
-              tickFormatter={(t: number) =>
-                new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              }
+              tickFormatter={(ms: number) => fmtAxisTime(ms, lang, minutes)}
               stroke={chartStyle.axis}
               fontSize={11}
-              minTickGap={40}
+              minTickGap={36}
             />
             <YAxis
               yAxisId="left"
               stroke={chartStyle.axis}
               fontSize={11}
-              width={spec.binary ? 44 : 56}
-              domain={spec.binary ? [0, 1] : spec.fit ? ["auto", "auto"] : [0, "auto"]}
-              ticks={spec.binary ? [0, 1] : undefined}
-              tickFormatter={spec.binary ? (v: number) => (v ? "yes" : "no") : undefined}
-              label={spec.unit ? axisUnit(spec.unit) : undefined}
+              width={52}
+              domain={domainOf(left)}
+              tickFormatter={(v: number) => fmtNumber(v, lang, left.zeroBased ? left.digits : left.digits + 1)}
+              label={axisUnit(left.unit)}
             />
-            {spec.rightUnit && (
+            {right && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
                 stroke={chartStyle.axis}
                 fontSize={11}
-                width={56}
-                domain={["auto", "auto"]}
-                label={axisUnit(spec.rightUnit, "right")}
+                width={52}
+                domain={domainOf(right)}
+                tickFormatter={(v: number) => fmtNumber(v, lang, right.digits + 1)}
+                label={axisUnit(right.unit, "right")}
               />
             )}
             <Tooltip
               {...chartStyle.tooltip}
-              labelFormatter={(t) => fmtClock(Number(t))}
+              labelFormatter={(ms) => fmtTooltipTime(Number(ms), lang, minutes)}
               formatter={(v, _name, item) => {
-                if (typeof v !== "number") return "—";
-                if (spec.binary) return v ? "yes" : "no";
-                return `${fmtNum(v)} ${unitOf.get(String(item.dataKey)) ?? ""}`;
+                const m = byKey.get(String(item.dataKey));
+                if (typeof v !== "number" || !m) return "—";
+                return `${m.approx ? "≈ " : ""}${num(m, v)} ${m.unit}`;
               }}
             />
-            {spec.series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
             {refs.map((r) => (
               <ReferenceLine
-                key={r.label}
+                key={r.path}
                 yAxisId="left"
                 y={r.value}
-                stroke={r.color}
-                strokeDasharray="5 4"
-                ifOverflow={spec.showRefs ? "extendDomain" : "discard"}
-                label={{ value: r.label, fill: r.color, fontSize: 10, position: "insideTopRight" }}
+                stroke={REF_COLOR[r.tone]}
+                strokeDasharray="6 4"
+                ifOverflow="extendDomain"
               />
             ))}
-            {spec.series.map((s) =>
-              spec.binary ? (
-                <Area
-                  key={s.field}
-                  yAxisId="left"
-                  type="stepAfter"
-                  dataKey={keyOf(s.field)}
-                  name={s.label}
-                  stroke={s.color}
-                  fill={s.color}
-                  fillOpacity={0.25}
-                  isAnimationActive={false}
-                />
-              ) : (
-                <Line
-                  key={s.field}
-                  yAxisId={s.right ? "right" : "left"}
-                  type="monotone"
-                  dataKey={keyOf(s.field)}
-                  name={s.label}
-                  stroke={s.color}
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              ),
-            )}
+            {reboots.map((ms) => (
+              <ReferenceLine
+                key={ms}
+                yAxisId="left"
+                x={ms}
+                stroke={REBOOT_COLOR}
+                strokeDasharray="2 3"
+                label={{ value: t("monitor.reboot"), fill: REBOOT_COLOR, fontSize: 10, position: "insideTopLeft" }}
+              />
+            ))}
+            {spec.series.map((s) => (
+              <Line
+                key={s.metric.field}
+                yAxisId={s.right ? "right" : "left"}
+                type="monotone"
+                dataKey={keyOf(s.metric.field)}
+                name={t(s.name)}
+                stroke={s.metric.color}
+                strokeWidth={2}
+                dot={false}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            ))}
           </ComposedChart>
         </ResponsiveContainer>
       )}
@@ -313,47 +254,94 @@ function HistoryChart({
   );
 }
 
-/** Raw history charts of one node from GET /nodes/{id}/history, with a range selector. */
-export function NodeHistoryCharts({ node }: { node: NodeOut }) {
-  const [minutes, setMinutes] = useState(60);
-  const specs = node.kind === "water" ? WATER_CHARTS : AIR_CHARTS;
-  const fields = specs.flatMap((c) => c.series.map((s) => s.field));
-  const history = useNodeHistory(node.id, minutes, fields);
-
-  const data = history.data;
-  // the window actually shown (previous range stays up while a new one loads)
-  const to = history.dataUpdatedAt || Date.now();
-  const from = to - (data?.minutes ?? minutes) * 60_000;
-  const rows = data ? toRows(data.points ?? [], fields, STALE_MS[node.kind] ?? 45_000) : [];
-
+/** 0/1 signals as step bands, one row each, sharing the time axis (last row shows it). */
+function Timeline({ spec, win }: { spec: TimelineSpec; win: Window }) {
+  const { t, lang } = useT();
+  const { rows, from, to, minutes } = win;
+  const reboots = win.reboots.filter((r) => r >= from && r <= to);
+  const hasData = spec.items.some((it) => rows.some((r) => r[keyOf(it.field)] != null));
   return (
-    <div className="node-charts">
-      <div className="charts-head">
-        <span className="panel-label">Raw history</span>
-        <div className="seg">
-          {RANGES.map((r) => (
-            <button
-              key={r.minutes}
-              className={r.minutes === minutes ? "active" : ""}
-              onClick={() => setMinutes(r.minutes)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        {history.isFetching && <span className="muted small">updating…</span>}
+    <div className="chart wide">
+      <div className="chart-head">
+        <span className="chart-title">{t(spec.title)}</span>
+        {spec.note && <span className="muted small">{t(spec.note)}</span>}
       </div>
-      {history.isError && !data ? (
-        <div className="err">History unavailable: {(history.error as Error).message}</div>
-      ) : !data ? (
-        <div className="muted small">Loading history…</div>
+      {!hasData ? (
+        <div className="chart-empty muted small">{t("history.noData")}</div>
       ) : (
-        <div className="charts">
-          {specs.map((spec) => (
-            <HistoryChart key={spec.title} spec={spec} rows={rows} from={from} to={to} doc={node.status} />
-          ))}
+        <div className="timeline">
+          {spec.items.map((it, i) => {
+            const last = i === spec.items.length - 1;
+            return (
+              <div className="tl-row" key={it.field}>
+                <span className="tl-label small">
+                  <span className="sw" style={{ background: it.color }} />
+                  {t(it.label)}
+                </span>
+                <ResponsiveContainer width="100%" height={last ? 46 : 24}>
+                  <AreaChart data={rows} margin={{ top: 2, right: 12, bottom: 0, left: 0 }}>
+                    <XAxis
+                      dataKey="t"
+                      type="number"
+                      scale="time"
+                      domain={[from, to]}
+                      ticks={timeTicks(from, to)}
+                      tickFormatter={(ms: number) => fmtAxisTime(ms, lang, minutes)}
+                      stroke={chartStyle.axis}
+                      fontSize={11}
+                      minTickGap={36}
+                      hide={!last}
+                    />
+                    <YAxis hide domain={[0, 1]} />
+                    <Tooltip
+                      {...chartStyle.tooltip}
+                      labelFormatter={(ms) => fmtTooltipTime(Number(ms), lang, minutes)}
+                      formatter={(v) => (typeof v !== "number" ? "—" : v ? t("common.yes") : t("common.no"))}
+                    />
+                    {reboots.map((ms) => (
+                      <ReferenceLine key={ms} x={ms} stroke={REBOOT_COLOR} strokeDasharray="2 3" />
+                    ))}
+                    <Area
+                      type="stepAfter"
+                      dataKey={keyOf(it.field)}
+                      name={t(it.label)}
+                      stroke={it.color}
+                      fill={it.color}
+                      fillOpacity={0.45}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Detail charts of one node over the selected window (rows from NodeMonitor). */
+export function NodeHistoryCharts({
+  node,
+  win,
+  showPresence = true,
+}: {
+  node: NodeOut;
+  win: Window;
+  /** false for dispatchers: no presence timeline */
+  showPresence?: boolean;
+}) {
+  const water = node.kind === "water";
+  const charts = water ? WATER_CHARTS : AIR_CHARTS;
+  const timeline = water ? WATER_TIMELINE : AIR_TIMELINE;
+  return (
+    <div className="charts">
+      {charts.map((spec) => (
+        <MetricChart key={spec.id} spec={spec} doc={node.status} win={win} />
+      ))}
+      {(water || showPresence) && <Timeline spec={timeline} win={win} />}
     </div>
   );
 }

@@ -1,0 +1,29 @@
+{
+  "_comment": "Demo building for building_sim.py: the seeded zones of bld_007 (zone_kitchen, zone_bedroom, zone_hallway, zone_boiler) plus the rooms of the three seeded flats, every flat laid out alike: kitchen (gas/smoke + sink leak), bathroom (CO from the water heater + leak), living room and bedroom (smoke). Common areas: stairwell hallway (smoke) and boiler room (gas/CO + leak). Floor plan in metres: Ap. 12 x 0-10 / Ap. 13 x 10-20 north of the corridor (y 0-4), corridor y 5, boiler room and Ap. 14 south of it (y 6-10). Rooms are named plainly inside their flat; type 'baie 13' or the id to pick one. The units exist in the seeded hub (listed for their labels); missing zones are created through the hub's admin API and found again by label within the unit.",
+  "building_id": "bld_007",
+  "units": [
+    {"unit_id": "unit_0312", "label": "Ap. 12",        "floor_id": "flr_03", "kind": "residential"},
+    {"unit_id": "unit_0313", "label": "Ap. 13",        "floor_id": "flr_03", "kind": "residential"},
+    {"unit_id": "unit_0314", "label": "Ap. 14",        "floor_id": "flr_03", "kind": "residential"},
+    {"unit_id": "common",    "label": "Spații comune", "floor_id": "flr_03", "kind": "common"}
+  ],
+  "rooms": [
+    {"zone_id": "zone_kitchen",    "label": "Bucătărie",        "unit_id": "unit_0312", "kind": "kitchen",     "pos": [2, 2],  "nodes": ["air", "water"]},
+    {"zone_id": "zone_bath_12",    "label": "Baie",             "unit_id": "unit_0312", "kind": "bathroom",    "pos": [5, 1],  "nodes": ["air", "water"]},
+    {"zone_id": "zone_living_12",  "label": "Living",           "unit_id": "unit_0312", "kind": "living_room", "pos": [5, 3],  "nodes": ["air"]},
+    {"zone_id": "zone_bedroom",    "label": "Dormitor",         "unit_id": "unit_0312", "kind": "bedroom",     "pos": [8, 2],  "nodes": ["air"]},
+
+    {"zone_id": "zone_kitchen_13", "label": "Bucătărie",        "unit_id": "unit_0313", "kind": "kitchen",     "pos": [12, 2], "nodes": ["air", "water"]},
+    {"zone_id": "zone_bath_13",    "label": "Baie",             "unit_id": "unit_0313", "kind": "bathroom",    "pos": [15, 1], "nodes": ["air", "water"]},
+    {"zone_id": "zone_living_13",  "label": "Living",           "unit_id": "unit_0313", "kind": "living_room", "pos": [15, 3], "nodes": ["air"]},
+    {"zone_id": "zone_bedroom_13", "label": "Dormitor",         "unit_id": "unit_0313", "kind": "bedroom",     "pos": [18, 2], "nodes": ["air"]},
+
+    {"zone_id": "zone_kitchen_14", "label": "Bucătărie",        "unit_id": "unit_0314", "kind": "kitchen",     "pos": [12, 8], "nodes": ["air", "water"]},
+    {"zone_id": "zone_bath_14",    "label": "Baie",             "unit_id": "unit_0314", "kind": "bathroom",    "pos": [15, 7], "nodes": ["air", "water"]},
+    {"zone_id": "zone_living_14",  "label": "Living",           "unit_id": "unit_0314", "kind": "living_room", "pos": [15, 9], "nodes": ["air"]},
+    {"zone_id": "zone_bedroom_14", "label": "Dormitor",         "unit_id": "unit_0314", "kind": "bedroom",     "pos": [18, 8], "nodes": ["air"]},
+
+    {"zone_id": "zone_hallway",    "label": "Hol scară",        "unit_id": "common",    "kind": "hallway",     "pos": [5, 5],  "nodes": ["air"]},
+    {"zone_id": "zone_boiler",     "label": "Centrală termică", "unit_id": "common",    "kind": "boiler",      "pos": [2, 8],  "nodes": ["air", "water"]}
+  ]
+}

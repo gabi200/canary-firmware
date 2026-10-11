@@ -3,6 +3,8 @@
 // ppm, ADC, µg/m³, °C, %RH, RSSI) and the app never asks for them. Parsing is
 // tolerant: missing or mistyped fields fall back to neutral defaults.
 
+import 'node_command.dart';
+
 /// One analyzed signal of a node, e.g. air quality "Good" (detail "AQI 29").
 class Indicator {
   const Indicator({
@@ -50,6 +52,7 @@ class NodeAnalysis {
     this.lastSeenTs,
     this.advice = const [],
     this.indicators = const [],
+    this.lastCommand,
   });
 
   final String nodeId;
@@ -64,16 +67,28 @@ class NodeAnalysis {
   final List<String> advice;
   final List<Indicator> indicators;
 
+  /// The latest device command (test, silence, valve), or null if none yet.
+  final NodeCommand? lastCommand;
+
   /// Reporting normally (online and not stale).
   bool get isLive => online && !stale;
 
-  factory NodeAnalysis.fromJson(Map<String, dynamic> j) {
+  /// The indicator with [key] (e.g. 'air_quality', 'leak', 'valve'), if any.
+  Indicator? indicator(String key) {
+    for (final i in indicators) {
+      if (i.key == key) return i;
+    }
+    return null;
+  }
+
+  /// [zoneId]: the containing zone, used when the node itself doesn't say.
+  factory NodeAnalysis.fromJson(Map<String, dynamic> j, {String? zoneId}) {
     final id = _str(j['node_id']);
     return NodeAnalysis(
       nodeId: id,
       kind: _str(j['kind']),
       name: _str(j['name'], id),
-      zoneId: _optStr(j['zone_id']),
+      zoneId: _optStr(j['zone_id']) ?? zoneId,
       online: j['online'] == true,
       stale: j['stale'] == true,
       lastSeenTs: _ts(j['last_seen_ts']),
@@ -81,6 +96,7 @@ class NodeAnalysis {
       headline: _str(j['headline']),
       advice: _strings(j['advice']),
       indicators: _maps(j['indicators']).map(Indicator.fromJson).toList(),
+      lastCommand: NodeCommand.tryParse(j['last_command']),
     );
   }
 }
@@ -92,11 +108,18 @@ class ZoneSummary {
     required this.status,
     required this.nodes,
     this.occupied,
+    this.unitId,
+    this.unitLabel,
   });
 
   final String zoneId;
   final String zoneLabel;
   final String status; // ok | attention | danger
+
+  /// The flat / common unit the zone belongs to ("Ap. 12", "Spații comune"),
+  /// when the hub says (older hubs don't).
+  final String? unitId;
+  final String? unitLabel;
 
   /// null when the zone has no air (presence) node.
   final bool? occupied;
@@ -105,9 +128,11 @@ class ZoneSummary {
   factory ZoneSummary.fromJson(Map<String, dynamic> j) => ZoneSummary(
         zoneId: _str(j['zone_id']),
         zoneLabel: _str(j['zone_label']),
+        unitId: _optStr(j['unit_id']),
+        unitLabel: _optStr(j['unit_label']),
         status: _str(j['status'], 'unknown'),
         occupied: j['occupied'] is bool ? j['occupied'] as bool : null,
-        nodes: _maps(j['nodes']).map(NodeAnalysis.fromJson).toList(),
+        nodes: [for (final n in _maps(j['nodes'])) NodeAnalysis.fromJson(n, zoneId: _optStr(j['zone_id']))],
       );
 }
 
@@ -134,6 +159,19 @@ class BuildingSummary {
   final List<ZoneSummary> zones;
 
   bool get hasNodes => zones.any((z) => z.nodes.isNotEmpty);
+
+  /// The same summary listing only [zones] (status, headline and counts stay
+  /// whole-building).
+  BuildingSummary withZones(List<ZoneSummary> zones) => BuildingSummary(
+        buildingId: buildingId,
+        generatedTs: generatedTs,
+        status: status,
+        headline: headline,
+        nodesTotal: nodesTotal,
+        nodesOnline: nodesOnline,
+        activeIncidents: activeIncidents,
+        zones: zones,
+      );
 
   NodeAnalysis? node(String nodeId) {
     for (final z in zones) {

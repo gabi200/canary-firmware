@@ -34,11 +34,22 @@ async def _is_duplicate(session: AsyncSession, device_id: str, epoch: int, seq: 
     return existing is not None
 
 
-async def ingest_telemetry(session: AsyncSession, payload: TelemetryPayload) -> IngestResult:
-    if await _is_duplicate(session, payload.device_id, payload.epoch, payload.seq):
+async def ingest_telemetry(
+    session: AsyncSession,
+    payload: TelemetryPayload,
+    *,
+    dedupe: bool = True,
+    touch_device: bool = True,
+    received_ts: datetime | None = None,
+) -> IngestResult:
+    """`dedupe` / `touch_device` are off on the hardware path, which already rejected the
+    duplicate status document and sets its devices' liveness itself; the unique
+    (device_id, epoch, seq) constraint still refuses a duplicate reading. `received_ts` is
+    when the hub received the message (default: now)."""
+    if dedupe and await _is_duplicate(session, payload.device_id, payload.epoch, payload.seq):
         return IngestResult(status="duplicate")
 
-    now = datetime.now(timezone.utc)
+    now = received_ts or datetime.now(timezone.utc)
     loc = payload.location
     sig = payload.signal
     reading = SensorReading(
@@ -63,7 +74,7 @@ async def ingest_telemetry(session: AsyncSession, payload: TelemetryPayload) -> 
     session.add(reading)
 
     # best-effort device liveness update
-    device = await session.get(Device, payload.device_id)
+    device = await session.get(Device, payload.device_id) if touch_device else None
     if device is not None:
         device.last_seen_ts = now
 

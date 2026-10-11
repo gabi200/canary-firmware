@@ -10,12 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_riverpod: ^2.5.1
   dio: ^5.7.0
   web_socket_channel: ^3.0.1
   shared_preferences: ^2.3.2
   flutter_local_notifications: ^17.2.3
-  intl: ^0.19.0
+  # Pinned by flutter_localizations (gen-l10n); also used for locale-aware dates/numbers.
+  intl: ^0.20.2
   url_launcher: ^6.3.2
   wakelock_plus: ^1.5.2
   # Remote push. Optional at runtime (see Config.enableFirebasePush); requires
@@ -31,3 +34,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # gen-l10n: lib/l10n/app_*.arb -> lib/l10n/app_localizations*.dart (see l10n.yaml).
+  generate: true
+  assets:
+    - assets/signs/

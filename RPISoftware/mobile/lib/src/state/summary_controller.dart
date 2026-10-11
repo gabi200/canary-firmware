@@ -47,8 +47,9 @@ class SummaryController extends StateNotifier<SummaryState> {
   void _onLiveEvent(Map<String, dynamic> ev) {
     final type = ev['type'];
     // `node`: a sensor's analysis changed. `incident`: the building status and
-    // headline also depend on open incidents. Anything else is ignored.
-    if (type != 'node' && type != 'incident') return;
+    // headline also depend on open incidents. `command_result`: a sensor's
+    // `last_command` ("Ultimul test") changed. Anything else is ignored.
+    if (type != 'node' && type != 'incident' && type != 'command_result') return;
     if (_pending?.isActive ?? false) return; // a refresh is already queued
     final last = _lastFetch;
     final elapsed = last == null ? minEventGap : DateTime.now().difference(last);
@@ -57,6 +58,13 @@ class SummaryController extends StateNotifier<SummaryState> {
 
   /// Refetch now; concurrent callers share the in-flight request.
   Future<void> refresh() => _inFlight ??= _fetch().whenComplete(() => _inFlight = null);
+
+  /// Refetch even if a request is in flight (e.g. after a language switch, when
+  /// that response would still be in the old language).
+  Future<void> reload() async {
+    await _inFlight;
+    await refresh();
+  }
 
   Future<void> _fetch() async {
     final session = _session;

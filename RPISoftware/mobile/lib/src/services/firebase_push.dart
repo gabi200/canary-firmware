@@ -2,7 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
-typedef PushHandler = void Function(String title, String body);
+/// Title/body as sent; null when absent (the caller supplies localized fallbacks).
+typedef PushHandler = void Function(String? title, String? body);
 
 /// Background message handler must be a top-level / static function.
 @pragma('vm:entry-point')
@@ -32,6 +33,6 @@ Future<void> firebaseInitAndSubscribe({required PushHandler onMessage}) async {
 
   FirebaseMessaging.onMessage.listen((m) {
     final n = m.notification;
-    onMessage(n?.title ?? 'Canary alert', n?.body ?? '');
+    onMessage(n?.title, n?.body);
   });
 }

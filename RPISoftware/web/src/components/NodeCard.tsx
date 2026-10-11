@@ -1,10 +1,12 @@
 import { useUpdateNode } from "../api/hooks";
 import type { NodeOut, Zone } from "../api/types";
-import { zoneLabel } from "../lib/labels";
-import { KIND_LABEL, connectivity, pick, pickNum } from "../lib/nodes";
-import { fmtAgo, fmtDuration, parseTs } from "../lib/time";
+import { useT } from "../i18n";
+import { kindLabel, zoneLabel } from "../lib/labels";
+import { connectivity, pick, pickNum } from "../lib/nodes";
+import { fmtAgo, fmtDateTime, fmtDuration } from "../lib/time";
 import { NodeAnalysisView } from "./Analysis";
-import { NodeHistoryCharts } from "./NodeHistoryCharts";
+import { NodeCommands } from "./NodeCommands";
+import { NodeMonitor } from "./NodeMonitor";
 import { RawStatus } from "./RawStatus";
 import { StatusPill } from "./StatusPill";
 
@@ -14,11 +16,14 @@ interface Props {
   zoneNames: Map<string, string>;
   /** PATCH /nodes/{id} is limited to managers and admins. */
   canEdit: boolean;
+  /** dispatchers do not see presence (radar) data */
+  showPresence?: boolean;
 }
 
 /** One physical device: identity + connectivity, then its raw status next to the hub's
  *  analysis of it, then raw history charts. */
-export function NodeCard({ node, zones, zoneNames, canEdit }: Props) {
+export function NodeCard({ node, zones, zoneNames, canEdit, showPresence = true }: Props) {
+  const { t, lang } = useT();
   const update = useUpdateNode();
   const conn = connectivity(node);
   const doc = node.status;
@@ -33,11 +38,11 @@ export function NodeCard({ node, zones, zoneNames, canEdit }: Props) {
     <div className="card node-card">
       <div className="node-head">
         <span className="node-name">{node.name}</span>
-        <span className="tag">{KIND_LABEL[node.kind] ?? node.kind}</span>
-        <StatusPill state={conn.level} label={conn.label} />
+        <span className="tag">{kindLabel(node.kind, t)}</span>
+        <StatusPill state={conn.level} label={t(`conn.${conn.state}`)} />
         <span className="spacer" />
         <label className="zone-picker">
-          Zone
+          {t("node.zone")}
           {canEdit ? (
             <select
               value={zoneId ?? ""}
@@ -47,7 +52,7 @@ export function NodeCard({ node, zones, zoneNames, canEdit }: Props) {
               {!knownZone && <option value={zoneId ?? ""}>{zoneLabel(zoneNames, zoneId)}</option>}
               {zones.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.label || z.id}
+                  {zoneLabel(zoneNames, z.id)}
                 </option>
               ))}
             </select>
@@ -59,53 +64,54 @@ export function NodeCard({ node, zones, zoneNames, canEdit }: Props) {
 
       <div className="node-meta">
         <span>
-          firmware <b>{typeof firmware === "string" ? firmware : "—"}</b>
+          {t("node.firmware")} <b>{typeof firmware === "string" ? firmware : "—"}</b>
         </span>
-        <span
-          title={node.last_seen_ts ? new Date(parseTs(node.last_seen_ts)).toLocaleString() : undefined}
-        >
-          last seen <b>{fmtAgo(node.last_seen_ts)}</b>
+        <span title={node.last_seen_ts ? fmtDateTime(node.last_seen_ts, lang) : undefined}>
+          {t("node.lastSeen")} <b>{fmtAgo(node.last_seen_ts, lang)}</b>
         </span>
         <span>
-          uptime <b>{uptime != null ? fmtDuration(uptime) : "—"}</b>
+          {t("node.uptime")} <b>{uptime != null ? fmtDuration(uptime, lang) : "—"}</b>
         </span>
         <span>
-          Wi-Fi <b className={rssi != null && rssi < -80 ? "t-attention" : ""}>
+          {t("node.wifi")} <b className={rssi != null && rssi < -80 ? "t-attention" : ""}>
             {rssi != null ? `${rssi} dBm` : "—"}
           </b>
         </span>
         <span>
-          MQTT base <b>{node.mqtt_base}</b>
+          {t("node.mqttBase")} <b>{node.mqtt_base}</b>
         </span>
         <span>
-          boot <b>#{node.boot_epoch}</b>
+          {t("node.boot")} <b>#{node.boot_epoch}</b>
         </span>
       </div>
       {update.isError && (
-        <div className="err">Could not move node: {(update.error as Error).message}</div>
+        <div className="err">{t("node.moveFailed", { msg: (update.error as Error).message })}</div>
       )}
+
+      {/* hardware test (managers / admins; renders nothing for other roles) */}
+      <NodeCommands node={node} variant="compact" />
+
+      <NodeMonitor node={node} showPresence={showPresence} />
 
       <div className="node-body">
         <section>
-          <div className="panel-label">Raw · latest status document</div>
-          {conn.label !== "online" && doc && (
+          <div className="panel-label">{t("node.rawLatest")}</div>
+          {conn.state !== "online" && doc && (
             <div className="muted small raw-note">
-              Device {conn.label} — values are from its last report.
+              {conn.state === "offline" ? t("node.lastReportOffline") : t("node.lastReportStale")}
             </div>
           )}
-          <RawStatus kind={node.kind} doc={doc} />
+          <RawStatus kind={node.kind} doc={doc} showPresence={showPresence} />
         </section>
         <section className="analysis-panel">
-          <div className="panel-label">Analysis</div>
+          <div className="panel-label">{t("common.analysis")}</div>
           {node.analysis ? (
             <NodeAnalysisView analysis={node.analysis} />
           ) : (
-            <div className="muted small">No analysis yet.</div>
+            <div className="muted small">{t("node.noAnalysis")}</div>
           )}
         </section>
       </div>
-
-      <NodeHistoryCharts node={node} />
     </div>
   );
 }

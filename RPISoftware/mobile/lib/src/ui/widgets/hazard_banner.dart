@@ -1,31 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../../i18n.dart';
 import '../../models/incident.dart';
 import '../../theme.dart';
+import 'safety_sign.dart';
 
 class HazardBanner extends StatelessWidget {
-  const HazardBanner({super.key, required this.incident, this.onTap});
+  const HazardBanner({super.key, required this.incident, this.zoneLabel, this.onTap});
   final Incident incident;
-  final VoidCallback? onTap;
 
-  IconData get _icon {
-    switch (incident.hazardType) {
-      case 'combustible_gas':
-        return Icons.local_fire_department;
-      case 'co':
-        return Icons.cloud;
-      case 'water_leak':
-        return Icons.water_drop;
-      case 'particulate':
-        return Icons.grain;
-      default:
-        return Icons.warning_amber_rounded;
-    }
-  }
+  /// Where it is, in words (room name / relative place); the zone id otherwise.
+  final String? zoneLabel;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = HazardColors.forState(incident.state);
+    final l10n = context.l10n;
+    final hazard = l10n.hazardName(incident.hazardType);
     return Material(
       color: color,
       borderRadius: BorderRadius.circular(16),
@@ -36,19 +28,20 @@ class HazardBanner extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              Icon(_icon, color: Colors.white, size: 44),
+              SafetySignImage(hazardSign(incident.hazardType), size: 44),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      incident.isEvacuation ? 'EVACUATE NOW' : incident.hazardLabel.toUpperCase(),
+                      incident.isEvacuation ? l10n.evacuateNow : hazard.toUpperCase(),
                       style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${incident.hazardLabel} · ${incident.state} · ${incident.primaryZoneId ?? ''}',
+                      [hazard, l10n.statusLabel(incident.state), if ((zoneLabel ?? incident.primaryZoneId) case final String z) z]
+                          .join(' · '),
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],

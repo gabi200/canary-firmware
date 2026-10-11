@@ -6,6 +6,11 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ro</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Canary Resident</string>
 	<key>CFBundleExecutable</key>
@@ -29,12 +34,29 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>
+		<string>sms</string>
+		<string>mailto</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).join</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>canary</string>
+			</array>
+		</dict>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Canary only reads whether you use a wheelchair, your walking steadiness and your audiogram, to suggest needs for your emergency profile. Nothing is saved without your consent.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Canary connects to your building's safety hub on the local network to show alerts and sensor status.</string>
 	<key>UIApplicationSceneManifest</key>

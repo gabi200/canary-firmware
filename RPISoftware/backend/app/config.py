@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me"
     jwt_algorithm: str = "HS256"
     jwt_ttl_seconds: int = 8 * 3600
+    # Fernet key for care profiles (health data, encrypted at rest); written to .env by
+    # scripts/pi_setup.sh. Empty -> the care-profile endpoints answer 503, the rest works.
+    care_key: str = ""
+
+    # --- external escalation webhook (ARC / 112 partner, docs/HARDWARE.md section 4) ---
+    escalation_url: str = ""  # empty: no webhook (notification rows only, as before)
+    escalation_secret: str = ""  # HMAC-SHA256 key; written to .env by scripts/pi_setup.sh
 
     # --- detection tuning ---
     clear_hold_samples: int = 3  # consecutive below-clear samples before resolution/false_alarm
@@ -46,6 +53,7 @@ class Settings(BaseSettings):
 
     # --- misc ---
     cors_origins: list[str] = ["*"]
+    public_url: str = "http://localhost"  # base of shareable links, e.g. household invites (/join/<code>)
 
     @property
     def is_postgres(self) -> bool:

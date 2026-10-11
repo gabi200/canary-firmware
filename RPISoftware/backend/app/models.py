@@ -135,6 +135,16 @@ class Node(Base):
     created_ts: Mapped[datetime] = _ts_col()
 
 
+class NodeInbox(Base):
+    """A node that registered itself (first status document) and nobody has placed in a room
+    yet: the technician's "new sensors" list. A new table so `nodes` stays untouched; the row
+    goes when the node is moved to a zone."""
+
+    __tablename__ = "node_inbox"
+    node_id: Mapped[str] = mapped_column(ForeignKey("nodes.id"), primary_key=True)
+    ts: Mapped[datetime] = _ts_col()
+
+
 # --------------------------------------------------------------------------- #
 # People & access
 # --------------------------------------------------------------------------- #
@@ -214,6 +224,170 @@ class CheckIn(Base):
     ts: Mapped[datetime] = _ts_col()
 
 
+class ResidentLocation(Base):
+    """Where a resident said they are during an incident (app.enums.Whereabouts); latest answer wins."""
+
+    __tablename__ = "resident_locations"
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    location: Mapped[str] = mapped_column(String)
+    ts: Mapped[datetime] = _ts_col()
+
+
+class UserStatus(Base):
+    """Account switch (a new table: `users` stays untouched). No row = active."""
+
+    __tablename__ = "user_status"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_ts: Mapped[datetime] = _ts_col()
+
+
+class StaffBuilding(Base):
+    """Which buildings an hoa_manager runs. A manager with no row runs every building (legacy
+    single-building hubs)."""
+
+    __tablename__ = "staff_buildings"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    building_id: Mapped[str] = mapped_column(ForeignKey("buildings.id"), primary_key=True)
+
+
+class DeviceCommand(Base):
+    """A command published to a node (`<base>/buzzer/set`, `<base>/valve/set`) and its result from
+    `<base>/command/result`. status: sent | accepted | rejected (timeout is computed on read)."""
+
+    __tablename__ = "device_commands"
+    __table_args__ = (Index("ix_device_commands_node_sent", "node_id", "sent_ts"),)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    node_id: Mapped[str] = mapped_column(String)
+    building_id: Mapped[str] = mapped_column(String, index=True)
+    command: Mapped[str] = mapped_column(String)  # TEST | SILENCE | OPEN | CLOSE
+    status: Mapped[str] = mapped_column(String, default="sent")
+    detail: Mapped[str | None] = mapped_column(String, nullable=True)  # firmware `state` or `error`
+    requested_by_user_id: Mapped[str] = mapped_column(String)
+    sent_ts: Mapped[datetime] = _ts_col()
+    result_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class HouseholdInvite(Base):
+    """A single-use link inviting someone to join a unit. Only the SHA-256 of the code is stored."""
+
+    __tablename__ = "household_invites"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    code_hash: Mapped[str] = mapped_column(String, unique=True)  # hex sha256 of the code
+    building_id: Mapped[str] = mapped_column(ForeignKey("buildings.id"), index=True)
+    unit_id: Mapped[str] = mapped_column(ForeignKey("units.id"), index=True)
+    inviter_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    care_profile_id: Mapped[str | None] = mapped_column(String, nullable=True)  # a non-self profile to hand over
+    created_ts: Mapped[datetime] = _ts_col()
+    expires_ts: Mapped[datetime] = mapped_column(UTCDateTime)
+    used_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    used_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    revoked_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class HouseholdInviteAttempt(Base):
+    """One invite preview / accept call, for the per-user hourly ceiling (rows older than an hour go)."""
+
+    __tablename__ = "household_invite_attempts"
+    __table_args__ = (Index("ix_household_invite_attempts_user_ts", "user_id", "ts"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String)
+    ts: Mapped[datetime] = _ts_col()
+
+
+class UserPref(Base):
+    """Per-user preferences (a new table so existing `users` rows stay untouched)."""
+
+    __tablename__ = "user_prefs"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    language: Mapped[str] = mapped_column(String, default="ro")  # ro | en
+
+
+class EscalationDelivery(Base):
+    """One attempt to deliver an escalation webhook event. `incident_id` has no foreign key on
+    purpose: the event is built inside the transition's transaction and must be recordable
+    from the delivery task's own session."""
+
+    __tablename__ = "escalation_deliveries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String, index=True)
+    incident_id: Mapped[str] = mapped_column(String, index=True)
+    state: Mapped[str] = mapped_column(String)  # incident state the event reports
+    attempt: Mapped[int] = mapped_column(Integer)  # 1..4
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)  # HTTP status, None on error
+    error: Mapped[str | None] = mapped_column(String, nullable=True)  # timeout | connection error ...
+    delivered: Mapped[bool] = mapped_column(Boolean, default=False)
+    ts: Mapped[datetime] = _ts_col()
+
+
+class EscalationOutbox(Base):
+    """An escalation event until it is settled, so retries survive a hub restart (resumed for
+    30 min). `body` is the original JSON (Fernet-sealed when CANARY_CARE_KEY is set), cleared
+    once delivered / failed / expired."""
+
+    __tablename__ = "escalation_outbox"
+    event_id: Mapped[str] = mapped_column(String, primary_key=True)
+    incident_id: Mapped[str] = mapped_column(String, index=True)
+    state: Mapped[str] = mapped_column(String)
+    body: Mapped[str] = mapped_column(String, default="")
+    sealed: Mapped[bool] = mapped_column(Boolean, default=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)  # made so far
+    status: Mapped[str] = mapped_column(String, default="pending", index=True)  # pending|delivered|failed|expired
+    next_attempt_ts: Mapped[datetime] = mapped_column(UTCDateTime)
+    created_ts: Mapped[datetime] = _ts_col()
+
+
+class TriangulationSnapshot(Base):
+    """Every distinct triangulation estimate computed for an incident (time series, pruned)."""
+
+    __tablename__ = "triangulation_snapshots"
+    __table_args__ = (Index("ix_triangulation_snapshots_incident_ts", "incident_id", "ts"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"))
+    ts: Mapped[datetime] = _ts_col(index=True)
+    source_zone_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    method: Mapped[str] = mapped_column(String, default="")
+    n_contributors: Mapped[int] = mapped_column(Integer, default=0)
+    airflow_applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    contributors: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class CareProfile(Base):
+    """A person who may not evacuate alone (GDPR art. 9 health data, explicit consent).
+    `*_enc` columns hold Fernet tokens (app.care); `person_user_id` is the owner for their
+    own (is_self) profile and null for a household member without the app. A new table,
+    so `create_all` adds it to existing databases."""
+
+    __tablename__ = "care_profiles"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    building_id: Mapped[str] = mapped_column(ForeignKey("buildings.id"), index=True)
+    unit_id: Mapped[str] = mapped_column(ForeignKey("units.id"))
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    person_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, unique=True)
+    display_name_enc: Mapped[str] = mapped_column(String)
+    needs_enc: Mapped[str] = mapped_column(String)
+    note_enc: Mapped[str | None] = mapped_column(String, nullable=True)
+    consent_ts: Mapped[datetime] = _ts_col()
+    created_ts: Mapped[datetime] = _ts_col()
+    updated_ts: Mapped[datetime] = _ts_col()
+
+
+class CareCheckIn(Base):
+    """A resident reporting the status of one of their care profiles during an incident."""
+
+    __tablename__ = "care_check_ins"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"), index=True)
+    care_profile_id: Mapped[str] = mapped_column(ForeignKey("care_profiles.id"), index=True)
+    by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String)  # app.enums.CheckInStatus (safe_* | needs_help)
+    ts: Mapped[datetime] = _ts_col()
+
+
 class Notification(Base):
     __tablename__ = "notifications"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
@@ -286,7 +460,11 @@ class ExternalIntegration(Base):
 # --------------------------------------------------------------------------- #
 class SensorReading(Base):
     __tablename__ = "sensor_readings"
-    __table_args__ = (UniqueConstraint("device_id", "epoch", "seq", name="uq_reading_device_epoch_seq"),)
+    __table_args__ = (
+        UniqueConstraint("device_id", "epoch", "seq", name="uq_reading_device_epoch_seq"),
+        # trend + false-alarm windows: one device, recent rows (also created on start, app.db)
+        Index("ix_sensor_readings_device_ts", "device_id", "ts"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(String, index=True)
     building_id: Mapped[str] = mapped_column(String, index=True)

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../i18n.dart';
 import '../../models/incident.dart';
 import '../../theme.dart';
+import 'safety_sign.dart';
 
 /// High-urgency EVACUATE NOW banner that flashes (~1 Hz) to grab attention on the
 /// phone. Falls back to a static red banner when the OS requests reduced motion.
@@ -29,6 +31,7 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final l10n = context.l10n;
 
     Widget banner(double t) {
       final bg = Color.lerp(HazardColors.evacuation, const Color(0xFFF44336), t)!;
@@ -38,7 +41,7 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFF44336).withOpacity(0.55 * t),
+              color: const Color(0xFFF44336).withValues(alpha: 0.55 * t),
               blurRadius: 24 * t,
               spreadRadius: 2 * t,
             ),
@@ -58,20 +61,20 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
                 children: [
                   Transform.scale(
                     scale: 1 + 0.12 * t,
-                    child: const Icon(Icons.directions_run, color: Colors.white, size: 46),
+                    child: const SafetySignImage(SafetySign.e002, size: 46),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'EVACUATE NOW',
-                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        Text(
+                          l10n.evacuateNow,
+                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${widget.incident.hazardLabel} · ${widget.zoneLabel ?? widget.incident.primaryZoneId ?? ''}',
+                          '${l10n.hazardName(widget.incident.hazardType)} · ${widget.zoneLabel ?? widget.incident.primaryZoneId ?? ''}',
                           style: const TextStyle(color: Colors.white, fontSize: 14),
                         ),
                       ],

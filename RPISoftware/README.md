@@ -115,6 +115,7 @@ uvicorn app.main:app --reload
 | `ana` | resident | check in ("I'm safe"), see status |
 | `mihai` | hoa_manager | dashboard, incidents, accounting, dismiss/evacuate/resolve |
 | `dispecer` | dispatcher_external | incident-centric view, accounting |
+| `tehnician` | technician | installs: floors, apartments, rooms, new sensors, alarm tests (no accounts, no incident actions) |
 | `admin` | system_admin | everything |
 
 The login is username-only: a known MVP limitation. Run the hub on a trusted LAN/VLAN

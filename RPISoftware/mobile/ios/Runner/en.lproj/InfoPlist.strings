@@ -1,0 +1,2 @@
+/* Health read permission (the app never writes to Health). */
+"NSHealthShareUsageDescription" = "Canary only reads whether you use a wheelchair, your walking steadiness and your audiogram, to suggest needs for your emergency profile. Nothing is saved without your consent.";

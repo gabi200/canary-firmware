@@ -6,6 +6,9 @@ no I/O, fully deterministic. The output never carries raw measurements (ppm, ADC
 counts, ug/m3, degC, %RH, RSSI, distances): the only numbers are the AQI in the
 air-quality `detail` and the warm-up countdown in the health `detail`, because
 residents receive it.
+
+Text is produced in the request's language (app.i18n.tr, English by default), so
+checks on indicator values compare against tr() of the English source string.
 """
 
 from __future__ import annotations
@@ -14,8 +17,10 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import NamedTuple
 
 from app.analytics.false_alarm import ReadingSample, _slope
+from app.i18n import tr
 
 # levels / statuses
 OK = "ok"
@@ -212,16 +217,20 @@ def is_stale(kind: str, last_seen_ts: datetime | None, now: datetime) -> bool:
     return (utc(now) - utc(last_seen_ts)).total_seconds() > limit
 
 
-def trend(points: Sequence[tuple[float, float]], warn: float | None) -> str | None:
-    """rising / falling / stable from (epoch_s, value) points, or None without enough
-    history. The fitted change across the window is compared with 10 % of `warn`."""
-    if warn is None or warn <= 0 or len(points) < TREND_MIN_POINTS:
+class TrendFit(NamedTuple):
+    """A series' least-squares fit, as computed by the database (app.analytics.nodes)."""
+
+    n: int
+    span_s: float
+    slope: float  # value per second
+
+
+def trend_from_fit(fit: TrendFit, warn: float | None) -> str | None:
+    """rising / falling / stable from a fit, or None without enough history. The fitted
+    change across the window is compared with 10 % of `warn`."""
+    if warn is None or warn <= 0 or fit.n < TREND_MIN_POINTS or fit.span_s < TREND_MIN_SPAN_S:
         return None
-    samples = [ReadingSample(ts=t, value=v) for t, v in sorted(points)]
-    span = samples[-1].ts - samples[0].ts
-    if span < TREND_MIN_SPAN_S:
-        return None
-    change = _slope(samples) * span
+    change = fit.slope * fit.span_s
     if change >= TREND_FRACTION * warn:
         return "rising"
     if change <= -TREND_FRACTION * warn:
@@ -229,13 +238,26 @@ def trend(points: Sequence[tuple[float, float]], warn: float | None) -> str | No
     return "stable"
 
 
-def _trends(doc: dict, history: Mapping[str, Sequence[tuple[float, float]]], now: datetime) -> dict[str, str | None]:
+def trend(points: Sequence[tuple[float, float]], warn: float | None) -> str | None:
+    """trend_from_fit of (epoch_s, value) points."""
+    if warn is None or warn <= 0 or len(points) < TREND_MIN_POINTS:
+        return None
+    samples = [ReadingSample(ts=t, value=v) for t, v in sorted(points)]
+    return trend_from_fit(TrendFit(len(samples), samples[-1].ts - samples[0].ts, _slope(samples)), warn)
+
+
+def _trends(doc: dict, history: Mapping[str, object], now: datetime) -> dict[str, str | None]:
+    """`history` per field: (epoch_s, value) points, or a TrendFit already limited to the window."""
     since = utc(now).timestamp() - TREND_WINDOW_S
     out: dict[str, str | None] = {}
     for field, channel, warn_key in TREND_FIELDS:
         ch = doc.get(channel)
         warn = finite_number(ch.get(warn_key)) if isinstance(ch, dict) else None
-        out[field] = trend([(t, v) for t, v in history.get(field, ()) if t >= since], warn)
+        series = history.get(field, ())
+        if isinstance(series, TrendFit):
+            out[field] = trend_from_fit(series, warn)
+        else:
+            out[field] = trend([(t, v) for t, v in series if t >= since], warn)
     return out
 
 
@@ -243,11 +265,11 @@ def _trends(doc: dict, history: Mapping[str, Sequence[tuple[float, float]]], now
 # Indicators
 # --------------------------------------------------------------------------- #
 def _indicator(key: str, level: str, value: str, detail: str | None = None, trend_: str | None = None) -> Indicator:
-    return Indicator(key, _LABELS[key], level, value, detail, trend_)
+    return Indicator(key, tr(_LABELS[key]), level, value, detail, trend_)
 
 
 def _no_data(key: str) -> Indicator:
-    return _indicator(key, UNKNOWN, "No data")
+    return _indicator(key, UNKNOWN, tr("No data"))
 
 
 def _channel(key: str, channel: object, fresh: bool, trend_: str | None) -> Indicator:
@@ -261,7 +283,7 @@ def _channel(key: str, channel: object, fresh: bool, trend_: str | None) -> Indi
     if graded and channel.get("valid", True) is not True:  # gas has no `valid` flag
         return _no_data(key)
     value, level = _CHANNEL_STATES[state]
-    return _indicator(key, level, value, None, trend_ if graded else None)
+    return _indicator(key, level, tr(value), None, trend_ if graded else None)
 
 
 def _air_quality(pm: object, fresh: bool, trend_: str | None) -> Indicator:
@@ -270,7 +292,7 @@ def _air_quality(pm: object, fresh: bool, trend_: str | None) -> Indicator:
         return _no_data(key)
     state = pm.get("state")
     if state == "fault":
-        return _indicator(key, ATTENTION, "Sensor fault")
+        return _indicator(key, ATTENTION, tr("Sensor fault"))
     if pm.get("valid") is not True:
         return _no_data(key)
     indices = [
@@ -288,7 +310,7 @@ def _air_quality(pm: object, fresh: bool, trend_: str | None) -> Indicator:
         value, level = "Particulate alarm", DANGER
     elif state == "warning" and level == OK:
         value, level = "Particulate warning", ATTENTION
-    return _indicator(key, level, value, f"AQI {aqi}", trend_)
+    return _indicator(key, level, tr(value), tr("AQI {aqi}", aqi=aqi), trend_)
 
 
 def _comfort(climate: object, fresh: bool) -> Indicator:
@@ -309,7 +331,7 @@ def _comfort(climate: object, fresh: bool) -> Indicator:
     elif rh > HUMID_RH:
         parts.append("Too humid")
     extreme = t < EXTREME_COLD_C or t > EXTREME_WARM_C or rh > EXTREME_HUMID_RH
-    return _indicator(key, ATTENTION if extreme else OK, ", ".join(parts) or "Comfortable")
+    return _indicator(key, ATTENTION if extreme else OK, ", ".join(map(tr, parts)) or tr("Comfortable"))
 
 
 def _occupancy(presence: object, fresh: bool) -> Indicator:
@@ -317,26 +339,26 @@ def _occupancy(presence: object, fresh: bool) -> Indicator:
     if fresh and isinstance(presence, dict) and presence.get("valid") is True:
         detected = presence.get("detected")
         if isinstance(detected, bool):
-            return _indicator(key, OK, "Occupied" if detected else "Empty")
-    return _indicator(key, UNKNOWN, "Unknown")
+            return _indicator(key, OK, tr("Occupied") if detected else tr("Empty"))
+    return _indicator(key, UNKNOWN, tr("Unknown"))
 
 
 def _health(kind: str, doc: dict, online: bool, stale: bool) -> Indicator:
     key = "health"
     if not online:
-        return _indicator(key, ATTENTION, "Offline")
+        return _indicator(key, ATTENTION, tr("Offline"))
     if stale:
-        return _indicator(key, ATTENTION, "Stale")
+        return _indicator(key, ATTENTION, tr("Stale"))
     wifi = doc.get("wifi")
     rssi = finite_number(wifi.get("rssi")) if isinstance(wifi, dict) else None
     if rssi is not None and rssi < WEAK_RSSI_DBM:
-        return _indicator(key, ATTENTION, "Weak Wi-Fi")
+        return _indicator(key, ATTENTION, tr("Weak Wi-Fi"))
     if kind == "air":
         warmup_s = finite_number(doc.get("warmup_remaining_seconds"))
         if warmup_s is not None and warmup_s > 0:
             minutes = math.ceil(min(warmup_s, 86400) / 60)
-            return _indicator(key, OK, "Warming up", f"{minutes} min left")
-    return _indicator(key, OK, "Online")
+            return _indicator(key, OK, tr("Warming up"), tr("{minutes} min left", minutes=minutes))
+    return _indicator(key, OK, tr("Online"))
 
 
 def _leak(doc: dict, fresh: bool) -> Indicator:
@@ -346,12 +368,12 @@ def _leak(doc: dict, fresh: bool) -> Indicator:
     sensor = doc.get("sensor")
     state = sensor.get("state") if isinstance(sensor, dict) else None
     if not isinstance(sensor, dict) or sensor.get("initialized") is not True or state not in ("wet", "dry"):
-        return _indicator(key, UNKNOWN, "Sensor not ready")
+        return _indicator(key, UNKNOWN, tr("Sensor not ready"))
     if state == "wet":
-        return _indicator(key, DANGER, "Leak detected")
+        return _indicator(key, DANGER, tr("Leak detected"))
     if doc.get("leak_latched") is True:
-        return _indicator(key, ATTENTION, "Leak cleared — inspect")
-    return _indicator(key, OK, "No leak")
+        return _indicator(key, ATTENTION, tr("Leak cleared — inspect"))
+    return _indicator(key, OK, tr("No leak"))
 
 
 def _valve(doc: dict) -> Indicator:
@@ -359,10 +381,10 @@ def _valve(doc: dict) -> Indicator:
     valve = doc.get("valve")
     applied = valve.get("applied") if isinstance(valve, dict) else None
     if applied == "open":
-        return _indicator("valve", OK, "Open")
+        return _indicator("valve", OK, tr("Open"))
     if applied == "closed":
-        return _indicator("valve", ATTENTION, "Closed")
-    return _indicator("valve", UNKNOWN, "Unknown")
+        return _indicator("valve", ATTENTION, tr("Closed"))
+    return _indicator("valve", UNKNOWN, tr("Unknown"))
 
 
 # --------------------------------------------------------------------------- #
@@ -372,10 +394,10 @@ Finding = tuple[str, str, str | None]
 
 
 def _connection_findings(health: Indicator) -> list[Finding]:
-    if health.value == "Offline":
-        return [(ATTENTION, "Sensor offline", _ADVICE_CONNECTION)]
-    if health.value == "Stale":
-        return [(ATTENTION, "No recent data from the sensor", _ADVICE_CONNECTION)]
+    if health.value == tr("Offline"):
+        return [(ATTENTION, tr("Sensor offline"), tr(_ADVICE_CONNECTION))]
+    if health.value == tr("Stale"):
+        return [(ATTENTION, tr("No recent data from the sensor"), tr(_ADVICE_CONNECTION))]
     return []
 
 
@@ -386,71 +408,81 @@ def _comfort_advice(value: str) -> str:
         "Too dry": "use a humidifier",
         "Too humid": "ventilate to lower the humidity",
     }
-    return "; ".join(tip for part, tip in tips.items() if part in value).capitalize()
+    return "; ".join(tr(tip) for part, tip in tips.items() if tr(part) in value).capitalize()
 
 
 def _air_findings(ind: Mapping[str, Indicator]) -> list[Finding]:
     health, co, gas, aq, comfort = (ind[k] for k in ("health", "co", "gas", "air_quality", "comfort"))
     findings = _connection_findings(health)
     if co.level == DANGER:
-        findings.append((DANGER, "Dangerous carbon monoxide level", "Leave the area now and call 112"))
+        findings.append((DANGER, tr("Dangerous carbon monoxide level"), tr("Leave the area now and call 112")))
     if gas.level == DANGER:
-        findings.append((DANGER, "Gas leak detected", "Do not use flames or switches; leave the area and call 112"))
+        findings.append(
+            (DANGER, tr("Gas leak detected"), tr("Do not use flames or switches; leave the area and call 112"))
+        )
     if aq.level == DANGER:
         findings.append(
-            (DANGER, "Hazardous air: smoke or heavy particulates",
-             "Check for smoke or fire; if there is a fire, leave and call 112")
+            (DANGER, tr("Hazardous air: smoke or heavy particulates"),
+             tr("Check for smoke or fire; if there is a fire, leave and call 112"))
         )
-    if co.value == "Elevated":
-        findings.append((ATTENTION, "Carbon monoxide is elevated", "Open windows and turn off fuel-burning appliances"))
-    if gas.value == "Elevated":
-        findings.append((ATTENTION, "Gas level is elevated", "Ventilate and check the stove and gas connections"))
-    if aq.level == ATTENTION and aq.value != "Sensor fault":
+    if co.value == tr("Elevated"):
         findings.append(
-            (ATTENTION, "Air quality is unhealthy", "Ventilate if the outdoor air is clean, or run an air purifier")
+            (ATTENTION, tr("Carbon monoxide is elevated"), tr("Open windows and turn off fuel-burning appliances"))
         )
-    if "Sensor fault" in (co.value, gas.value, aq.value):
-        findings.append((ATTENTION, "Sensor fault", "Have the sensor checked by the installer"))
+    if gas.value == tr("Elevated"):
+        findings.append(
+            (ATTENTION, tr("Gas level is elevated"), tr("Ventilate and check the stove and gas connections"))
+        )
+    if aq.level == ATTENTION and aq.value != tr("Sensor fault"):
+        findings.append(
+            (ATTENTION, tr("Air quality is unhealthy"),
+             tr("Ventilate if the outdoor air is clean, or run an air purifier"))
+        )
+    if tr("Sensor fault") in (co.value, gas.value, aq.value):
+        findings.append((ATTENTION, tr("Sensor fault"), tr("Have the sensor checked by the installer")))
     if comfort.level == ATTENTION:
-        findings.append((ATTENTION, f"Uncomfortable: {comfort.value.lower()}", _comfort_advice(comfort.value)))
-    if health.value == "Weak Wi-Fi":
-        findings.append((ATTENTION, "Weak Wi-Fi signal", _ADVICE_WIFI))
-    if health.value == "Warming up":
-        findings.append((OK, "Sensor warming up", None))
+        headline = tr("Uncomfortable: {conditions}", conditions=comfort.value.lower())
+        findings.append((ATTENTION, headline, _comfort_advice(comfort.value)))
+    if health.value == tr("Weak Wi-Fi"):
+        findings.append((ATTENTION, tr("Weak Wi-Fi signal"), tr(_ADVICE_WIFI)))
+    if health.value == tr("Warming up"):
+        findings.append((OK, tr("Sensor warming up"), None))
     return findings
 
 
 def _air_default(ind: Mapping[str, Indicator]) -> str:
     aq = ind["air_quality"].value
-    if aq == "Good":
-        return "Air is good"
-    if aq == "Moderate":
-        return "Air quality is moderate"
-    return "No air quality data yet"
+    if aq == tr("Good"):
+        return tr("Air is good")
+    if aq == tr("Moderate"):
+        return tr("Air quality is moderate")
+    return tr("No air quality data yet")
 
 
 def _water_findings(ind: Mapping[str, Indicator]) -> list[Finding]:
     health, leak, valve = ind["health"], ind["leak"], ind["valve"]
     findings = _connection_findings(health)
-    if leak.value == "Leak detected":
-        advice = (
+    if leak.value == tr("Leak detected"):
+        advice = tr(
             "Water supply was shut off automatically. Fix the leak and dry the sensor, "
             "then reopen the valve on the device."
-            if valve.value == "Closed"
+            if valve.value == tr("Closed")
             else "Shut off the water supply and fix the leak"
         )
-        findings.append((DANGER, "Water leak detected", advice))
-    elif leak.value == "Leak cleared — inspect":
+        findings.append((DANGER, tr("Water leak detected"), advice))
+    elif leak.value == tr("Leak cleared — inspect"):
         findings.append(
-            (ATTENTION, "Leak cleared — inspect the area",
-             "Make sure the leak is fixed and the area is dry, then reopen the valve on the device")
+            (ATTENTION, tr("Leak cleared — inspect the area"),
+             tr("Make sure the leak is fixed and the area is dry, then reopen the valve on the device"))
         )
-    elif valve.value == "Closed":
-        findings.append((ATTENTION, "Water supply is shut off", "Reopen the valve on the device when it is safe"))
-    if leak.value == "Sensor not ready":
-        findings.append((OK, "Leak sensor not ready", "Check that the leak sensor is connected"))
-    if health.value == "Weak Wi-Fi":
-        findings.append((ATTENTION, "Weak Wi-Fi signal", _ADVICE_WIFI))
+    elif valve.value == tr("Closed"):
+        findings.append(
+            (ATTENTION, tr("Water supply is shut off"), tr("Reopen the valve on the device when it is safe"))
+        )
+    if leak.value == tr("Sensor not ready"):
+        findings.append((OK, tr("Leak sensor not ready"), tr("Check that the leak sensor is connected")))
+    if health.value == tr("Weak Wi-Fi"):
+        findings.append((ATTENTION, tr("Weak Wi-Fi signal"), tr(_ADVICE_WIFI)))
     return findings
 
 
@@ -480,7 +512,7 @@ def analyze_node(
     last_seen_ts: datetime | None,
     status: object,
     now: datetime,
-    history: Mapping[str, Sequence[tuple[float, float]]] | None = None,
+    history: Mapping[str, Sequence[tuple[float, float]] | TrendFit] | None = None,
 ) -> NodeAnalysis:
     """Analyze one node from its latest raw status document.
 
@@ -506,7 +538,7 @@ def analyze_node(
     else:
         indicators = [_leak(doc, fresh), _valve(doc), _health(kind, doc, online, stale)]
         by_key = {i.key: i for i in indicators}
-        headline, advice = _headline_and_advice(_water_findings(by_key), "No leak")
+        headline, advice = _headline_and_advice(_water_findings(by_key), tr("No leak"))
     return NodeAnalysis(
         node_id=node_id,
         kind=kind,
@@ -552,7 +584,7 @@ def summarize_building(
     for zone_id in sorted(by_zone, key=lambda z: (label(z), z)):
         members = sorted(by_zone[zone_id], key=lambda n: (n.name, n.node_id))
         occupancy = [i.value for n in members if n.kind == "air" for i in n.indicators if i.key == "occupancy"]
-        occupied = True if "Occupied" in occupancy else False if "Empty" in occupancy else None
+        occupied = True if tr("Occupied") in occupancy else False if tr("Empty") in occupancy else None
         zones.append(
             ZoneSummary(
                 zone_id=zone_id,
@@ -578,10 +610,10 @@ def summarize_building(
         incident_status = DANGER if any(i.state in _ALARMED for i in incidents) else ATTENTION
         status, headline = _worst((incident_status, node_status)), top.title
     elif worst_node is None:
-        status, headline = ATTENTION, "No sensors connected"
+        status, headline = ATTENTION, tr("No sensors connected")
     else:
         status = node_status
-        headline = worst_node.headline if node_status != OK else "All clear"
+        headline = worst_node.headline if node_status != OK else tr("All clear")
 
     return BuildingSummary(
         building_id=building_id,

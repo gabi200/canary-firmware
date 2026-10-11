@@ -27,8 +27,8 @@ broker needs a unique base topic.**
 | --- | --- | --- | --- |
 | `<base>/availability` | device → hub | yes | `online`; last will `offline` |
 | `<base>/status` | device → hub | yes | status JSON (below); on change + heartbeat (air 15 s, water 60 s) |
-| `<base>/command/result` | device → hub | no | command result JSON (ignored by the hub for now) |
-| `<base>/valve/set`, `<base>/buzzer/set` | hub → device | never retain | not used by the hub yet |
+| `<base>/command/result` | device → hub | no | `{"command","accepted":true,"state"}` or `{"command","accepted":false,"error"}`; matched to the hub's command (§4) |
+| `<base>/valve/set`, `<base>/buzzer/set` | hub → device | never retain | sent by `POST /nodes/{id}/commands` (QoS 1): air `buzzer/set` `TEST`\|`SILENCE`; water `valve/set` `OPEN`\|`CLOSE`, `buzzer/set` `SILENCE` |
 
 The hub subscribes to `#` (setting `CANARY_MQTT_SUBSCRIBE`, default `#`) and
 dispatches by topic suffix. Legacy `canary/v1/.../telemetry|event` messages
@@ -196,14 +196,138 @@ and time remaining in `health.detail`.
 
 | Method | Path | Roles | Response |
 | --- | --- | --- | --- |
-| GET | `/buildings/{id}/summary` | any authenticated (resident included) | `BuildingSummary` — **analysis only** (mobile + dashboard) |
-| GET | `/buildings/{id}/nodes` | hoa_manager, dispatcher_external, system_admin | `NodeOut[]` — raw + analysis (dashboard) |
-| GET | `/nodes/{node_id}/history?minutes=60&fields=a,b` | hoa_manager, dispatcher_external, system_admin | `NodeHistory` (dashboard) |
+| GET | `/buildings/{id}/summary` | any authenticated (resident: own building only) | `BuildingSummary` — **analysis only** (mobile + dashboard) |
+| GET | `/buildings/{id}/nodes` | hoa_manager, dispatcher_external, system_admin | `NodeOut[]` — raw + analysis (dashboard); each with `last_command` (command item or `null`; also on summary `zones[].nodes[]`, where residents see `requested_by_name` only for their own commands) |
+| GET | `/nodes/{node_id}/history?minutes=60&fields=a,b` | hoa_manager, dispatcher_external, system_admin; resident (own unit + common areas, environmental fields) | `NodeHistory` (dashboard charts, mobile sparklines) |
 | PATCH | `/nodes/{node_id}` body `{"zone_id"?: str, "name"?: str}` | hoa_manager, system_admin | `NodeOut`; 404 unknown node, 400 unknown zone |
+| POST | `/nodes/{node_id}/commands` body `{"command": "TEST"\|"SILENCE"\|"OPEN"\|"CLOSE"}` | system_admin; hoa_manager (their buildings); resident (nodes in zones of their own units, not common areas; else 404); dispatcher 403 | 202 `{"command_id", "node_id", "command", "status": "sent", "sent_ts"}`; 422 not a command of that node kind (air TEST/SILENCE, water OPEN/CLOSE/SILENCE), 409 node offline, 429 < 3 s after the node's last command, 503 broker not connected |
+| GET | `/nodes/{node_id}/commands?limit=20` | as POST | newest first `[{"command_id", "command", "status": "sent"\|"accepted"\|"rejected"\|"timeout", "detail", "requested_by_name", "sent_ts", "result_ts"}]`; `detail` = the firmware's `state` (accepted) or `error` (rejected); `timeout` = no answer after 15 s (computed on read; a late answer within 30 s still lands) |
+| GET | `/me` | any authenticated | `{"user_id", "username", "display_name", "role", "phone", "email", "language", "units": [{"unit_id", "unit_label", "building_id", "floor_label", "kind"}]}`; `units` from resident units, `[]` for staff; `language` `ro`\|`en` (notifications), `ro` until chosen |
+| PATCH | `/me` body any of `{"display_name": str (1–60, trimmed), "phone": str, "email": str, "language": "ro"\|"en"}` | any authenticated | same shape. Phone → E.164 (`0722 123 456`, `0040…`, `+40…` → `+40722123456`; other `+…` E.164 kept), `""` clears; email needs one `@` and a dotted domain (≤ 254), `""` clears; `null`, `username`, `role` or other fields → 422. Audited `account_updated` with the changed field names only |
+| POST | `/me/household/invites` body `{"unit_id": str, "care_profile_id": str\|null}` | resident | 201 `{"id", "code", "url", "app_url", "unit_id", "unit_label", "care_profile_id", "expires_ts"}` (the only time `code` is shown); 404 not the caller's residential unit / not their non-self profile in it, 422 an `is_self` profile, 409 five pending for the unit |
+| GET | `/me/household/invites` | resident | caller's pending invites `[{"id", "unit_id", "unit_label", "care_profile_id", "care_profile_name", "created_ts", "expires_ts"}]` (no code) |
+| DELETE | `/me/household/invites/{id}` | resident (inviter) | 204 revoke; 404 otherwise (incl. used / revoked) |
+| GET | `/household/invites/{code}` | any authenticated | `{"building_name", "unit_label", "floor_label", "inviter_name", "has_care_profile", "care_profile_name", "expires_ts"}`; unknown / expired / used / revoked → the same 404; counts toward the attempt ceiling |
+| POST | `/household/invites/{code}/accept` body `{"take_over_care_profile": bool, "consent": bool}` | resident only (staff incl. admin → 403) | `{"unit_id", "unit_label", "building_id", "care_profile_id": str\|null}`; 409 own invite, 409 take-over while having an `is_self` profile (invite not consumed), 422 take-over without `consent: true`; counts toward the ceiling |
+| GET | `/me/household` | resident | `[{"unit_id", "unit_label", "members": [{"user_id", "display_name", "is_me", "since"}]}]` for the caller's residential units (`since`: joined by invite, else `null`) |
+| DELETE | `/me/household/{unit_id}` | resident | 204: leave the unit (own membership, own care profiles there and own pending invites for it); 404 not a member |
+| GET | `/me/care-profiles` | resident | `CareProfileOut[]` — the caller's own profiles only |
+| GET | `/admin/users?building_id=` | system_admin, hoa_manager | `[{"user_id", "username", "display_name", "role", "phone", "email", "active", "units": [{"unit_id", "unit_label"}]}]` (residents by unit, staff by building assignment) |
+| POST | `/admin/users` body `{"username", "display_name", "role", "phone"?, "email"?, "unit_ids"?}` | system_admin; hoa_manager (role `resident` only, else 403) | 201 same shape; username `^[a-z0-9._-]{3,32}$` (409 taken), phone/email as `/me`; `unit_ids` residential units in scope (404 / 422), residents only |
+| PATCH | `/admin/users/{id}` any of `{"display_name", "role", "phone", "email", "unit_ids", "active"}` | system_admin; hoa_manager (residents of their buildings) | same shape; `unit_ids` replaces the set; staff roles need `unit_ids: []`; `active: false` → `/auth/token` answers 401 `account disabled` (already issued tokens run until they expire); deactivating yourself → 409 |
+| GET / POST | `/admin/buildings/{id}/floors` (POST `{"label", "level"}`) | system_admin, hoa_manager | `[{"floor_id", "label", "level"}]` / 201 one |
+| GET / POST | `/admin/buildings/{id}/units` (POST `{"label", "floor_id", "kind": "residential"\|"common"}`) | system_admin, hoa_manager | `[{"unit_id", "label", "floor_id", "floor_label", "kind", "residents"}]` / 201 one |
+| PATCH | `/admin/units/{id}` `{"label"?, "kind"?}` | system_admin, hoa_manager | unit item; 409 making a unit with residents `common` |
+| GET / POST | `/admin/buildings/{id}/zones` (POST `{"label", "kind", "unit_id", "pos_x", "pos_y"}`, floor taken from the unit) | system_admin, hoa_manager | `[{"zone_id", "label", "kind", "unit_id", "unit_label", "floor_id", "floor_label", "pos_x", "pos_y", "nodes": [{"node_id", "name", "kind", "online", "status"}]}]` / 201 one |
+| PATCH / DELETE | `/admin/zones/{id}` (PATCH any of `{"label", "kind", "unit_id", "pos_x", "pos_y"}`) | system_admin, hoa_manager | zone item (devices in it follow a new unit) / 204; 409 while nodes or devices are assigned |
+| DELETE | `/admin/nodes/{node_id}` | system_admin, hoa_manager (their buildings) | 204: removes an **offline** node, its logical devices and its command history (409 `node online`); raw snapshots and readings stay (incident evidence, pruned by retention), so the same base topic re-registers as usual and sees that earlier history. Audited `admin_node_deleted` |
+| POST | `/me/care-profiles` body `CareProfileIn` | resident | 201 `CareProfileOut`; 404 unit not one of the caller's residential units, 409 second `is_self`, 422 invalid (see below) |
+| PUT | `/me/care-profiles/{id}` body `CareProfileIn` | resident (owner) | `CareProfileOut`; 404 not the owner's |
+| DELETE | `/me/care-profiles/{id}` | resident (owner) | 204; hard delete with its care check-ins (works without `CANARY_CARE_KEY`) |
+| POST | `/incidents/{id}/care-checkin` body `{"care_profile_id": str, "status": "safe_outside"\|"safe_inside"\|"needs_help"}` | resident (owner, own building) | `{"ok": true}`; 404 unknown/other building/not the owner's, 409 incident not open; WS `care_checkin` |
+| GET | `/incidents/{id}/roster` | hoa_manager, dispatcher_external, system_admin | adds `priority: PriorityPersonOut[]` + `priority_awaiting` (open incidents only, else `[]`/`0`) |
+| GET | `/incidents/{id}/accounting` | hoa_manager, dispatcher_external, system_admin | adds `priority_awaiting` (a count only) |
+| GET | `/incidents/{id}/escalations` | hoa_manager, dispatcher_external, system_admin | `[{"event_id", "state", "attempts", "last_status": int\|null, "last_error": str\|null, "delivered": bool, "ts"}]` — webhook events, oldest first |
+| GET | `/incidents/{id}/triangulation/history` | hoa_manager, dispatcher_external, system_admin | `{"incident_id", "snapshots": [{"ts", "source_zone_id", "source_x", "source_y", "confidence", "method", "n_contributors", "airflow_applied", "contributors": [{"device_id", "zone_id", "value", "weight"}]}]}` — every distinct estimate, oldest first, ≤ 500 (evenly thinned, first and last kept); pruned after `CANARY_RETENTION_DAYS` |
+| GET | `/buildings/{id}/zones` | any authenticated (resident: own building) | `ZoneOut[]`, now also `unit_label` and `floor_label` (e.g. `Ap. 12`, `Etaj 3`) |
+
+**Language:** generated REST text (`label`, `value`, `detail`, `headline`, `advice`, incident titles) is
+Romanian when `Accept-Language` starts with `ro`, else English; codes never change, WebSocket events stay English.
+Stored notifications (resident `push`, manager `web_push`) are written in each recipient's `/me` `language`
+(default `ro`), whatever the triggering request's language; external-integration rows stay English.
+
+**Dispatcher presence privacy:** `dispatcher_external` never gets raw presence history (`presence.*` history
+fields → 403; their default fields leave it out) nor the raw `presence` object in `/buildings/{id}/nodes`, and
+gets `radar_presence` / `wifi_presence` readings only while an incident is open in that building. Aggregates
+(`/occupancy`, accounting, zone `occupied`) stay available. hoa_manager / system_admin are unchanged.
+
+**Admin scope:** system_admin manages everything; an hoa_manager only the buildings assigned to them in
+`staff_buildings` (the seed assigns `mihai` → `bld_007`; a manager with no assignment manages every building,
+for older single-building hubs) and only `resident` accounts; other roles get 403, out-of-scope ids 404. Every
+admin change is audited `admin_<thing>_<created|updated|deleted>` with the changed field names only. Zone
+kinds: `kitchen`, `living_room`, `bedroom`, `bathroom`, `hallway`, `stairwell`, `boiler`, `other`. Device
+commands are published only to the hub's own MQTT broker and audited `device_command`.
+
+**Resident scope:** a resident only reaches buildings they have a unit in: `GET /buildings` lists only those;
+another building's `/buildings/{id}/*`, `/incidents/{id}[/events|/checkin]` → 404; the WebSocket closes with 1008.
+`/buildings/{id}/readings` gives residents hazard readings only (never `radar_presence` / `wifi_presence`).
+
+**Care profiles (health data).** Optional, so people who cannot evacuate alone are prioritized
+when they do not respond during an incident (GDPR art. 9: explicit consent, minimal data).
+- *Data:* `display_name` (1–60), `needs` from fixed codes `reduced_mobility`, `wheelchair`,
+  `bedridden`, `hearing_impaired`, `visually_impaired`, `medical_device`, `young_child`, `pet`,
+  optional `note` (≤ 280; no diagnoses or medication). At least one need or a note.
+- *Consent:* every create/update needs `"consent": true` (a JSON boolean; `1`/`"true"` → 422)
+  and sets `consent_ts`. A resident creates profiles for themselves (`is_self`, at most one) and
+  for household members without the app, in their own residential units only.
+- *Who sees what, when:* the owner manages them via `/me/care-profiles` (not even a co-resident
+  of the same flat sees them). Managers and dispatchers see them **only** in
+  `/incidents/{id}/roster` `priority` while the incident is open (detection … evacuation); never
+  otherwise, there is no list endpoint for staff. `accounting` carries just `priority_awaiting`.
+  Status = latest care check-in or, for `is_self`, the person's own `/checkin`; else `unknown`.
+  Sorted `needs_help`, `no_response`, `unknown`, `safe_inside`, `safe_outside`, then unit;
+  `priority_awaiting` = everyone not safe. The WebSocket `care_checkin` event carries ids and
+  status only. The escalation webhook (below) gets per person only `unit_label`, `floor_label`,
+  `needs` codes and `status`: never names, notes or phones.
+- *Deletion:* `DELETE` withdraws consent: the profile and its check-ins are hard-deleted.
+- *Audit:* `care_profile_created|updated|deleted` (actor user id, target profile id) and
+  `care_profile_view` on every roster read that returns priority people (`identity_unlock`,
+  `detail: {"count": n}`); entries never contain names, needs or notes.
+- *Encryption:* name, needs and note are Fernet-encrypted at rest with `CANARY_CARE_KEY`
+  (`scripts/pi_setup.sh` generates it). Without a valid key the care endpoints answer 503 and the
+  roster still lists priority people by unit and contact, without details. Keep the key: losing
+  or changing it makes stored profiles unreadable.
+
+`CareProfileIn`: `{"unit_id": str, "display_name": str, "is_self": bool, "needs": [code], "note": str|null, "consent": true}`.
+`CareProfileOut`: `{"id", "unit_id", "unit_label", "display_name", "is_self", "needs", "note", "consent_ts", "updated_ts"}`.
+`PriorityPersonOut`: `{"care_profile_id", "display_name", "unit_id", "unit_label", "floor_label", "needs", "note", "status", "status_ts", "contact_name", "contact_phone"}` (contact = the profile owner).
+
+**Household invites.** A resident invites someone who has (or will get) their own account to their
+flat with a link: `url` = `CANARY_PUBLIC_URL/join/<code>`, `app_url` = `canary://join/<code>`. The code
+(`secrets.token_urlsafe(16)`) is returned once; the hub stores only its SHA-256. Invites are single use,
+expire after 72 h, at most 5 pending per unit; unknown, expired, used and revoked codes give the same 404.
+Accepting adds the invitee to the unit (an existing member just consumes the invite). With
+`take_over_care_profile` + `consent: true` and a care profile on the invite, the invitee becomes its owner
+and person (`is_self`, new `consent_ts`); if they already have an `is_self` profile → 409 and the invite
+stays valid. The preview shows the profile's name only, never needs or notes. Ceiling: 20 preview +
+accept calls per user per rolling hour (stored in `household_invite_attempts`), then 429. Audit
+`household_invite_created|revoked|accepted`, `household_left`, `care_profile_transferred` (ids only:
+never the code, names, needs or notes). There is no signup: `/auth/token` knows only existing users.
+
+**Escalation webhook (ARC / 112 partner).** With `CANARY_ESCALATION_URL` set, every transition into
+`escalation`, `evacuation` or `resolution` POSTs one event after the transition commits (unset: no
+webhook, notification rows only, as before). Headers: `Content-Type: application/json`,
+`X-Canary-Event: <event_id>` (unchanged on retries: idempotency key), `X-Canary-Timestamp: <unix s>`
+(per attempt), `X-Canary-Signature: sha256=<hex HMAC-SHA256(CANARY_ESCALATION_SECRET, timestamp + "." + raw body)>`.
+Receivers must check the signature and a ±5 min timestamp window (`simulator/arc_receiver.py` does).
+Delivery runs in the background and never blocks or breaks the incident: 5 s timeout, up to 4 attempts
+(0 s, 5 s, 30 s, 120 s), any 2xx is delivered, redirects are not followed. Each attempt is a row in
+`escalation_deliveries` (listed by `/incidents/{id}/escalations`); the outcome is audited
+`escalation_sent` / `escalation_failed` (state, attempts, status code; no payload). Retries survive a
+restart: each event sits in `escalation_outbox` (original body, Fernet-sealed with `CANARY_CARE_KEY`, cleared
+once settled); at startup pending events younger than 30 min resume with the same `event_id` and body, older
+ones become `expired` (audit `escalation_expired`). Body (`canary.escalation.v1`; no names, notes or phones):
+```json
+{"schema": "canary.escalation.v1", "event_id": "uuid", "sent_ts": "2026-10-10T12:00:00Z",
+ "building": {"id": "bld_007", "name": "Bloc A1", "address": "Str. Exemplu 12, Bucuresti"},
+ "incident": {"id": "…", "state": "evacuation", "hazard_type": "combustible_gas", "severity": "critical",
+              "opened_ts": "…Z", "primary_zone_id": "zone_kitchen", "primary_zone_label": "Bucătărie",
+              "est_source_zone_id": "zone_kitchen", "est_source_zone_label": "Bucătărie",
+              "triangulation_confidence": 0.7, "signature_verdict": "gas_leak"},
+ "accounting": {"occupancy_total": 3.0, "accounted": 1, "unaccounted": 2, "needs_help": 0, "priority_awaiting": 1},
+ "priority": [{"unit_label": "Ap. 12", "floor_label": "Etaj 3", "needs": ["wheelchair"], "status": "unknown"}]}
+```
+`signature_verdict` (latest hazard-signature label) and the zone labels are `null` when unknown; `priority`
+is `[]` once the incident is no longer open (e.g. on `resolution`).
 
 Timestamps (`*_ts`, `ts`) are timezone-aware UTC with a `Z` suffix
 (`2026-09-23T12:00:00Z`), on SQLite as well as Postgres. Device data is stamped on
 receipt by the hub (§1).
+
+**Receive time and backlog:** the MQTT client stamps every message when it arrives; `last_seen_ts`, the
+raw snapshot / reading `ts` and command-result matching (and its 15 s timeout) use that stamp, so a
+processing backlog never ages a node or turns a prompt device answer into `timeout`. `GET /health` reports
+`"ingest": {"connected": bool, "queue": <messages waiting>, "lag_s": <oldest one's wait>}`.
 
 `BuildingSummary`:
 ```json
@@ -212,7 +336,7 @@ receipt by the hub (§1).
   "status": "ok", "headline": "All clear",
   "nodes_total": 2, "nodes_online": 2, "active_incidents": 0,
   "zones": [
-    {"zone_id": "zone_kitchen", "zone_label": "Bucatarie", "status": "ok", "occupied": true,
+    {"zone_id": "zone_kitchen", "zone_label": "Bucătărie", "status": "ok", "occupied": true,
      "nodes": [NodeAnalysis, "..."]}
   ]
 }
@@ -224,6 +348,7 @@ the most severe open incident's title, else the worst node headline, else
 only zones that contain nodes; `occupied` is `null` when the zone has no air node.
 **Residents** never see occupancy (who is home stays manager/dispatcher-only, like
 `/occupancy`): for them `occupied` is always `null` and `occupancy` indicators are omitted.
+For residents `zones`, `nodes_total`, `nodes_online` and, with no open incident, `status`/`headline` cover only their own unit's and common zones (what history allows); while any incident is open in the building, `status`, `headline` and `active_incidents` are whole-building.
 
 `NodeOut`:
 ```json
@@ -239,11 +364,23 @@ only zones that contain nodes; `occupied` is `null` when the zone has no air nod
 {"node_id": "canary", "minutes": 60, "fields": ["co.ppm", "particulate.pm2_5"],
  "points": [{"ts": "2026-09-23T11:00:15Z", "values": {"co.ppm": 3, "particulate.pm2_5": 7}}]}
 ```
-`minutes` 1–10080 (default 60). Fields are dotted paths into the raw document;
-booleans become 0/1, missing → `null`. Points ascending, downsampled to ≤ 360.
+`minutes` 1–10080 (default 60), at most 20 fields. Fields are dotted paths into the raw document;
+booleans become 0/1, missing → `null`. A measurement is `null` (a gap, never a stale value) when its
+channel is untrustworthy in that document: `state` `warmup`/`fault`/`uninitialized`, `valid: false` or
+`initialized: false`; thresholds (`warn_*`, `danger_*`, `*_threshold`) and the flags themselves stay readable.
+Points ascending, ≤ 360: a window with up to 360 snapshots returns them as they are; a longer one is split
+into 360 equal time buckets, one point per non-empty bucket with `ts` = its newest sample. Bucket value:
+**MAX** for `co.*`, `gas.*`, `particulate.*`, `sensor.adc`, `sensor.*_threshold`, `leak_latched`,
+`presence.detected` (short spikes survive); **MEAN** rounded to 0.1 for any other number (e.g. `climate.*`,
+`wifi.rssi`); the newest value for text. Nulls are ignored; an all-null bucket is `null`.
 Default fields — air: `co.ppm`, `gas.adc`, `particulate.pm1_0`,
 `particulate.pm2_5`, `particulate.pm10`, `climate.temperature_c`,
 `climate.humidity_percent`, `presence.detected`; water: `sensor.adc`, `leak_latched`.
+**Residents:** only nodes in a zone of their own unit or of a common unit (`Unit.kind = common`: hallway,
+boiler room) of their building, else 404. Fields: the defaults minus `presence.*` (also their defaults) plus the
+thresholds `co.warn_ppm`, `co.danger_ppm`, `gas.warn_adc`, `gas.danger_adc`, `particulate.warn_pm2_5`,
+`particulate.danger_pm2_5`, `particulate.warn_pm10`, `particulate.danger_pm10` / `sensor.wet_threshold`,
+`sensor.dry_threshold`; any other field → 400.
 
 ## 5. WebSocket (`/api/v1/ws/incidents?building_id=&token=`)
 
@@ -272,7 +409,11 @@ a broken socket is dropped.
 | `CANARY_MQTT_SUBSCRIBE` | `#` | subscription filter for hardware + legacy topics |
 | `CANARY_DEFAULT_BUILDING_ID` / `_ZONE_ID` | `bld_007` / `zone_hallway` | where new nodes land |
 | `CANARY_CLEAR_HOLD_SAMPLES` | `3` | consecutive clearing readings, from a device that reported the hazard, before its incident closes |
-| `CANARY_RETENTION_DAYS` | `14` | hourly, in batches of 2000 rows, delete `node_status`, `sensor_readings` and `occupancy_estimates` rows older than this; `0` disables. Incidents, events, check-ins and the audit log are never pruned |
+| `CANARY_PUBLIC_URL` | `http://localhost` | base of shareable links (household invites: `/join/<code>`) |
+| `CANARY_ESCALATION_URL` | unset | escalation webhook target (http/https); unset → no webhook |
+| `CANARY_ESCALATION_SECRET` | unset | HMAC key signing the webhook; written to `.env` by `scripts/pi_setup.sh`; share it with the partner |
+| `CANARY_CARE_KEY` | unset | Fernet key encrypting care profiles; written to `.env` by `scripts/pi_setup.sh`. Unset → care endpoints 503 |
+| `CANARY_RETENTION_DAYS` | `14` | hourly, in batches of 2000 rows, delete `node_status`, `sensor_readings`, `occupancy_estimates`, `signature_assessments` and `triangulation_snapshots` rows older than this; `0` disables. Incidents, events, check-ins, escalation deliveries and the audit log are never pruned |
 
 Under docker compose, `docker-compose.yml` fixes the MQTT connection (enabled, broker
 `mosquitto:1883`, user `hub`; the password comes from `.env`) and uses SQLite at

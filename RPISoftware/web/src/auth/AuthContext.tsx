@@ -1,8 +1,11 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 
-import { api } from "../api/client";
+import { UNAUTHORIZED_EVENT, api } from "../api/client";
 import type { Token } from "../api/types";
 import { config } from "../config";
+import { useT } from "../i18n";
 
 export interface Session {
   token: string;
@@ -36,6 +39,33 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(load);
+  const queryClient = useQueryClient();
+  const { lang } = useT();
+  const token = session?.token ?? null;
+  // the public invitation page (/join/…) makes no API calls at all
+  const publicPage = useLocation().pathname.startsWith("/join/");
+
+  // the server sends managers' notifications in their language: tell it after login and on
+  // every switch (best effort: an older backend without PATCH /me just ignores it)
+  useEffect(() => {
+    if (!token || publicPage) return;
+    api.patch("/api/v1/me", token, { language: lang }).catch(() => undefined);
+  }, [token, lang, publicPage]);
+
+  // the session expired (8 h) or the hub's key changed: back to the login page
+  useEffect(() => {
+    const drop = () => {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* storage blocked */
+      }
+      setSession(null);
+      queryClient.clear();
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, drop);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, drop);
+  }, [queryClient]);
 
   const value = useMemo<AuthValue>(
     () => ({
@@ -57,9 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout() {
         localStorage.removeItem(STORAGE_KEY);
         setSession(null);
+        // drop everything fetched under this session from memory (rosters carry health data)
+        queryClient.clear();
       },
     }),
-    [session],
+    [session, queryClient],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

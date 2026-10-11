@@ -25,7 +25,10 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
-engine = create_async_engine(settings.database_url, future=True, pool_pre_ping=True)
+# pre-ping guards against dropped server connections; a local SQLite file has none, and on the
+# Pi every ping is one more thread round trip per session.
+engine = create_async_engine(settings.database_url, future=True, pool_pre_ping=not settings.database_url.startswith(
+    "sqlite"))
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 if engine.dialect.name == "sqlite":
@@ -48,6 +51,12 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         yield session
 
 
+# Indexes added after a table first shipped: `create_all` never touches existing tables, so these
+# are created idempotently on every start (same definitions as in app.models).
+_LATE_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS ix_sensor_readings_device_ts ON sensor_readings (device_id, ts)",
+)
+
 # TimescaleDB hypertables (time-series entities). (table, time_column)
 _HYPERTABLES: list[tuple[str, str]] = [
     ("sensor_readings", "ts"),
@@ -63,6 +72,8 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        for statement in _LATE_INDEXES:
+            await conn.execute(text(statement))
 
         if settings.is_postgres:
             # TimescaleDB extension + hypertables (idempotent, best-effort).

@@ -14,12 +14,18 @@ import logging
 import re
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.api.admin import router as admin_router
+from app.api.device_commands import router as commands_router
+from app.api.household import router as household_router
 from app.api.routes import router
+from app.care.service import CareUnavailable
 from app.config import settings
 from app.db import init_db
+from app.i18n import LanguageMiddleware
 from app.retention import run_retention
 
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +56,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         await seed_if_empty()
 
+    from app.notify import escalation
+
+    await escalation.resume_pending()  # escalation retries survive a restart
+
     stop = asyncio.Event()
     retention_task = asyncio.create_task(run_retention(stop))
     mqtt_task: asyncio.Task | None = None
@@ -66,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         stop.set()
+        await escalation.stop()
         for task in (mqtt_task, retention_task):
             if task is not None:
                 task.cancel()
@@ -88,12 +99,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(LanguageMiddleware)  # Accept-Language: ro|en for REST text (app/i18n.py)
 app.include_router(router)
+app.include_router(household_router)
+app.include_router(commands_router)
+app.include_router(admin_router)
+
+
+@app.exception_handler(CareUnavailable)
+async def care_unavailable(_: Request, exc: CareUnavailable) -> JSONResponse:
+    """Care profiles need CANARY_CARE_KEY; everything else keeps working without it."""
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.get("/health", tags=["meta"])
 async def health() -> dict:
-    return {"status": "ok", "service": "canary-backend", "version": "0.1.0"}
+    """`ingest`: MQTT messages waiting to be processed and the oldest one's wait (s)."""
+    from app.ingestion.broker import ingest_stats
+
+    return {"status": "ok", "service": "canary-backend", "version": "0.1.0", "ingest": ingest_stats()}
 
 
 @app.get("/", tags=["meta"])

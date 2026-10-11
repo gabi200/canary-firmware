@@ -1,6 +1,9 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../config.dart';
 import 'firebase_push.dart';
 
@@ -10,24 +13,27 @@ import 'firebase_push.dart';
 /// alarm arriving over WebSocket raises a heads-up notification). Remote FCM push
 /// is wired behind Config.enableFirebasePush and requires a Firebase project +
 /// the iOS critical-alert entitlement to break through silent/DND (see README).
+/// Channel name/description and fallback titles follow the app language.
 class Notifications {
   Notifications._();
   static final Notifications instance = Notifications._();
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _ready = false;
+  AppLocalizations _l10n = lookupAppLocalizations(const Locale('en'));
 
-  /// High-importance channel for life-safety alerts (Android).
-  static const AndroidNotificationChannel _alarmChannel = AndroidNotificationChannel(
-    'canary_alarm',
-    'Emergency alerts',
-    description: 'Critical building safety alarms (gas, CO, evacuation).',
-    importance: Importance.max,
-    playSound: true,
-    enableVibration: true,
-  );
+  /// High-importance channel for life-safety alerts (Android), named in the app language.
+  AndroidNotificationChannel get _alarmChannel => AndroidNotificationChannel(
+        'canary_alarm',
+        _l10n.notificationChannelName,
+        description: _l10n.notificationChannelDescription,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
 
-  Future<void> init() async {
+  Future<void> init(AppLocalizations l10n) async {
+    _l10n = l10n;
     if (_ready) return;
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings(
@@ -37,10 +43,7 @@ class Notifications {
       // requestCriticalPermission: true,  // enable once the entitlement is approved
     );
     await _plugin.initialize(const InitializationSettings(android: android, iOS: ios));
-
-    await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_alarmChannel);
+    await _registerChannel();
 
     if (Config.enableFirebasePush) {
       await _initFirebase();
@@ -48,11 +51,26 @@ class Notifications {
     _ready = true;
   }
 
+  /// Language switch: later notifications (and the Android channel name shown in
+  /// system settings) use the new language.
+  Future<void> setLocalizations(AppLocalizations l10n) async {
+    _l10n = l10n;
+    if (_ready) await _registerChannel();
+  }
+
+  // Re-creating an existing channel id only updates its name and description.
+  Future<void> _registerChannel() async {
+    await _plugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_alarmChannel);
+  }
+
   Future<void> showAlarm(String title, String body, {bool critical = false}) async {
+    final channel = _alarmChannel;
     final android = AndroidNotificationDetails(
-      _alarmChannel.id,
-      _alarmChannel.name,
-      channelDescription: _alarmChannel.description,
+      channel.id,
+      channel.name,
+      channelDescription: channel.description,
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.alarm,
@@ -85,6 +103,9 @@ class Notifications {
 
   Future<void> _firebaseSetup() async {
     // Implemented in firebase_push.dart to keep firebase imports isolated.
-    await firebaseInitAndSubscribe(onMessage: (title, body) => showAlarm(title, body, critical: true));
+    await firebaseInitAndSubscribe(
+      onMessage: (title, body) =>
+          showAlarm(title ?? _l10n.pushFallbackTitle, body ?? '', critical: true),
+    );
   }
 }

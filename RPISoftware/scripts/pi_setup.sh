@@ -8,8 +8,10 @@
 #   scripts/pi_setup.sh --rotate air-kitchen         # new password for an existing sensor
 #
 # It:
-#   1. creates RPISoftware/.env (mode 600) with a random CANARY_JWT_SECRET and
-#      CANARY_MQTT_PASSWORD (the backend's broker password) when missing;
+#   1. creates RPISoftware/.env (mode 600) with a random CANARY_JWT_SECRET,
+#      CANARY_MQTT_PASSWORD (the backend's broker password), CANARY_CARE_KEY
+#      (encrypts care profiles: health data) and CANARY_ESCALATION_SECRET (signs
+#      the ARC / 112 escalation webhook) when missing;
 #   2. writes mosquitto/config/passwd with user "hub" and every sensor user named
 #      on the command line (new sensors get a random password, existing ones keep
 #      theirs unless --rotate). mosquitto_passwd runs in a throwaway
@@ -54,6 +56,11 @@ note() {
 # N random bytes as hex (coreutils od: present on Raspberry Pi OS and macOS).
 rand_hex() {
   od -An -tx1 -N"$1" /dev/urandom | tr -d ' \n'
+}
+
+# A Fernet key: 32 random bytes, url-safe base64 (44 characters).
+rand_fernet_key() {
+  head -c 32 /dev/urandom | base64 | tr -d '\n' | tr '+/' '-_'
 }
 
 # Last NAME=value in .env, without surrounding quotes or a trailing CR.
@@ -149,6 +156,17 @@ fi
 if ! grep -q '^CANARY_JWT_SECRET=' "$ENV_FILE"; then
   printf 'CANARY_JWT_SECRET=%s\n' "$(rand_hex 32)" >>"$ENV_FILE"
   note "generated CANARY_JWT_SECRET"
+fi
+if ! grep -q '^CANARY_CARE_KEY=' "$ENV_FILE"; then
+  # Encrypts care profiles (health data) at rest. Changing or losing it makes the stored
+  # profiles unreadable, so it is never rotated here.
+  printf 'CANARY_CARE_KEY=%s\n' "$(rand_fernet_key)" >>"$ENV_FILE"
+  note "generated CANARY_CARE_KEY"
+fi
+if ! grep -q '^CANARY_ESCALATION_SECRET=' "$ENV_FILE"; then
+  # HMAC key of the escalation webhook; give the same value to the ARC / 112 partner.
+  printf 'CANARY_ESCALATION_SECRET=%s\n' "$(rand_hex 32)" >>"$ENV_FILE"
+  note "generated CANARY_ESCALATION_SECRET"
 fi
 if ! grep -q '^CANARY_MQTT_PASSWORD=' "$ENV_FILE"; then
   printf 'CANARY_MQTT_PASSWORD=%s\n' "$(rand_hex 16)" >>"$ENV_FILE"

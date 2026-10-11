@@ -1,14 +1,17 @@
-const LABELS: Record<string, { text: string; cls: string }> = {
-  genuine: { text: "genuine", cls: "alarm" },
-  likely_benign: { text: "held · likely benign", cls: "detection" },
-  transient: { text: "held · transient", cls: "detection" },
-  drift: { text: "sensor drift", cls: "detection" },
-  micro_leak_trend: { text: "micro-leak trend", cls: "detection" },
+import { useT } from "../i18n";
+import { tokenLabel } from "../lib/labels";
+
+const CLS: Record<string, string> = {
+  genuine: "alarm",
+  likely_benign: "detection",
+  transient: "detection",
+  drift: "detection",
+  micro_leak_trend: "detection",
 };
 
 /** Renders the false-alarm-reduction assessment as a pill (null for insufficient/none). */
 export function SignalBadge({ cls }: { cls: string | null }) {
+  const { t } = useT();
   if (!cls || cls === "insufficient_data") return null;
-  const m = LABELS[cls] ?? { text: cls.replace(/_/g, " "), cls: "" };
-  return <span className={`pill ${m.cls}`}>{m.text}</span>;
+  return <span className={`pill ${CLS[cls] ?? ""}`}>{tokenLabel(t, "signal", cls)}</span>;
 }

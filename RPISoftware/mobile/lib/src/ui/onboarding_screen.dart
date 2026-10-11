@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
+import '../i18n.dart';
 import '../state/providers.dart';
+import 'widgets/language_toggle.dart';
+import '../theme.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -14,7 +17,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _username = TextEditingController(text: 'ana');
   final _building = TextEditingController(text: Config.defaultBuildingId);
   bool _busy = false;
-  String? _error;
+
+  /// Why the last login failed, or null. Kept as the error (not text) so the
+  /// message follows a language switch.
+  Object? _error;
 
   @override
   void dispose() {
@@ -31,7 +37,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       await ref.read(sessionProvider.notifier).login(_username.text.trim(), _building.text.trim());
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -39,7 +45,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
+      // Language can be picked before signing in.
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        actions: const [
+          Padding(padding: EdgeInsets.only(right: 12), child: LanguageToggle()),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -54,17 +70,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   const SizedBox(height: 8),
                   const Text('Canary', textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
-                  const Text('Building safety for residents',
-                      textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+                  Text(l10n.onboardingTagline,
+                      textAlign: TextAlign.center, style: TextStyle(color: context.palette.muted)),
                   const SizedBox(height: 32),
                   TextField(
                     controller: _username,
-                    decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l10n.username, border: const OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _building,
-                    decoration: const InputDecoration(labelText: 'Building ID', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l10n.buildingId, border: const OutlineInputBorder()),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -78,18 +94,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                      child: Text(l10n.loginFailed(l10n.errorReason(_error!)),
+                          style: const TextStyle(color: Colors.red)),
                     ),
                   FilledButton(
                     onPressed: _busy ? null : _login,
                     child: _busy
                         ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Link my unit'),
+                        : Text(l10n.linkMyUnit),
                   ),
                   const SizedBox(height: 12),
-                  Text('Server: ${Config.apiBase}',
+                  Text(l10n.serverAddress(Config.apiBase),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.black38, fontSize: 12)),
+                      style: TextStyle(color: context.palette.faint, fontSize: 12)),
                 ],
               ),
             ),

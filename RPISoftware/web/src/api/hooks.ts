@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "../auth/AuthContext";
 import { api } from "./client";
@@ -11,6 +11,7 @@ import type {
   Incident,
   IncidentAction,
   IncidentEvent,
+  Escalation,
   NodeHistory,
   NodeOut,
   NodePatch,
@@ -19,6 +20,7 @@ import type {
   Resident,
   Roster,
   Triangulation,
+  TriangulationHistory,
   Zone,
 } from "./types";
 
@@ -101,6 +103,31 @@ export function useTriangulation(incidentId: string | null) {
   });
 }
 
+/** Stored triangulation estimates of an incident, oldest first (404 on older backends: the
+ *  caller falls back to the current estimate). */
+export function useTriangulationHistory(incidentId: string | null) {
+  const { token } = useCtx();
+  return useQuery({
+    queryKey: ["triangulationHistory", incidentId],
+    enabled: !!incidentId,
+    queryFn: () => api.get<TriangulationHistory>(`/api/v1/incidents/${incidentId}/triangulation/history`, token),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
+/** Deliveries of an incident to external dispatch (ARC); 404 on older backends -> nothing shown. */
+export function useEscalations(incidentId: string | null) {
+  const { token } = useCtx();
+  return useQuery({
+    queryKey: ["escalations", incidentId],
+    enabled: !!incidentId,
+    queryFn: () => api.get<Escalation[]>(`/api/v1/incidents/${incidentId}/escalations`, token),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
 export function useOccupancy() {
   const { token, buildingId } = useCtx();
   return useQuery({
@@ -119,7 +146,9 @@ export function useResidents() {
   });
 }
 
-/** Per-incident resident roster: who is safe, who needs help, who is still unaccounted. */
+/** Per-incident resident roster: who is safe, who needs help, who is still unaccounted, plus
+ *  the priority (care profile) people. Health data lives only in react-query memory and
+ *  `gcTime: 0` drops it as soon as no view of an active incident uses it. */
 export function useRoster(incidentId: string | null) {
   const { token } = useCtx();
   return useQuery({
@@ -127,6 +156,7 @@ export function useRoster(incidentId: string | null) {
     enabled: !!incidentId,
     queryFn: () => api.get<Roster>(`/api/v1/incidents/${incidentId}/roster`, token),
     refetchInterval: 5_000,
+    gcTime: 0,
   });
 }
 
@@ -172,8 +202,15 @@ export function useNodes() {
   });
 }
 
-/** Raw status history of one node; `fields` are dotted paths into its status document. */
-export function useNodeHistory(nodeId: string, minutes: number, fields?: string[]) {
+/** Raw status history of one node; `fields` are dotted paths into its status document.
+ *  `refetchMs`: polling interval (false to pause, e.g. while the chart is off screen);
+ *  react-query also pauses it while the browser tab is hidden. */
+export function useNodeHistory(
+  nodeId: string,
+  minutes: number,
+  fields?: string[],
+  refetchMs: number | false = 60_000,
+) {
   const { token } = useCtx();
   const qs = new URLSearchParams({ minutes: String(minutes) });
   if (fields?.length) qs.set("fields", fields.join(","));
@@ -183,7 +220,29 @@ export function useNodeHistory(nodeId: string, minutes: number, fields?: string[
       api.get<NodeHistory>(`/api/v1/nodes/${encodeURIComponent(nodeId)}/history?${qs}`, token),
     // keep the previous range on screen while a newly selected one loads
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
+    refetchInterval: refetchMs,
+  });
+}
+
+/** History of several nodes over the same window (one request per node; same cache keys as
+ *  useNodeHistory, so a drawer and the map share the data). */
+export function useNodeHistories(
+  requests: { nodeId: string; fields: string[] }[],
+  minutes: number,
+  refetchMs: number | false = 60_000,
+) {
+  const { token } = useCtx();
+  return useQueries({
+    queries: requests.map(({ nodeId, fields }) => {
+      const qs = new URLSearchParams({ minutes: String(minutes), fields: fields.join(",") });
+      return {
+        queryKey: ["history", nodeId, minutes, fields.join(",")],
+        queryFn: () =>
+          api.get<NodeHistory>(`/api/v1/nodes/${encodeURIComponent(nodeId)}/history?${qs}`, token),
+        placeholderData: keepPreviousData,
+        refetchInterval: refetchMs,
+      };
+    }),
   });
 }
 

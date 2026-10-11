@@ -1,5 +1,8 @@
 import type { AnalysisLevel, NodeKind, NodeStatusDoc } from "../api/types";
-import { fmtNum, leafPaths, pick, pickNum, stateLevel } from "../lib/nodes";
+import { useT, type Lang, type MsgKey, type TFn } from "../i18n";
+import { fmtNumber } from "../lib/format";
+import { deviceToken } from "../lib/labels";
+import { leafPaths, pick, pickNum, stateLevel } from "../lib/nodes";
 import { fmtDuration } from "../lib/time";
 import { StatusPill } from "./StatusPill";
 
@@ -7,20 +10,22 @@ type Grade = (value: unknown, doc: unknown) => AnalysisLevel;
 
 interface Field {
   path: string;
-  label: string;
+  /** Dictionary key; fields without one (unknown firmware fields) show their raw path. */
+  label?: MsgKey;
   unit?: string;
-  fmt?: "ms" | "s" | "duration" | "led";
+  /** "token": a firmware enum value (open / closed, none / co / gas ...) shown translated. */
+  fmt?: "ms" | "s" | "duration" | "led" | "token";
   /** Device thresholds shown next to the value: [caption, path]. */
-  refs?: [string, string][];
+  refs?: [MsgKey, string][];
   /** Colours the value (attention / danger) against the device's own thresholds. */
   grade?: Grade;
 }
 
 interface Group {
-  title: string;
+  title: MsgKey;
   /** Device-graded state shown as a pill in the group header. */
   state?: string;
-  note?: string;
+  note?: MsgKey;
   fields: Field[];
 }
 
@@ -30,8 +35,8 @@ const UG = "µg/m³";
 function limits(warn: string, danger: string): Pick<Field, "refs" | "grade"> {
   return {
     refs: [
-      ["warn", warn],
-      ["danger", danger],
+      ["ref.warn", warn],
+      ["ref.danger", danger],
     ],
     grade: (v, doc) => {
       if (typeof v !== "number") return "ok";
@@ -51,126 +56,126 @@ const flag =
 const byState: Grade = (v) => stateLevel(v);
 
 const DEVICE: Field[] = [
-  { path: "device.name", label: "Name" },
-  { path: "device.firmware", label: "Firmware" },
-  { path: "uptime_ms", label: "Uptime", fmt: "duration" },
+  { path: "device.name", label: "raw.name" },
+  { path: "device.firmware", label: "raw.firmware" },
+  { path: "uptime_ms", label: "raw.uptime", fmt: "duration" },
 ];
 
 const NETWORK: Group = {
-  title: "Wi-Fi / MQTT / OTA",
+  title: "raw.groupNetwork",
   fields: [
-    { path: "wifi.connected", label: "Wi-Fi connected", grade: flag(false) },
+    { path: "wifi.connected", label: "raw.wifiConnected", grade: flag(false) },
     {
       path: "wifi.rssi",
-      label: "Wi-Fi RSSI",
+      label: "raw.wifiRssi",
       unit: "dBm",
       grade: (v) => (typeof v === "number" && v < -80 ? "attention" : "ok"),
     },
-    { path: "mqtt.enabled", label: "MQTT enabled" },
-    { path: "mqtt.connected", label: "MQTT connected", grade: flag(false) },
-    { path: "ota.in_progress", label: "OTA in progress" },
+    { path: "mqtt.enabled", label: "raw.mqttEnabled" },
+    { path: "mqtt.connected", label: "raw.mqttConnected", grade: flag(false) },
+    { path: "ota.in_progress", label: "raw.otaInProgress" },
   ],
 };
 
 const AIR: Group[] = [
   {
-    title: "Device",
-    fields: [...DEVICE, { path: "warmup_remaining_seconds", label: "Warm-up left", fmt: "s" }],
+    title: "raw.groupDevice",
+    fields: [...DEVICE, { path: "warmup_remaining_seconds", label: "raw.warmupLeft", fmt: "s" }],
   },
   {
-    title: "Carbon monoxide",
+    title: "sensor.co",
     state: "co.state",
     fields: [
-      { path: "co.ppm", label: "CO", unit: "ppm", ...limits("co.warn_ppm", "co.danger_ppm") },
-      { path: "co.peak_ppm", label: "Peak", unit: "ppm" },
-      { path: "co.valid", label: "Valid", grade: flag(false) },
-      { path: "co.age_ms", label: "Age", fmt: "ms" },
+      { path: "co.ppm", label: "metric.co", unit: "ppm", ...limits("co.warn_ppm", "co.danger_ppm") },
+      { path: "co.peak_ppm", label: "raw.peak", unit: "ppm" },
+      { path: "co.valid", label: "raw.valid", grade: flag(false) },
+      { path: "co.age_ms", label: "raw.age", fmt: "ms" },
     ],
   },
   {
-    title: "Combustible gas (MQ5)",
+    title: "chart.gasMq5",
     state: "gas.state",
-    note: "Raw ADC count (0–4095), not ppm",
+    note: "raw.gasNote",
     fields: [
-      { path: "gas.adc", label: "Gas", unit: "ADC", ...limits("gas.warn_adc", "gas.danger_adc") },
-      { path: "gas.peak_adc", label: "Peak", unit: "ADC" },
+      { path: "gas.adc", label: "metric.gas", unit: "ADC", ...limits("gas.warn_adc", "gas.danger_adc") },
+      { path: "gas.peak_adc", label: "raw.peak", unit: "ADC" },
     ],
   },
   {
-    title: "Particulates",
+    title: "chart.particulates",
     state: "particulate.state",
     fields: [
-      { path: "particulate.pm1_0", label: "PM1.0", unit: UG },
+      { path: "particulate.pm1_0", label: "metric.pm1", unit: UG },
       {
         path: "particulate.pm2_5",
-        label: "PM2.5",
+        label: "metric.pm25",
         unit: UG,
         ...limits("particulate.warn_pm2_5", "particulate.danger_pm2_5"),
       },
       {
         path: "particulate.pm10",
-        label: "PM10",
+        label: "metric.pm10",
         unit: UG,
         ...limits("particulate.warn_pm10", "particulate.danger_pm10"),
       },
-      { path: "particulate.peak_pm2_5", label: "Peak PM2.5", unit: UG },
-      { path: "particulate.peak_pm10", label: "Peak PM10", unit: UG },
-      { path: "particulate.valid", label: "Valid", grade: flag(false) },
-      { path: "particulate.age_ms", label: "Age", fmt: "ms" },
+      { path: "particulate.peak_pm2_5", label: "raw.peakPm25", unit: UG },
+      { path: "particulate.peak_pm10", label: "raw.peakPm10", unit: UG },
+      { path: "particulate.valid", label: "raw.valid", grade: flag(false) },
+      { path: "particulate.age_ms", label: "raw.age", fmt: "ms" },
     ],
   },
   {
-    title: "Climate",
+    title: "raw.groupClimate",
     fields: [
-      { path: "climate.temperature_c", label: "Temperature", unit: "°C" },
-      { path: "climate.humidity_percent", label: "Humidity", unit: "%RH" },
-      { path: "climate.valid", label: "Valid", grade: flag(false) },
-      { path: "climate.age_ms", label: "Age", fmt: "ms" },
+      { path: "climate.temperature_c", label: "metric.temperature", unit: "°C" },
+      { path: "climate.humidity_percent", label: "metric.humidity", unit: "%RH" },
+      { path: "climate.valid", label: "raw.valid", grade: flag(false) },
+      { path: "climate.age_ms", label: "raw.age", fmt: "ms" },
     ],
   },
   {
-    title: "Presence (LD2410 radar)",
+    title: "raw.groupPresence",
     fields: [
-      { path: "presence.detected", label: "Detected" },
-      { path: "presence.moving", label: "Moving" },
-      { path: "presence.stationary", label: "Stationary" },
-      { path: "presence.moving_distance_cm", label: "Moving target", unit: "cm" },
-      { path: "presence.moving_energy", label: "Moving energy" },
-      { path: "presence.stationary_distance_cm", label: "Stationary target", unit: "cm" },
-      { path: "presence.stationary_energy", label: "Stationary energy" },
-      { path: "presence.detection_distance_cm", label: "Detection distance", unit: "cm" },
-      { path: "presence.valid", label: "Valid", grade: flag(false) },
-      { path: "presence.age_ms", label: "Age", fmt: "ms" },
+      { path: "presence.detected", label: "raw.detected" },
+      { path: "presence.moving", label: "raw.moving" },
+      { path: "presence.stationary", label: "raw.stationary" },
+      { path: "presence.moving_distance_cm", label: "raw.movingTarget", unit: "cm" },
+      { path: "presence.moving_energy", label: "raw.movingEnergy" },
+      { path: "presence.stationary_distance_cm", label: "raw.stationaryTarget", unit: "cm" },
+      { path: "presence.stationary_energy", label: "raw.stationaryEnergy" },
+      { path: "presence.detection_distance_cm", label: "raw.detectionDistance", unit: "cm" },
+      { path: "presence.valid", label: "raw.valid", grade: flag(false) },
+      { path: "presence.age_ms", label: "raw.age", fmt: "ms" },
     ],
   },
   {
-    title: "Alarm / LED",
+    title: "raw.groupAlarmLed",
     state: "alarm.state",
     fields: [
-      { path: "alarm.hazard", label: "Hazard" },
-      { path: "alarm.sounding", label: "Sounding", grade: flag(true, "danger") },
-      { path: "alarm.silence_remaining_seconds", label: "Silence left", fmt: "s" },
-      { path: "alarm.self_test", label: "Self-test" },
-      { path: "alarm.led_color", label: "LED colour", fmt: "led" },
-      { path: "alarm.led_on", label: "LED on" },
+      { path: "alarm.hazard", label: "raw.hazard", fmt: "token" },
+      { path: "alarm.sounding", label: "raw.sounding", grade: flag(true, "danger") },
+      { path: "alarm.silence_remaining_seconds", label: "raw.silenceLeft", fmt: "s" },
+      { path: "alarm.self_test", label: "raw.selfTest" },
+      { path: "alarm.led_color", label: "raw.ledColour", fmt: "led" },
+      { path: "alarm.led_on", label: "raw.ledOn" },
     ],
   },
   NETWORK,
 ];
 
 const WATER: Group[] = [
-  { title: "Device", fields: DEVICE },
+  { title: "raw.groupDevice", fields: DEVICE },
   {
-    title: "Leak sensor",
+    title: "chart.leakSensor",
     state: "sensor.state",
     fields: [
       {
         path: "sensor.adc",
-        label: "Sensor",
+        label: "metric.sensor",
         unit: "ADC",
         refs: [
-          ["wet ≥", "sensor.wet_threshold"],
-          ["dry ≤", "sensor.dry_threshold"],
+          ["ref.wet", "sensor.wet_threshold"],
+          ["ref.dry", "sensor.dry_threshold"],
         ],
         // wet at >= wet_threshold, dry at <= dry_threshold, holds its state in between
         grade: (v, doc) => {
@@ -180,27 +185,27 @@ const WATER: Group[] = [
           return wet != null && v >= wet ? "danger" : dry != null && v > dry ? "attention" : "ok";
         },
       },
-      { path: "sensor.initialized", label: "Initialized", grade: flag(false) },
+      { path: "sensor.initialized", label: "raw.initialized", grade: flag(false) },
     ],
   },
   {
-    title: "Leak latch",
-    fields: [{ path: "leak_latched", label: "Leak latched", grade: flag(true) }],
+    title: "chart.leakLatch",
+    fields: [{ path: "leak_latched", label: "raw.leakLatched", grade: flag(true) }],
   },
   {
-    title: "Valve",
+    title: "raw.groupValve",
     fields: [
-      { path: "valve.requested", label: "Requested", grade: byState },
-      { path: "valve.applied", label: "Applied", grade: byState },
-      { path: "valve.relay_active", label: "Relay active" },
+      { path: "valve.requested", label: "raw.requested", grade: byState, fmt: "token" },
+      { path: "valve.applied", label: "raw.applied", grade: byState, fmt: "token" },
+      { path: "valve.relay_active", label: "raw.relayActive" },
     ],
   },
   {
-    title: "Alarm",
+    title: "raw.groupAlarm",
     state: "alarm.state",
     fields: [
-      { path: "alarm.sounding", label: "Sounding", grade: flag(true, "danger") },
-      { path: "alarm.remaining_seconds", label: "Time left", fmt: "s" },
+      { path: "alarm.sounding", label: "raw.sounding", grade: flag(true, "danger") },
+      { path: "alarm.remaining_seconds", label: "raw.timeLeft", fmt: "s" },
     ],
   },
   NETWORK,
@@ -218,34 +223,35 @@ const LED_CSS: Record<string, string> = {
   white: "#e6edf3",
 };
 
-function fmtValue(v: unknown, fmt?: Field["fmt"]): string {
+function fmtValue(v: unknown, fmt: Field["fmt"], t: TFn, lang: Lang): string {
   if (v === undefined || v === null) return "—";
-  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (typeof v === "boolean") return v ? t("common.yes") : t("common.no");
   if (typeof v === "number") {
-    if (fmt === "duration") return fmtDuration(v);
-    if (fmt === "s") return fmtDuration(v * 1000);
-    if (fmt === "ms") return v < 10_000 ? `${(v / 1000).toFixed(1)} s` : fmtDuration(v);
-    return fmtNum(v);
+    if (fmt === "duration") return fmtDuration(v, lang);
+    if (fmt === "s") return fmtDuration(v * 1000, lang);
+    if (fmt === "ms") return v < 10_000 ? `${fmtNumber(v / 1000, lang, 1, true)} ${t("unit.s")}` : fmtDuration(v, lang);
+    return fmtNumber(v, lang, 1);
   }
-  if (typeof v === "string") return v.replace(/_/g, " ");
+  if (typeof v === "string") return fmt === "token" || fmt === "led" ? deviceToken(v, t) : v.replace(/_/g, " ");
   return JSON.stringify(v);
 }
 
 function FieldRow({ field, doc }: { field: Field; doc: unknown }) {
+  const { t, lang } = useT();
   const v = pick(doc, field.path);
   const level = v === undefined ? "ok" : (field.grade?.(v, doc) ?? "ok");
   const refs = (field.refs ?? []).flatMap(([caption, path]) => {
     const r = pickNum(doc, path);
-    return r == null ? [] : [`${caption} ${fmtNum(r)}`];
+    return r == null ? [] : [`${t(caption)} ${fmtNumber(r, lang, 1)}`];
   });
   return (
     <div className="kv">
-      <span className="k">{field.label}</span>
+      <span className="k">{field.label ? t(field.label) : field.path}</span>
       <span className={`v t-${level}`}>
         {field.fmt === "led" && typeof v === "string" && (
           <span className="led-swatch" style={{ background: LED_CSS[v] ?? "transparent" }} />
         )}
-        {fmtValue(v, field.fmt)}
+        {fmtValue(v, field.fmt, t, lang)}
         {field.unit && v != null && <span className="u">{field.unit}</span>}
       </span>
       {refs.length > 0 && <span className="ref">{refs.join(" · ")}</span>}
@@ -254,20 +260,26 @@ function FieldRow({ field, doc }: { field: Field; doc: unknown }) {
 }
 
 /** Latest raw status document, grouped the way the firmware groups it; any field the
- *  layout does not know (other firmware versions) is listed under "Other fields". */
-export function RawStatus({ kind, doc }: { kind: NodeKind; doc: NodeStatusDoc | null }) {
-  if (!doc) return <div className="muted small">No status document received yet.</div>;
+ *  layout does not know (other firmware versions) is listed under "Other fields". A group with
+ *  none of its fields in the document (e.g. presence stripped for dispatchers) is left out. */
+export function RawStatus({ kind, doc, showPresence = true }: { kind: NodeKind; doc: NodeStatusDoc | null; showPresence?: boolean }) {
+  const { t } = useT();
+  if (!doc) return <div className="muted small">{t("raw.empty")}</div>;
 
-  const groups = GROUPS[kind] ?? [];
+  const groups = (GROUPS[kind] ?? []).filter(
+    (g) =>
+      (showPresence || !g.fields.some((f) => f.path.startsWith("presence."))) &&
+      g.fields.some((f) => pick(doc, f.path) !== undefined),
+  );
   const known = new Set(
     groups.flatMap((g) => [
       ...(g.state ? [g.state] : []),
       ...g.fields.flatMap((f) => [f.path, ...(f.refs ?? []).map(([, p]) => p)]),
     ]),
   );
-  const extra = leafPaths(doc).filter((p) => !known.has(p));
+  const extra = leafPaths(doc).filter((p) => !known.has(p) && (showPresence || !p.startsWith("presence.")));
   const all: Group[] = extra.length
-    ? [...groups, { title: "Other fields", fields: extra.map((p) => ({ path: p, label: p })) }]
+    ? [...groups, { title: "raw.groupOther", fields: extra.map((p) => ({ path: p })) }]
     : groups;
 
   return (
@@ -278,12 +290,12 @@ export function RawStatus({ kind, doc }: { kind: NodeKind; doc: NodeStatusDoc | 
           return (
             <div className="raw-group" key={g.title}>
               <div className="raw-group-head">
-                <span>{g.title}</span>
+                <span>{t(g.title)}</span>
                 {typeof state === "string" && (
-                  <StatusPill state={stateLevel(state)} label={state} />
+                  <StatusPill state={stateLevel(state)} label={deviceToken(state, t)} />
                 )}
               </div>
-              {g.note && <div className="muted small raw-note">{g.note}</div>}
+              {g.note && <div className="muted small raw-note">{t(g.note)}</div>}
               {g.fields.map((f) => (
                 <FieldRow key={f.path} field={f} doc={doc} />
               ))}
@@ -292,7 +304,7 @@ export function RawStatus({ kind, doc }: { kind: NodeKind; doc: NodeStatusDoc | 
         })}
       </div>
       <details className="raw-json">
-        <summary>Verbatim JSON</summary>
+        <summary>{t("raw.json")}</summary>
         <pre>{JSON.stringify(doc, null, 2)}</pre>
       </details>
     </>

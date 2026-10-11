@@ -12,5 +12,9 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // Read-only Apple Health import for the emergency profile (HealthImport.swift).
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "HealthImportPlugin") {
+      HealthImportPlugin.register(with: registrar)
+    }
   }
 }

@@ -1,13 +1,12 @@
 import type { IncidentEvent } from "../api/types";
-import { parseTs } from "../lib/time";
+import { useT } from "../i18n";
+import { actorLabel, reasonLabel, stateLabel } from "../lib/labels";
+import { fmtClock } from "../lib/time";
 import { StatusPill } from "./StatusPill";
 
-function fmt(ts: string): string {
-  return new Date(parseTs(ts)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
 export function IncidentTimeline({ events }: { events: IncidentEvent[] }) {
-  if (events.length === 0) return <div className="muted small">No events yet.</div>;
+  const { t, lang } = useT();
+  if (events.length === 0) return <div className="muted small">{t("timeline.empty")}</div>;
   return (
     <div>
       {events.map((e) => (
@@ -15,13 +14,13 @@ export function IncidentTimeline({ events }: { events: IncidentEvent[] }) {
           <StatusPill state={e.to_state} />
           <div className="grow">
             <div className="small">
-              {e.from_state} → {e.to_state}
+              {stateLabel(e.from_state, t)} → {stateLabel(e.to_state, t)}
             </div>
             <div className="muted small">
-              {e.reason} · {e.actor}
+              {reasonLabel(e.reason, t)} · {actorLabel(e.actor, t)}
             </div>
           </div>
-          <div className="muted small">{fmt(e.ts)}</div>
+          <div className="muted small">{fmtClock(e.ts, lang)}</div>
         </div>
       ))}
     </div>

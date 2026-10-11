@@ -1,15 +1,19 @@
 """Notification service (MVP).
 
-Persists Notification rows (the auditable record of who was told what) and pushes
-a live event over WebSocket. Real FCM/APNs/SMS/email/webhook transports plug in
-here behind the same interface in a later phase. Always broadcasts the incident
-event to the building room so dashboards update; selects human/external recipients
-per incident state per ARCHITECTURE.md section 7.
+Persists Notification rows (the auditable record of who was told what), each in its
+recipient's language (user_prefs, default Romanian), and pushes a live event over
+WebSocket (English, unchanged). Real FCM/APNs/SMS/email transports plug in here behind
+the same interface in a later phase. Always broadcasts the incident event to the
+building room so dashboards update; selects human/external recipients per incident
+state per ARCHITECTURE.md section 7, and sends the signed escalation webhook
+(app.notify.escalation) on the external states.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
+from functools import partial
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +24,7 @@ from app.enums import (
     NotificationChannel,
     Role,
 )
+from app.i18n import DEFAULT_USER_LANGUAGE, tr, translate
 from app.models import (
     AuditLogEntry,
     ExternalIntegration,
@@ -27,7 +32,9 @@ from app.models import (
     Notification,
     ResidentUnit,
     User,
+    UserPref,
 )
+from app.notify import escalation
 from app.realtime.ws import manager
 
 _HAZARD_LABEL = {
@@ -65,26 +72,40 @@ _EXTERNAL_STATES = {
 }
 
 
-def _message(incident: Incident, state: IncidentState) -> tuple[str, str]:
-    hz = _HAZARD_LABEL.get(incident.hazard_type, incident.hazard_type)
+def _english(text: str, **values: str) -> str:
+    return text.format(**values) if values else text
+
+
+Translator = Callable[..., str]
+
+
+def _message(incident: Incident, state: IncidentState, t: Translator = _english) -> tuple[str, str]:
+    """(title, body) through the translator `t`: English for WebSocket events and external
+    integrations, each recipient's language for their notification, the request's for the
+    REST summary (app.i18n.tr)."""
+    hz = t(_HAZARD_LABEL.get(incident.hazard_type, incident.hazard_type))
     if state == IncidentState.alarm:
-        body = _ALARM_BODY.get(incident.hazard_type, f"{hz} detected. Prepare to evacuate. Follow guidance.")
-        return (f"{hz} ALARM", body)
+        body = _ALARM_BODY.get(incident.hazard_type, "{hazard} detected. Prepare to evacuate. Follow guidance.")
+        return (t("{hazard} ALARM", hazard=hz), t(body, hazard=hz))
     if state == IncidentState.evacuation:
-        return (f"EVACUATE NOW — {hz}", "Evacuate via the safe route to the assembly point. Check in when safe.")
+        return (
+            t("EVACUATE NOW — {hazard}", hazard=hz),
+            t("Evacuate via the safe route to the assembly point. Check in when safe."),
+        )
     if state == IncidentState.escalation:
-        return (f"{hz} escalated", "Incident escalated to monitoring/emergency partners.")
+        return (t("{hazard} escalated", hazard=hz), t("Incident escalated to monitoring/emergency partners."))
     if state == IncidentState.resolution:
         body = _CLEAR_BODY.get(incident.hazard_type, "The hazard has cleared. It is safe to return per instructions.")
-        return (f"{hz} — all clear", body)
+        return (t("{hazard} — all clear", hazard=hz), t(body))
     if state == IncidentState.false_alarm:
-        return (f"{hz} — stand down", "The alert was a false alarm. No action needed.")
-    return (f"{hz} — {state.value}", f"Incident is now in state {state.value}.")
+        return (t("{hazard} — stand down", hazard=hz), t("The alert was a false alarm. No action needed."))
+    return (t("{hazard} — {state}", hazard=hz, state=t(state.value)),
+            t("Incident is now in state {state}.", state=t(state.value)))
 
 
 def incident_title(incident: Incident) -> str:
-    """The resident-facing title for an incident in its current state."""
-    return _message(incident, IncidentState(incident.state))[0]
+    """The resident-facing title for an incident in its current state, in the request's language."""
+    return _message(incident, IncidentState(incident.state), tr)[0]
 
 
 class NotificationService:
@@ -92,7 +113,13 @@ class NotificationService:
         self.session = session
 
     async def on_state(self, incident: Incident, state: IncidentState) -> None:
-        title, body = _message(incident, state)
+        title, body = _message(incident, state)  # English: WebSocket + external integrations
+        by_language: dict[str, tuple[str, str]] = {}
+
+        def message_for(lang: str) -> tuple[str, str]:
+            if lang not in by_language:
+                by_language[lang] = _message(incident, state, partial(translate, lang))
+            return by_language[lang]
 
         # 1) Always broadcast the live incident event to the building dashboard room.
         await manager.broadcast(
@@ -113,18 +140,16 @@ class NotificationService:
             },
         )
 
-        # 2) Managers are notified on every transition.
+        # 2) Managers are notified on every transition; 3) residents on resident-facing states.
         managers = (
             await self.session.scalars(select(User).where(User.role == Role.hoa_manager.value))
         ).all()
-        for m in managers:
-            self._add_notification(incident, state, NotificationChannel.web_push, title, body, user_id=m.id)
-
-        # 3) Residents on resident-facing states.
-        if state in _RESIDENT_STATES:
-            residents = await self._building_residents(incident.building_id)
-            for r in residents:
-                self._add_notification(incident, state, NotificationChannel.push, title, body, user_id=r.id)
+        residents = await self._building_residents(incident.building_id) if state in _RESIDENT_STATES else []
+        languages = await self._languages([u.id for u in (*managers, *residents)])
+        for channel, people in ((NotificationChannel.web_push, managers), (NotificationChannel.push, residents)):
+            for person in people:
+                own_title, own_body = message_for(languages.get(person.id, DEFAULT_USER_LANGUAGE))
+                self._add_notification(incident, state, channel, own_title, own_body, user_id=person.id)
 
         # 4) External integrations on escalation / evacuation / resolution.
         if state in _EXTERNAL_STATES:
@@ -143,6 +168,8 @@ class NotificationService:
                 self._add_notification(
                     incident, state, NotificationChannel.external, title, body, integration_id=integ.id
                 )
+            # signed webhook to the ARC / 112 partner, sent after this transaction commits
+            await escalation.queue(self.session, incident, state)
 
         # 5) Audit the privacy-sensitive identity unlock when the building is alarmed.
         if state in ALARMED_STATES:
@@ -197,6 +224,14 @@ class NotificationService:
                 delivered=False,
             )
         )
+
+    async def _languages(self, user_ids: list[str]) -> dict[str, str]:
+        if not user_ids:
+            return {}
+        rows = await self.session.execute(
+            select(UserPref.user_id, UserPref.language).where(UserPref.user_id.in_(user_ids))
+        )
+        return dict(rows.all())
 
     async def _building_residents(self, building_id: str) -> list[User]:
         rows = (

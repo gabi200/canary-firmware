@@ -99,6 +99,7 @@ class Node:
 
     heartbeat_s = 0.0
     command_topics: tuple[str, ...] = ()
+    log_heartbeats = True       # building_sim.py turns this off to keep many nodes readable
 
     def __init__(self, base: str, clock: Clock, args: argparse.Namespace) -> None:
         self.base = base
@@ -236,7 +237,8 @@ class Node:
             doc = self.status(now)
             payload = json.dumps(doc, separators=(",", ":"))
             self.client.publish(self.topic("status"), payload, qos=0, retain=True)
-            log(self.base, f"status [{'+'.join(self._reasons)}] {self.summary(now)}")
+            if self.log_heartbeats or self._reasons != ["heartbeat"]:
+                log(self.base, f"status [{'+'.join(self._reasons)}] {self.summary(now)}")
             if self.args.verbose:
                 print(payload, flush=True)
             self._reasons.clear()
@@ -611,9 +613,9 @@ class WaterNode(Node):
 
 
 class Sim:
-    def __init__(self, args: argparse.Namespace) -> None:
+    def __init__(self, args: argparse.Namespace, clock: Clock | None = None) -> None:
         self.args = args
-        self.clock = Clock(5.0 if args.fast else 1.0)
+        self.clock = clock or Clock(5.0 if args.fast else 1.0)  # building_sim.py shares one clock
         self.air = AirNode(args.air_base, self.clock, args)
         self.water = WaterNode(args.water_base, self.clock, args)
         self.nodes: list[Node] = [self.air, self.water]
@@ -685,6 +687,11 @@ def prelude(sim: Sim) -> Scenario:
 
 def run_normal(sim: Sim) -> Scenario:
     sim.say("normal: both nodes in steady state; small drifts show up in the heartbeats")
+    yield from steady(sim)
+
+
+def steady(sim: Sim) -> Scenario:
+    """Small drifts around clean air and a dry probe, forever (also used by building_sim.py)."""
     air, water = sim.air, sim.water
     while True:
         air.set_co(random.randint(1, 5))

@@ -1,0 +1,9 @@
+{
+  "_comment": "Three rooms of Ap. 12 for building_sim.py: the seeded kitchen and bedroom plus a bathroom the hub creates on the first run.",
+  "building_id": "bld_007",
+  "rooms": [
+    {"zone_id": "zone_kitchen", "label": "Bucătărie", "unit_id": "unit_0312", "kind": "kitchen",  "pos": [2, 2], "nodes": ["air", "water"]},
+    {"zone_id": "zone_bedroom", "label": "Dormitor",  "unit_id": "unit_0312", "kind": "bedroom",  "pos": [8, 2], "nodes": ["air"]},
+    {"zone_id": "zone_bath_12", "label": "Baie",      "unit_id": "unit_0312", "kind": "bathroom", "pos": [5, 1], "nodes": ["air", "water"]}
+  ]
+}

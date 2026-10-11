@@ -1,14 +1,11 @@
-String hazardDont(String hazardType) {
-  switch (hazardType) {
-    case 'combustible_gas':
-      return "Don't use the lift, light switches, or open flames.";
-    case 'co':
-      return "Don't stay inside. Get to fresh air now.";
-    case 'particulate':
-      return "Stay low under smoke. Don't use the lift.";
-    case 'water_leak':
-      return "Don't touch electrical devices or switches near water.";
-    default:
-      return "Don't use the lift.";
-  }
-}
+import '../../l10n/app_localizations.dart';
+
+/// The "don't" line on the alarm screen in the app language, backed up by the
+/// signs from `hazardAdviceSigns()`.
+String hazardDont(AppLocalizations l10n, String hazardType) => switch (hazardType) {
+      'combustible_gas' => l10n.dontGas,
+      'co' => l10n.dontCo,
+      'particulate' => l10n.dontSmoke,
+      'water_leak' => l10n.dontWaterLeak,
+      _ => l10n.dontDefault,
+    };

@@ -31,21 +31,6 @@ class Incident {
         ...affectedZoneIds,
       };
 
-  String get hazardLabel {
-    switch (hazardType) {
-      case 'combustible_gas':
-        return 'Gas leak';
-      case 'co':
-        return 'Carbon monoxide';
-      case 'water_leak':
-        return 'Water leak';
-      case 'particulate':
-        return 'Smoke / particulates';
-      default:
-        return hazardType;
-    }
-  }
-
   factory Incident.fromJson(Map<String, dynamic> j) => Incident(
         id: j['id'] as String,
         buildingId: j['building_id'] as String,

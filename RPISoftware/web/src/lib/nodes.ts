@@ -1,14 +1,5 @@
 import type { AnalysisLevel, NodeOut } from "../api/types";
 
-export const LEVEL_LABEL: Record<string, string> = {
-  ok: "OK",
-  attention: "Attention",
-  danger: "Danger",
-  unknown: "Unknown",
-};
-
-export const KIND_LABEL: Record<string, string> = { air: "Air", water: "Water" };
-
 /** Value at a dotted path ("co.ppm") of a raw status document; undefined when absent. */
 export function pick(doc: unknown, path: string): unknown {
   let cur = doc;
@@ -55,13 +46,11 @@ export function stateLevel(state: unknown): AnalysisLevel {
   }
 }
 
-/** Connectivity pill of a node. */
-export function connectivity(node: NodeOut): { level: AnalysisLevel; label: string } {
-  if (!node.online) return { level: "attention", label: "offline" }; // connectivity, not a hazard
-  if (node.analysis?.stale) return { level: "attention", label: "stale" };
-  return { level: "ok", label: "online" };
-}
+export type Connectivity = "online" | "stale" | "offline";
 
-export function fmtNum(v: number): string {
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+/** Connectivity pill of a node (`state` is a token; label it with `conn.<state>`). */
+export function connectivity(node: NodeOut): { level: AnalysisLevel; state: Connectivity } {
+  if (!node.online) return { level: "attention", state: "offline" }; // connectivity, not a hazard
+  if (node.analysis?.stale) return { level: "attention", state: "stale" };
+  return { level: "ok", state: "online" };
 }

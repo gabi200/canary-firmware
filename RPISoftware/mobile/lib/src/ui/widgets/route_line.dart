@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../i18n.dart';
 import '../../models/evacuation.dart';
 import '../../theme.dart';
+import 'safety_sign.dart';
 
 /// Ordered, text-first evacuation directions with a visible route spine.
 class RouteLine extends StatelessWidget {
@@ -55,9 +57,11 @@ class _Stop extends StatelessWidget {
     final hint = waypoint.hint.trim();
     final dotColor = isLast ? HazardColors.routeLine
         : (isFirst ? HazardColors.start : HazardColors.routeLine);
+    final l10n = context.l10n;
+    // Waypoint label/hint are building data from the server: shown as sent.
     return Semantics(
       container: true,
-      label: 'Step ${index + 1} of $total: ${waypoint.label}.${hint.isEmpty ? '' : ' $hint'}',
+      label: '${l10n.routeStep(index + 1, total, waypoint.label)}${hint.isEmpty ? '' : ' $hint'}',
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20),
@@ -73,7 +77,7 @@ class _Stop extends StatelessWidget {
                     height: isFirst || isLast ? 22 : 16,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isFirst || isLast ? dotColor : HazardColors.surface,
+                      color: isFirst || isLast ? dotColor : context.palette.surface,
                       border: Border.all(color: dotColor, width: 3),
                     ),
                   ),
@@ -91,8 +95,8 @@ class _Stop extends StatelessWidget {
                           color: HazardColors.start,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Text('Start here',
-                            style: TextStyle(color: HazardColors.onHazard, fontSize: 14,
+                        child: Text(l10n.startHere,
+                            style: const TextStyle(color: HazardColors.onHazard, fontSize: 14,
                                 fontWeight: FontWeight.bold)),
                       ),
                     if (isFirst) const SizedBox(height: 6),
@@ -100,19 +104,19 @@ class _Stop extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (isLast) ...[
-                          const Icon(Icons.flag, color: HazardColors.routeLine, size: 24),
+                          const SafetySignImage(SafetySign.e007, size: 24, decorative: true),
                           const SizedBox(width: 6),
                         ],
                         Expanded(
                           child: Text(waypoint.label,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                                  color: HazardColors.text)),
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                                  color: context.palette.text)),
                         ),
                       ],
                     ),
                     if (hint.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(hint, style: const TextStyle(fontSize: 14, color: HazardColors.muted)),
+                      Text(hint, style: TextStyle(fontSize: 14, color: context.palette.muted)),
                     ],
                   ],
                 ),
@@ -131,23 +135,24 @@ class _AvoidRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(label: 'Avoid: $name', child: ExcludeSemantics(child: Padding(
+    final text = context.l10n.avoidZone(name);
+    return Semantics(label: text, child: ExcludeSemantics(child: Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CustomPaint(
             size: const Size(32, 52),
-            painter: _AvoidDashPainter(),
+            painter: _AvoidDashPainter(background: context.palette.surface),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Row(
               children: [
-                const Icon(Icons.block, color: HazardColors.alarm, size: 24),
+                const SafetySignImage(SafetySign.p001, size: 24, decorative: true),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text('Avoid: $name',
+                  child: Text(text,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
                           color: HazardColors.alarm)),
                 ),
@@ -161,9 +166,14 @@ class _AvoidRow extends StatelessWidget {
 }
 
 class _AvoidDashPainter extends CustomPainter {
+  _AvoidDashPainter({required this.background});
+
+  /// The screen behind the route, so the dashes cut the green spine.
+  final Color background;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final background = Paint()..color = HazardColors.surface;
+    final background = Paint()..color = this.background;
     final dash = Paint()
       ..color = HazardColors.alarm
       ..strokeWidth = 4;
@@ -174,5 +184,5 @@ class _AvoidDashPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_AvoidDashPainter old) => old.background != background;
 }

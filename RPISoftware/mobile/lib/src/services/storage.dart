@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth.dart';
 import '../models/check_in.dart';
 
-/// Local persistence: auth session, presence-consent flag, and the offline
-/// check-in queue. SharedPreferences keeps the MVP dependency-light; a later
+/// Local persistence: auth session, presence-consent flag, app language, and the
+/// offline check-in queue. SharedPreferences keeps the MVP dependency-light; a later
 /// phase swaps the queue for Hive/Isar as called out in ARCHITECTURE.md section D.
 class Storage {
   Storage(this._prefs);
@@ -15,6 +15,14 @@ class Storage {
   static const _kSession = 'session';
   static const _kConsent = 'presence_consent';
   static const _kQueue = 'pending_checkins';
+  static const _kLanguage = 'language';
+  static const _kCareHintDismissed = 'care_hint_dismissed';
+  static const _kHomeView = 'home_status_view';
+  static const _kSensorScope = 'sensor_scope';
+  static const _kIncidentLocation = 'incident_location';
+  static const _kThemeMode = 'theme_mode';
+  static const _kSectionsCollapsed = 'home_sections_collapsed';
+  static const _kRoomsExpanded = 'home_rooms_expanded';
 
   static Future<Storage> create() async => Storage(await SharedPreferences.getInstance());
 
@@ -37,6 +45,57 @@ class Storage {
   // --- consent ---
   bool get presenceConsent => _prefs.getBool(_kConsent) ?? false;
   Future<void> setPresenceConsent(bool v) => _prefs.setBool(_kConsent, v);
+
+  // --- language ('ro' | 'en'); null until the user picks one ---
+  String? get languageCode => _prefs.getString(_kLanguage);
+  Future<void> setLanguageCode(String code) => _prefs.setString(_kLanguage, code);
+
+  // --- home hint for emergency profiles. Only this flag is stored: care
+  // profiles themselves (health data) are never written to the device. ---
+  bool get careHintDismissed => _prefs.getBool(_kCareHintDismissed) ?? false;
+  Future<void> setCareHintDismissed() => _prefs.setBool(_kCareHintDismissed, true);
+
+  // --- "Starea locuinței" view: 'list' (default) | 'sketch' ---
+  String get homeStatusView => _prefs.getString(_kHomeView) ?? 'list';
+  Future<void> setHomeStatusView(String view) => _prefs.setString(_kHomeView, view);
+
+  // --- appearance: 'system' | 'light' | 'dark'; null until the user picks ---
+  String? get themeMode => _prefs.getString(_kThemeMode);
+  Future<void> setThemeMode(String mode) => _prefs.setString(_kThemeMode, mode);
+
+  // --- home list: collapsed sections and rooms opened inline (ids only) ---
+  List<String> get sectionsCollapsed => _prefs.getStringList(_kSectionsCollapsed) ?? const [];
+  Future<void> setSectionsCollapsed(List<String> ids) => _prefs.setStringList(_kSectionsCollapsed, ids);
+  List<String> get roomsExpanded => _prefs.getStringList(_kRoomsExpanded) ?? const [];
+  Future<void> setRoomsExpanded(List<String> ids) => _prefs.setStringList(_kRoomsExpanded, ids);
+
+  // --- apartment / room picked over the sensor lists: JSON with the building
+  // and unit / zone ids only ---
+  String? get sensorScope => _prefs.getString(_kSensorScope);
+  Future<void> setSensorScope(String json) => _prefs.setString(_kSensorScope, json);
+
+  // --- "Unde ești acum?" per account and incident: {"<user>/<incident>": home |
+  // building | outside}, the most recent ones only ---
+  static const _incidentLocationsKept = 20;
+
+  Map<String, String> _incidentLocations() {
+    try {
+      final j = jsonDecode(_prefs.getString(_kIncidentLocation) ?? '{}');
+      return j is Map ? {for (final e in j.entries) if (e.value is String) '${e.key}': e.value as String} : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  String? incidentLocation(String key) => _incidentLocations()[key];
+
+  Future<void> setIncidentLocation(String key, String location) {
+    final all = _incidentLocations()
+      ..remove(key)
+      ..[key] = location;
+    final kept = all.entries.skip(all.length > _incidentLocationsKept ? all.length - _incidentLocationsKept : 0);
+    return _prefs.setString(_kIncidentLocation, jsonEncode(Map.fromEntries(kept)));
+  }
 
   // --- offline check-in queue ---
   List<PendingCheckIn> pendingCheckIns() {

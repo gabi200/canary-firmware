@@ -107,6 +107,29 @@ services:
     environment: *sim-env
     command: ["--scenario", "normal"]
 
+  # Many rooms at once (simulator/rooms.demo.json: 14 rooms, 20 hw_sim nodes): creates the
+  # missing zones through the hub's admin API and moves every node into its room. Stop hw-sim
+  # first (same base topics). Interactive: type e.g. "bucatarie gaz", "toate normal", "list".
+  #   docker compose --profile sim run --rm building-sim                  (Ctrl-C stops)
+  #   docker compose --profile sim up -d building-sim && docker compose attach building-sim
+  #   docker compose --profile sim run --rm building-sim --config rooms.small.json --fast
+  building-sim:
+    build: ./simulator
+    profiles: ["sim"]
+    init: true
+    stdin_open: true
+    tty: true
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      backend:
+        condition: service_started   # building_sim.py waits for the API itself
+    environment:
+      <<: *sim-env
+      HUB_URL: http://backend:8000
+    entrypoint: ["python", "building_sim.py"]
+    command: ["--config", "rooms.demo.json"]
+
   # Legacy canary.telemetry.v1 simulator (sensors of the seeded demo building).
   #   docker compose --profile sim run --rm simulator --scenario gas_leak
   simulator:
@@ -119,6 +142,20 @@ services:
     environment: *sim-env
     entrypoint: ["python", "simulate.py"]
     command: ["--scenario", "gas_leak"]
+
+  # Test receiver for the escalation webhook (ARC / 112 partner): checks the HMAC signature
+  # and timestamp, logs each event. Point the backend at it with
+  # CANARY_ESCALATION_URL=http://arc-sim:8099/canary in .env (RUNME.md section 1.8):
+  #   docker compose --profile sim up -d arc-sim && docker compose logs -f arc-sim
+  arc-sim:
+    build: ./simulator
+    profiles: ["sim"]
+    init: true
+    environment:
+      CANARY_ESCALATION_SECRET: ${CANARY_ESCALATION_SECRET:-}
+    entrypoint: ["python", "arc_receiver.py"]
+    ports:
+      - "8099:8099"
 
 volumes:
   mosquitto_data:

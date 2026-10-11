@@ -15,14 +15,14 @@ from sqlalchemy import delete, select
 
 from app.config import settings
 from app.db import SessionLocal
-from app.models import NodeStatus, OccupancyEstimate, SensorReading, SignatureAssessmentRow
+from app.models import NodeStatus, OccupancyEstimate, SensorReading, SignatureAssessmentRow, TriangulationSnapshot
 
 log = logging.getLogger("canary.retention")
 
 PRUNE_INTERVAL_S = 3600
 # Rows per transaction: keeps each write lock short so live ingestion never waits long.
 PRUNE_BATCH = 2000
-_PRUNED = (NodeStatus, SensorReading, OccupancyEstimate, SignatureAssessmentRow)
+_PRUNED = (NodeStatus, SensorReading, OccupancyEstimate, SignatureAssessmentRow, TriangulationSnapshot)
 
 
 async def prune_old_rows(now: datetime | None = None) -> dict[str, int]:

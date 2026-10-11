@@ -1,6 +1,9 @@
 # Canary simulators: MQTT only, no hardware needed. Multi-arch base image.
 #   hw_sim.py    firmware-accurate ESP32 air + water nodes (default entrypoint)
+#   building_sim.py  many rooms of hw_sim nodes from rooms.demo.json / rooms.small.json
+#                (compose service "building-sim")
 #   simulate.py  legacy canary.telemetry.v1 sensors (compose service "simulator")
+#   arc_receiver.py  test receiver for the escalation webhook (compose service "arc-sim")
 # Broker settings come from MQTT_HOST / MQTT_PORT / MQTT_USERNAME / MQTT_PASSWORD
 # (set by docker-compose.yml), so `run --rm hw-sim --scenario co` needs no flags.
 FROM python:3.12-slim
@@ -13,7 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /sim
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-COPY hw_sim.py simulate.py ./
+COPY hw_sim.py building_sim.py rooms.demo.json rooms.small.json simulate.py arc_receiver.py ./
 
 USER nobody
 ENTRYPOINT ["python", "hw_sim.py"]

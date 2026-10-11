@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import type { WsEvent } from "../api/types";
 import { config } from "../config";
+import { applyCommandEvent } from "../lib/commands";
 
 /** Runs `fn` at most once per `ms`; a call inside the window schedules one trailing run
  *  so the latest event is never dropped. */
@@ -30,7 +31,8 @@ function throttle(fn: () => void, ms: number) {
  *
  * `node` events (a hardware status/availability message was processed) refresh only the
  * sensor queries: summary + nodes (bursts coalesced) and the reporting nodes' raw history
- * (at most every 10 s).
+ * (at most every 10 s). `command_result` events (a device answered a hardware-test command)
+ * settle the live command store (lib/commands.ts).
  */
 export function useIncidentSocket(buildingId: string, token: string | null) {
   const qc = useQueryClient();
@@ -47,10 +49,16 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
       qc.invalidateQueries({ queryKey: ["summary"] });
       qc.invalidateQueries({ queryKey: ["nodes"] });
     }, 2_000);
-    // only the nodes that reported since the last history refresh
+    // only the nodes that reported since the last history refresh, and only short windows
+    // (≤ 6 h, aggregated slots ≤ 1 min): longer ones poll on their own slower interval
     const historyDue = new Set<string>();
     const refreshHistory = throttle(() => {
-      for (const id of historyDue) qc.invalidateQueries({ queryKey: ["history", id] });
+      for (const id of historyDue) {
+        qc.invalidateQueries({
+          queryKey: ["history", id],
+          predicate: (q) => typeof q.queryKey[2] !== "number" || q.queryKey[2] <= 360,
+        });
+      }
       historyDue.clear();
     }, 10_000);
 
@@ -87,6 +95,23 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
             }
             return;
           }
+          if (data.type === "command_result") {
+            // a device answered a command (hardware test): settle its live status chip
+            applyCommandEvent(data, qc);
+            return;
+          }
+          if (data.type === "care_checkin") {
+            // a priority person checked in: refresh who is still waiting (no health data here)
+            setLastEvent(data);
+            qc.invalidateQueries({ queryKey: ["roster"] });
+            qc.invalidateQueries({ queryKey: ["accounting"] });
+            return;
+          }
+          if (data.type === "location") {
+            // a resident answered "Where are you now?": shown in the roster
+            qc.invalidateQueries({ queryKey: ["roster"] });
+            return;
+          }
           if (data.type !== "incident" && data.type !== "checkin") return; // unknown event type
           setLastEvent(data);
           qc.invalidateQueries({ queryKey: ["incidents"] });
@@ -96,6 +121,8 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
           if (data.type === "incident") {
             qc.invalidateQueries({ queryKey: ["events"] });
             qc.invalidateQueries({ queryKey: ["triangulation"] });
+            qc.invalidateQueries({ queryKey: ["triangulationHistory"] });
+            qc.invalidateQueries({ queryKey: ["escalations"] });
             refreshNodes(); // building status/headline are derived from open incidents
           }
         } catch {

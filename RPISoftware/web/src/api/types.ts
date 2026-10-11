@@ -19,6 +19,12 @@ export interface Zone {
   unit_id: string;
   label: string;
   kind: string;
+  /** Position in the building (metres, arbitrary origin): the coordinates triangulation uses. */
+  pos_x?: number | null;
+  pos_y?: number | null;
+  /** Building labels of the zone's unit and floor ("Ap. 12", "Etaj 3"), when the backend sends them. */
+  unit_label?: string | null;
+  floor_label?: string | null;
 }
 
 export interface Device {
@@ -94,6 +100,26 @@ export interface Triangulation {
   contributors: TriangulationContributor[];
 }
 
+/** One stored triangulation estimate (GET /incidents/{id}/triangulation/history). */
+export interface TriangulationSnapshot extends Omit<Triangulation, "incident_id"> {
+  ts: string;
+}
+
+export interface TriangulationHistory {
+  incident_id: string;
+  snapshots: TriangulationSnapshot[];
+}
+
+/** Delivery of an incident to an external dispatcher (GET /incidents/{id}/escalations). */
+export interface Escalation {
+  event_id: string;
+  state: string;
+  attempts: number;
+  last_status: string | null;
+  delivered: boolean;
+  ts: string;
+}
+
 export interface IncidentEvent {
   id: string;
   incident_id: string;
@@ -116,6 +142,8 @@ export interface Accounting {
   unaccounted: number;
   needs_help: number;
   zones_with_people: ZoneOccupancy[];
+  /** Care-profile people not yet confirmed safe (absent on older backends). */
+  priority_awaiting?: number;
 }
 
 export interface Occupancy {
@@ -136,6 +164,8 @@ export interface RosterEntry extends Resident {
   status: string; // safe_outside | safe_inside | needs_help | no_response | unknown
   source: string | null;
   ts: string | null;
+  /** the resident's answer to "Where are you now?" (home | building | outside); absent: not answered */
+  location?: string | null;
 }
 
 export interface Roster {
@@ -145,6 +175,40 @@ export interface Roster {
   needs_help: number;
   awaiting: number;
   entries: RosterEntry[];
+  /** Care profiles, most urgent first. Health data (GDPR art. 9): the backend returns it only
+   *  while the incident is active and audits every read; empty otherwise. Optional so an
+   *  older backend without care profiles still works. */
+  priority?: PriorityPerson[];
+  /** Priority people not yet confirmed safe. */
+  priority_awaiting?: number;
+}
+
+/** Special-needs codes a resident can register (unknown future codes render as text). */
+export type CareNeed =
+  | "reduced_mobility"
+  | "wheelchair"
+  | "bedridden"
+  | "hearing_impaired"
+  | "visually_impaired"
+  | "medical_device"
+  | "young_child"
+  | "pet";
+
+export type PriorityStatus = "needs_help" | "no_response" | "unknown" | "safe_inside" | "safe_outside";
+
+/** A person who may not be able to evacuate alone (care profile), with their live status. */
+export interface PriorityPerson {
+  care_profile_id: string;
+  display_name: string;
+  unit_id: string | null;
+  unit_label: string | null;
+  floor_label: string | null;
+  needs: (CareNeed | string)[];
+  note: string | null;
+  status: PriorityStatus;
+  status_ts: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
 }
 
 export interface AssemblyPoint {
@@ -155,6 +219,13 @@ export interface AssemblyPoint {
   lon: number | null;
 }
 
+export interface Waypoint {
+  id: string;
+  label: string;
+  kind: string;
+  hint: string;
+}
+
 export interface EvacuationRoute {
   id: string;
   building_id: string;
@@ -162,7 +233,9 @@ export interface EvacuationRoute {
   from_zone_id: string | null;
   to_assembly_point_id: string;
   label: string;
+  /** Ordered waypoint ids (zones, stairwells, exits, the assembly point). */
   path: string[];
+  waypoints?: Waypoint[];
 }
 
 export interface Evacuation {
@@ -173,7 +246,8 @@ export interface Evacuation {
 
 export type IncidentAction = "dismiss" | "order-evacuation" | "resolve";
 
-/** WebSocket event envelope ("incident", "checkin" or "node"; other types are ignored). */
+/** WebSocket event envelope ("incident", "checkin", "care_checkin" or "node"; other types are
+ *  ignored). "care_checkin" carries no health data, only ids + status. */
 export interface WsEvent {
   type: string;
   incident_id?: string;
@@ -186,9 +260,15 @@ export interface WsEvent {
   triangulation_confidence?: number | null;
   title?: string;
   body?: string;
-  /** checkin: the check-in status; node: the node's analysis status. */
+  /** checkin: the check-in status; node: the node's analysis status; command_result:
+   *  accepted | rejected | timeout. */
   status?: string;
   node_id?: string;
+  /** command_result: the command it answers, and the firmware's state / error token. */
+  command_id?: string;
+  command?: string;
+  detail?: string | null;
+  care_profile_id?: string;
   kind?: string;
   zone_id?: string;
   online?: boolean;
@@ -227,11 +307,16 @@ export interface NodeAnalysis {
   headline: string;
   advice: string[];
   indicators: Indicator[];
+  /** summary nodes: newest command sent to the node (hardware test), null when none */
+  last_command?: CommandRecord | null;
 }
 
 export interface ZoneSummary {
   zone_id: string;
   zone_label: string;
+  /** the zone's apartment, on newer hubs (the scope bar maps zones through /zones instead) */
+  unit_id?: string | null;
+  unit_label?: string | null;
   status: AnalysisStatus;
   /** null when the zone has no air node (no presence radar). */
   occupied: boolean | null;
@@ -349,6 +434,10 @@ export interface NodeOut {
   /** Latest raw status document, or null before the first one. */
   status: NodeStatusDoc | null;
   analysis: NodeAnalysis;
+  /** Newest command sent to the node (hardware test), null when none; absent on older backends. */
+  last_command?: CommandRecord | null;
+  /** Registered itself and not placed in a room yet (technician's "new sensors"). */
+  is_new?: boolean;
 }
 
 /** PATCH /nodes/{id} body. */
@@ -365,3 +454,122 @@ export interface NodeHistory {
   fields: string[];
   points: { ts: string; values: Record<string, number | string | null> }[];
 }
+
+// --------------------------------------------------------------------------- //
+// Device commands (hardware test): POST/GET /nodes/{id}/commands
+// --------------------------------------------------------------------------- //
+
+/** Air: TEST (4 s self-test, buzzer + LED), SILENCE. Water: OPEN / CLOSE the valve, SILENCE. */
+export type NodeCommandName = "TEST" | "SILENCE" | "OPEN" | "CLOSE";
+
+/** `timeout`: no answer from the device within 15 s (the backend computes it on read). */
+export type CommandStatus = "sent" | "accepted" | "rejected" | "timeout";
+
+/** 202 answer of POST /nodes/{id}/commands. */
+export interface CommandAck {
+  command_id: string;
+  node_id: string;
+  command: NodeCommandName;
+  status: "sent";
+  sent_ts: string;
+}
+
+/** One command of GET /nodes/{id}/commands (newest first) and NodeOut.last_command. */
+export interface CommandRecord {
+  command_id: string;
+  command: NodeCommandName | string;
+  status: CommandStatus | string;
+  /** firmware token: `state` when accepted (self_test, silenced, open, closed), `error` when not */
+  detail: string | null;
+  requested_by_name: string | null;
+  sent_ts: string;
+  result_ts: string | null;
+}
+
+// --------------------------------------------------------------------------- //
+// Administration (/admin/...): accounts, floors, apartments, rooms
+// --------------------------------------------------------------------------- //
+
+export interface AdminUnitRef {
+  unit_id: string;
+  unit_label: string;
+}
+
+export interface AdminUser {
+  user_id: string;
+  username: string;
+  display_name: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  active: boolean;
+  units: AdminUnitRef[];
+}
+
+export interface AdminUserCreate {
+  username: string;
+  display_name: string;
+  role: string;
+  phone?: string;
+  email?: string;
+  unit_ids?: string[];
+}
+
+export type AdminUserPatch = Partial<{
+  display_name: string;
+  role: string;
+  phone: string;
+  email: string;
+  unit_ids: string[];
+  active: boolean;
+}>;
+
+export interface AdminFloor {
+  floor_id: string;
+  label: string;
+  level: number;
+}
+
+export type UnitKind = "residential" | "common";
+
+export interface AdminUnit {
+  unit_id: string;
+  label: string;
+  floor_id: string;
+  floor_label: string;
+  kind: UnitKind | string;
+  /** number of residents linked to the unit (a list on some backends) */
+  residents: number | unknown[];
+}
+
+export interface AdminZoneNode {
+  node_id: string;
+  name: string;
+  kind: NodeKind;
+  online: boolean;
+  status: AnalysisStatus | string;
+}
+
+export interface AdminZone {
+  zone_id: string;
+  label: string;
+  kind: string;
+  unit_id: string;
+  unit_label: string | null;
+  floor_id: string;
+  floor_label: string | null;
+  /** metres, arbitrary origin (the coordinates triangulation uses) */
+  pos_x: number | null;
+  pos_y: number | null;
+  nodes: AdminZoneNode[];
+}
+
+export interface AdminZoneCreate {
+  label: string;
+  kind: string;
+  unit_id: string;
+  pos_x: number;
+  pos_y: number;
+}
+
+export type AdminZonePatch = Partial<AdminZoneCreate>;

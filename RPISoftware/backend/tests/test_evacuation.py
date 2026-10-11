@@ -47,7 +47,7 @@ async def test_evacuation_resolves_mixed_waypoints_to_human_readable_values(clie
     route = resp.json()["routes"][0]
     assert route["path"] == ["zone_hallway", "stairwell_main", "exit_front", "ap_main", "exit_rear"]
     assert route["waypoints"] == [
-        {"id": "zone_hallway", "label": "Hol", "kind": "hallway", "hint": ""},
+        {"id": "zone_hallway", "label": "Hol scară", "kind": "hallway", "hint": ""},
         {
             "id": "stairwell_main",
             "label": "Scara principala",
@@ -73,7 +73,7 @@ async def test_evacuation_skips_dict_waypoint_without_string_id(client):
     assert resp.status_code == 200, resp.text
     route = resp.json()["routes"][0]
     assert route["path"] == ["zone_hallway"]
-    assert route["waypoints"] == [{"id": "zone_hallway", "label": "Hol", "kind": "hallway", "hint": ""}]
+    assert route["waypoints"] == [{"id": "zone_hallway", "label": "Hol scară", "kind": "hallway", "hint": ""}]
 
 
 async def test_evacuation_skips_non_string_non_dict_waypoint(client):

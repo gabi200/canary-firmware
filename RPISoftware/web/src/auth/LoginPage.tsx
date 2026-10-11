@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 
 import { config } from "../config";
 import { Card } from "../components/Card";
+import { LangToggle } from "../components/LangToggle";
+import { useT } from "../i18n";
 import { useAuth } from "./AuthContext";
 
 export function LoginPage() {
   const { login } = useAuth();
+  const { t } = useT();
   const navigate = useNavigate();
   const [username, setUsername] = useState("mihai");
   const [buildingId, setBuildingId] = useState(config.defaultBuildingId);
@@ -31,23 +34,26 @@ export function LoginPage() {
     <div className="login">
       <Card>
         <div className="box">
-          <div className="brand" style={{ fontSize: 26, marginBottom: 4 }}>
-            Canary<span className="dot">.</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+            <div className="brand" style={{ fontSize: 26 }}>
+              Canary<span className="dot">.</span>
+            </div>
+            <LangToggle />
           </div>
           <div className="muted small" style={{ marginBottom: 20 }}>
-            Operations console — managers &amp; emergency services
+            {t("login.tagline")}
           </div>
           <form onSubmit={submit}>
             <div className="field">
-              <label>Username</label>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} />
+              <label htmlFor="login-username">{t("login.username")}</label>
+              <input id="login-username" value={username} onChange={(e) => setUsername(e.target.value)} />
             </div>
             <div className="field">
-              <label>Building ID</label>
-              <input value={buildingId} onChange={(e) => setBuildingId(e.target.value)} />
+              <label htmlFor="login-building">{t("login.buildingId")}</label>
+              <input id="login-building" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} />
             </div>
-            <div className="btn-row" style={{ marginBottom: 12 }}>
-              {["mihai", "dispecer", "admin"].map((u) => (
+            <div className="btn-row" style={{ marginBottom: 12 }} role="group" aria-label={t("login.demoAccounts")}>
+              {["mihai", "dispecer", "tehnician", "admin"].map((u) => (
                 <button type="button" key={u} className="btn" onClick={() => setUsername(u)}>
                   {u}
                 </button>
@@ -55,11 +61,13 @@ export function LoginPage() {
             </div>
             {err && <div className="err">{err}</div>}
             <button type="submit" className="btn primary" style={{ width: "100%" }} disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
+              {busy ? t("login.signingIn") : t("login.signIn")}
             </button>
           </form>
           <div className="muted small" style={{ marginTop: 12 }}>
-            Server: {config.apiBase || `${window.location.origin} (same origin)`}
+            {t("login.server", {
+              url: config.apiBase || t("login.sameOrigin", { origin: window.location.origin }),
+            })}
           </div>
         </div>
       </Card>

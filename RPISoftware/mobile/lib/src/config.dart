@@ -26,6 +26,11 @@ class Config {
     defaultValue: false,
   );
 
+  /// QA / screenshot aid: a screen to open right after start (residents), e.g.
+  /// `--dart-define=CANARY_START_ROUTE=care-health` opens the care form for
+  /// "Pentru mine" and starts the Apple Health import. Empty (off) by default.
+  static const String startRoute = String.fromEnvironment('CANARY_START_ROUTE');
+
   /// States that put the app into the full-screen emergency experience.
   static const Set<String> alarmingStates = {'alarm', 'escalation', 'evacuation'};
 }

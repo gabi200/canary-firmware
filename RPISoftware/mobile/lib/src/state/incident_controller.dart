@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'dart:ui' show Locale;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
+import '../i18n.dart';
 import '../models/auth.dart';
 import '../models/check_in.dart';
 import '../models/incident.dart';
@@ -50,14 +53,19 @@ class IncidentsState {
 /// notification when the building enters an alarming state, and manages the
 /// offline check-in queue (flushed when the socket reconnects).
 class IncidentController extends StateNotifier<IncidentsState> {
-  IncidentController(this._api, this._storage, this._session)
-      : super(IncidentsState(pending: _storage.pendingCheckIns().length)) {
+  IncidentController(this._api, this._storage, this._session,
+      {AppLocalizations Function()? localizations})
+      : _l10n = localizations ?? (() => lookupAppLocalizations(const Locale('en'))),
+        super(IncidentsState(pending: _storage.pendingCheckIns().length)) {
     if (_session != null) _init();
   }
 
   final ApiClient _api;
   final Storage _storage;
   final AuthSession? _session;
+
+  /// Strings in the current app language, read when a notification is raised.
+  final AppLocalizations Function() _l10n;
   WsClient? _ws;
   final Set<String> _alarmed = {};
   final _live = StreamController<Map<String, dynamic>>.broadcast();
@@ -68,6 +76,9 @@ class IncidentController extends StateNotifier<IncidentsState> {
 
   Future<void> _init() async {
     await refresh();
+    // A 401 just now signed out and disposed this controller: no socket for the
+    // old token (it would retry the rejected token for as long as the app runs).
+    if (!mounted) return;
     _connectWs();
   }
 
@@ -87,11 +98,13 @@ class IncidentController extends StateNotifier<IncidentsState> {
     if (session == null) return;
     final ws = WsClient(buildingId: session.buildingId, token: session.token);
     _ws = ws;
-    ws.events.listen(_onEvent, onDone: () => _setConnected(false));
+    ws.events.listen(_onEvent);
+    ws.connection.listen((up) {
+      _setConnected(up);
+      // socket up -> try to drain any queued check-ins
+      if (up) flushQueue();
+    });
     ws.connect();
-    _setConnected(true);
-    // socket up -> try to drain any queued check-ins
-    flushQueue();
   }
 
   // The socket's onDone fires after dispose (logout); don't touch state then.
@@ -105,8 +118,9 @@ class IncidentController extends StateNotifier<IncidentsState> {
     final type = ev['type'];
     // Sensor analysis update (HARDWARE.md §5): never an incident, and no eventSeq
     // bump — these arrive on every sensor heartbeat and would make manager
-    // dashboards refetch accounting/roster continuously.
-    if (type == 'node') return;
+    // dashboards refetch accounting/roster continuously. Same for a device's
+    // answer to a test command (`command_result`, followed by the test views).
+    if (type == 'node' || type == 'command_result') return;
     // Any live frame advances eventSeq so manager dashboards refetch accounting/roster.
     state = state.copyWith(eventSeq: state.eventSeq + 1);
     if (type != 'incident') {
@@ -119,9 +133,12 @@ class IncidentController extends StateNotifier<IncidentsState> {
 
     if (incident.isAlarming && !_alarmed.contains(incident.id + incident.state)) {
       _alarmed.add(incident.id + incident.state);
+      // Text is built locally in the app language: the frame's title/body are
+      // English and shared by every client of the building.
+      final alert = _l10n().incidentAlert(incident);
       Notifications.instance.showAlarm(
-        (ev['title'] as String?) ?? '${incident.hazardLabel} alert',
-        (ev['body'] as String?) ?? 'Open Canary for guidance.',
+        alert.title,
+        alert.body,
         critical: incident.severity == 'critical' || incident.isEvacuation,
       );
     }
@@ -185,7 +202,6 @@ class IncidentController extends StateNotifier<IncidentsState> {
 /// Convenience flags for the UI.
 extension IncidentStateX on IncidentsState {
   bool get isNormal => activeAlarm == null;
-  String get buildingStatusLabel => activeAlarm == null ? 'All clear' : activeAlarm!.state;
 }
 
 /// Alarming-states reference re-exported for the UI layer.

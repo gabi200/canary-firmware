@@ -1,0 +1,2 @@
+/* Permisiunea de citire din Sănătate (aplicația nu scrie niciodată în Sănătate). */
+"NSHealthShareUsageDescription" = "Canary citește doar dacă folosești scaun cu rotile, stabilitatea mersului și audiograma, ca să-ți propună nevoile pentru profilul de urgență. Nu salvează nimic fără acordul tău.";

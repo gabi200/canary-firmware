@@ -53,15 +53,107 @@ class HazardColors {
   }
 }
 
-ThemeData buildTheme() {
+/// Neutral colours that change with light / dark mode, plus [ink] for status
+/// colours drawn as text or icons on the app's surfaces. Hazard fills (red /
+/// amber / green banners with white text) stay the same in both modes.
+@immutable
+class CanaryPalette extends ThemeExtension<CanaryPalette> {
+  const CanaryPalette({
+    required this.dark,
+    required this.surface,
+    required this.text,
+    required this.muted,
+    required this.faint,
+    required this.divider,
+    required this.tile,
+    required this.tileBorder,
+    required this.chip,
+  });
+
+  static const light = CanaryPalette(
+    dark: false,
+    surface: Colors.white,
+    text: HazardColors.text,
+    muted: Colors.black54,
+    faint: Colors.black38,
+    divider: HazardColors.divider,
+    tile: Color(0xFFF5F6F8),
+    tileBorder: Color(0xFFE3E5E8),
+    chip: Color(0xFFE8EAED),
+  );
+
+  static const darkPalette = CanaryPalette(
+    dark: true,
+    surface: Color(0xFF1C1F24),
+    text: Color(0xFFE8EAED),
+    muted: Color(0xFFB4B9C0),
+    faint: Color(0xFF8A9099),
+    divider: Color(0xFF3C4148),
+    tile: Color(0xFF262A30),
+    tileBorder: Color(0xFF3A3F47),
+    chip: Color(0xFF3A3F47),
+  );
+
+  final bool dark;
+
+  /// Cards, sheets and the alarm screen's body.
+  final Color surface;
+  final Color text;
+
+  /// Secondary text (was black54).
+  final Color muted;
+
+  /// Hints, chevrons, disabled (was black38).
+  final Color faint;
+  final Color divider;
+
+  /// Reading tiles and empty-state boxes.
+  final Color tile;
+  final Color tileBorder;
+
+  /// Small count badges.
+  final Color chip;
+
+  /// A status colour as text or an icon on [surface]: as is in light mode,
+  /// lighter in dark mode so green / amber / red stay readable.
+  Color ink(Color status) => dark ? Color.lerp(status, Colors.white, 0.45)! : status;
+
+  /// [status] washed over [surface], for tinted cards and tiles.
+  Color tint(Color status, [int alpha = 30]) =>
+      Color.alphaBlend(status.withAlpha(dark ? alpha + 24 : alpha), surface);
+
+  @override
+  CanaryPalette copyWith() => this;
+
+  @override
+  CanaryPalette lerp(CanaryPalette? other, double t) => other == null || t < 0.5 ? this : other;
+}
+
+extension CanaryPaletteX on BuildContext {
+  /// The palette of the active theme (light when a test pumps no theme).
+  CanaryPalette get palette => Theme.of(this).extension<CanaryPalette>() ?? CanaryPalette.light;
+}
+
+ThemeData buildTheme({Brightness brightness = Brightness.light}) {
+  final dark = brightness == Brightness.dark;
+  final palette = dark ? CanaryPalette.darkPalette : CanaryPalette.light;
   final scheme = ColorScheme.fromSeed(
     seedColor: const Color(0xFF1565C0),
-    brightness: Brightness.light,
+    brightness: brightness,
   );
   return ThemeData(
     useMaterial3: true,
-    colorScheme: scheme,
+    colorScheme: dark ? scheme.copyWith(surface: const Color(0xFF121418)) : scheme,
     appBarTheme: const AppBarTheme(centerTitle: true),
+    cardTheme: dark ? CardThemeData(color: palette.surface) : null,
+    dividerColor: palette.divider,
+    // White text reads on the app's green / red snackbars in both modes; the
+    // plain ones are dark grey in dark mode (not the light inverse surface).
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: dark ? const Color(0xFF3A3F47) : null,
+      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+    ),
+    extensions: [palette],
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(56),

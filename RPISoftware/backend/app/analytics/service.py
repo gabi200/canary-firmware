@@ -14,7 +14,7 @@ from app.analytics.signature.rules import SignatureAssessment, assess
 from app.analytics.triangulation import SensorPoint, TriangulationResult, triangulate
 from app.detection.thresholds import thresholds_for
 from app.enums import NodeKind, SensorType
-from app.models import Incident, Node, NodeStatus, SensorReading, SignatureAssessmentRow, Zone
+from app.models import Incident, Node, NodeStatus, SensorReading, SignatureAssessmentRow, TriangulationSnapshot, Zone
 
 log = logging.getLogger("canary.signature")
 
@@ -118,7 +118,30 @@ class AnalyticsService:
                 for c in result.contributors
             ],
         }
+        await self._snapshot(incident.id, result, incident.triangulation_detail["contributors"])
         return result
+
+    async def _snapshot(self, incident_id: str, result: TriangulationResult, contributors: list[dict]) -> None:
+        """Keep the estimate in the incident's triangulation history unless it repeats the last one."""
+        fields = {
+            "source_zone_id": result.source_zone_id,
+            "source_x": result.source_x,
+            "source_y": result.source_y,
+            "confidence": result.confidence,
+            "method": result.method,
+            "n_contributors": result.n_contributors,
+            "airflow_applied": result.airflow_applied,
+            "contributors": contributors,
+        }
+        last = await self.session.scalar(
+            select(TriangulationSnapshot)
+            .where(TriangulationSnapshot.incident_id == incident_id)
+            .order_by(TriangulationSnapshot.ts.desc(), TriangulationSnapshot.id.desc())
+            .limit(1)
+        )
+        if last is not None and all(getattr(last, k) == v for k, v in fields.items()):
+            return
+        self.session.add(TriangulationSnapshot(incident_id=incident_id, **fields))
 
     async def classify_signature(self, node_id: str, incident_id: str) -> SignatureAssessment | None:
         """Label an air node's recent window and store the assessment (with the shadow

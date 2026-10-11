@@ -11,6 +11,7 @@ os.environ["CANARY_MQTT_ENABLED"] = "false"
 os.environ["CANARY_AUTO_CREATE_SCHEMA"] = "false"
 os.environ["CANARY_AUTO_SEED"] = "false"
 os.environ["CANARY_JWT_SECRET"] = "test-secret"
+os.environ["CANARY_CARE_KEY"] = "dGVzdC1vbmx5LWNhcmUta2V5LTMyLWJ5dGVzLWxvbmc="  # Fernet test key
 
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402

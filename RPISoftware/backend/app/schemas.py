@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, field_validator, model_validator
 
 from app.enums import (
+    CareNeed,
     CheckInSource,
     CheckInStatus,
     EdgeState,
     SensorType,
     Severity,
+    Whereabouts,
 )
 
 
@@ -84,6 +87,214 @@ class TokenRequest(BaseModel):
     username: str
 
 
+# --------------------------------------------------------------------------- #
+# Self-service account (/me)
+# --------------------------------------------------------------------------- #
+_PHONE_SEPARATORS = re.compile(r"[\s.\-()/]")
+_E164 = re.compile(r"\+[1-9]\d{7,14}")
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]+")
+PHONE_HINT = "phone must be a Romanian number (0722 123 456) or international E.164 (+40722123456); \"\" clears it"
+
+
+def normalize_phone(raw: str) -> str:
+    """E.164 from a Romanian (0722 123 456, 0040 722 123 456) or international (+40722123456)
+    number; "" stays "" (clears). ValueError for anything else."""
+    phone = _PHONE_SEPARATORS.sub("", raw.strip())
+    if not phone:
+        return ""
+    if re.fullmatch(r"0[1-9]\d{8}", phone):  # national: 0 + 9 digits
+        phone = "+40" + phone[1:]
+    elif phone.startswith("00"):  # international prefix
+        phone = "+" + phone[2:]
+    if not _E164.fullmatch(phone) or (phone.startswith("+40") and len(phone) != 12):
+        raise ValueError(PHONE_HINT)
+    return phone
+
+
+class MeUnitOut(BaseModel):
+    unit_id: str
+    unit_label: str
+    building_id: str
+    floor_label: str | None
+    kind: str  # residential | common
+
+
+class MeOut(BaseModel):
+    user_id: str
+    username: str
+    display_name: str
+    role: str
+    phone: str  # E.164, or "" when unset
+    email: str
+    language: str  # ro | en (notifications); "ro" until chosen
+    units: list[MeUnitOut]  # from resident_units; empty for staff
+
+
+class MeUpdate(BaseModel):
+    """Any of the editable fields; username, role and anything else are refused (422)."""
+
+    model_config = ConfigDict(extra="forbid")
+    display_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)] | None = None
+    phone: str | None = None
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=254)] | None = None
+    language: Literal["ro", "en"] | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str | None) -> str | None:
+        return None if value is None else normalize_phone(value)
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str | None) -> str | None:
+        if value and not _EMAIL.fullmatch(value):
+            raise ValueError("email must look like name@example.com; \"\" clears it")
+        return value
+
+    @model_validator(mode="after")
+    def _no_nulls(self) -> "MeUpdate":
+        for name in self.model_fields_set:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null; use \"\" to clear phone or email")
+        return self
+
+
+# --------------------------------------------------------------------------- #
+# Admin API (docs/HARDWARE.md section 4)
+# --------------------------------------------------------------------------- #
+USERNAME = r"^[a-z0-9._-]{3,32}$"
+DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+def _email_or_blank(value: str | None) -> str | None:
+    if value and not _EMAIL.fullmatch(value):
+        raise ValueError("email must look like name@example.com; \"\" clears it")
+    return value
+
+
+class AdminUnitRef(BaseModel):
+    unit_id: str
+    unit_label: str
+
+
+class AdminUserOut(BaseModel):
+    user_id: str
+    username: str
+    display_name: str
+    role: str
+    phone: str
+    email: str
+    active: bool
+    units: list[AdminUnitRef]
+
+
+class AdminUserIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: Annotated[str, StringConstraints(pattern=USERNAME)]
+    display_name: DisplayName
+    role: Literal["resident", "hoa_manager", "dispatcher_external", "technician", "system_admin"]
+    phone: str = ""
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=254)] = ""
+    unit_ids: list[str] = Field(default_factory=list, max_length=20)
+
+    _phone = field_validator("phone")(classmethod(lambda cls, v: normalize_phone(v)))
+    _email = field_validator("email")(classmethod(lambda cls, v: _email_or_blank(v)))
+
+
+class AdminUserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    display_name: DisplayName | None = None
+    role: Literal["resident", "hoa_manager", "dispatcher_external", "technician", "system_admin"] | None = None
+    phone: str | None = None
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=254)] | None = None
+    unit_ids: list[str] | None = Field(default=None, max_length=20)
+    active: StrictBool | None = None
+
+    _phone = field_validator("phone")(classmethod(lambda cls, v: None if v is None else normalize_phone(v)))
+    _email = field_validator("email")(classmethod(lambda cls, v: _email_or_blank(v)))
+
+    @model_validator(mode="after")
+    def _no_nulls(self) -> "AdminUserUpdate":
+        for name in self.model_fields_set:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
+
+class FloorOut(BaseModel):
+    floor_id: str
+    label: str
+    level: int
+
+
+class FloorIn(BaseModel):
+    label: Label
+    level: int = Field(ge=-10, le=200)
+
+
+class AdminUnitOut(BaseModel):
+    unit_id: str
+    label: str
+    floor_id: str
+    floor_label: str | None
+    kind: str  # residential | common
+    residents: int
+
+
+class UnitIn(BaseModel):
+    label: Label
+    floor_id: str
+    kind: Literal["residential", "common"]
+
+
+class UnitUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: Label | None = None
+    kind: Literal["residential", "common"] | None = None
+
+
+class ZoneNodeOut(BaseModel):
+    node_id: str
+    name: str
+    kind: str
+    online: bool
+    status: str  # analysis status: ok | attention | danger
+
+
+class AdminZoneOut(BaseModel):
+    zone_id: str
+    label: str
+    kind: str
+    unit_id: str
+    unit_label: str | None
+    floor_id: str
+    floor_label: str | None
+    pos_x: float
+    pos_y: float
+    nodes: list[ZoneNodeOut]
+
+
+ZoneKindName = Literal["kitchen", "living_room", "bedroom", "bathroom", "hallway", "stairwell", "boiler", "other"]
+
+
+class ZoneIn(BaseModel):
+    label: Label
+    kind: ZoneKindName
+    unit_id: str
+    pos_x: float = Field(default=0.0, ge=-1000, le=1000)
+    pos_y: float = Field(default=0.0, ge=-1000, le=1000)
+
+
+class ZoneUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: Label | None = None
+    kind: ZoneKindName | None = None
+    unit_id: str | None = None
+    pos_x: float | None = Field(default=None, ge=-1000, le=1000)
+    pos_y: float | None = Field(default=None, ge=-1000, le=1000)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -150,6 +361,16 @@ class CheckInRequest(BaseModel):
     source: CheckInSource = CheckInSource.cloud
 
 
+class LocationIn(BaseModel):
+    location: Whereabouts
+
+
+class LocationOut(BaseModel):
+    incident_id: str
+    location: str
+    ts: datetime
+
+
 class CheckInOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -173,6 +394,7 @@ class AccountingOut(BaseModel):
     unaccounted: int
     needs_help: int
     zones_with_people: list[ZoneOccupancy]
+    priority_awaiting: int = 0  # care-profile people not confirmed safe (open incidents only)
 
 
 class ResidentOut(BaseModel):
@@ -191,6 +413,135 @@ class RosterEntry(ResidentOut):
     status: str  # safe_outside | safe_inside | needs_help | no_response | unknown
     source: str | None = None
     ts: datetime | None = None
+    location: str | None = None  # home | building | outside, as the resident answered
+
+
+# --------------------------------------------------------------------------- #
+# Care profiles (special needs; GDPR art. 9 health data, docs/HARDWARE.md section 4)
+# --------------------------------------------------------------------------- #
+class CareProfileIn(BaseModel):
+    unit_id: str
+    display_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+    is_self: bool
+    needs: list[CareNeed] = Field(default_factory=list, max_length=16)
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=280)] | None = None
+    consent: StrictBool
+
+    @field_validator("consent")
+    @classmethod
+    def _explicit_consent(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("explicit consent (true) is required to store care needs")
+        return value
+
+    @model_validator(mode="after")
+    def _needs_or_note(self) -> "CareProfileIn":
+        self.needs = list(dict.fromkeys(self.needs))
+        self.note = self.note or None
+        if not self.needs and not self.note:
+            raise ValueError("give at least one need or a note")
+        return self
+
+
+# --------------------------------------------------------------------------- #
+# Household invites (docs/HARDWARE.md section 4)
+# --------------------------------------------------------------------------- #
+class HouseholdInviteIn(BaseModel):
+    unit_id: str
+    care_profile_id: str | None = None  # a non-self care profile of the caller in that unit
+
+
+class HouseholdInviteCreated(BaseModel):
+    id: str
+    code: str  # returned only here; the hub keeps its SHA-256
+    url: str
+    app_url: str
+    unit_id: str
+    unit_label: str
+    care_profile_id: str | None
+    expires_ts: datetime
+
+
+class HouseholdInviteOut(BaseModel):
+    id: str
+    unit_id: str
+    unit_label: str
+    care_profile_id: str | None
+    care_profile_name: str | None
+    created_ts: datetime
+    expires_ts: datetime
+
+
+class InvitePreviewOut(BaseModel):
+    building_name: str
+    unit_label: str
+    floor_label: str | None
+    inviter_name: str
+    has_care_profile: bool
+    care_profile_name: str | None
+    expires_ts: datetime
+
+
+class InviteAcceptIn(BaseModel):
+    take_over_care_profile: StrictBool = False
+    consent: StrictBool = False
+
+    @model_validator(mode="after")
+    def _consent_for_take_over(self) -> "InviteAcceptIn":
+        if self.take_over_care_profile and self.consent is not True:
+            raise ValueError("taking over a care profile needs explicit consent (true)")
+        return self
+
+
+class InviteAcceptOut(BaseModel):
+    unit_id: str
+    unit_label: str
+    building_id: str
+    care_profile_id: str | None  # the care profile now yours, if one was handed over
+
+
+class HouseholdMemberOut(BaseModel):
+    user_id: str
+    display_name: str
+    is_me: bool
+    since: datetime | None  # when they joined by invite; null for members registered otherwise
+
+
+class HouseholdOut(BaseModel):
+    unit_id: str
+    unit_label: str
+    members: list[HouseholdMemberOut]
+
+
+class CareProfileOut(BaseModel):
+    id: str
+    unit_id: str
+    unit_label: str | None
+    display_name: str
+    is_self: bool
+    needs: list[str]
+    note: str | None
+    consent_ts: datetime
+    updated_ts: datetime
+
+
+class CareCheckInRequest(BaseModel):
+    care_profile_id: str
+    status: Literal["safe_outside", "safe_inside", "needs_help"]
+
+
+class PriorityPersonOut(BaseModel):
+    care_profile_id: str
+    display_name: str
+    unit_id: str
+    unit_label: str | None
+    floor_label: str | None
+    needs: list[str]
+    note: str | None
+    status: str  # needs_help | no_response | unknown | safe_inside | safe_outside
+    status_ts: datetime | None
+    contact_name: str | None  # the profile owner
+    contact_phone: str | None
 
 
 class RosterOut(BaseModel):
@@ -200,6 +551,8 @@ class RosterOut(BaseModel):
     needs_help: int
     awaiting: int  # not yet confirmed safe (unknown / no_response)
     entries: list[RosterEntry]
+    priority: list[PriorityPersonOut] = []  # care profiles, only while the incident is open
+    priority_awaiting: int = 0  # priority people not confirmed safe
 
 
 class DeviceOut(BaseModel):
@@ -270,6 +623,8 @@ class ZoneOut(BaseModel):
     unit_id: str
     label: str
     kind: str
+    unit_label: str | None = None
+    floor_label: str | None = None
     pos_x: float
     pos_y: float
 
@@ -279,6 +634,35 @@ class TriangulationContributor(BaseModel):
     zone_id: str
     value: float
     weight: float
+
+
+class TriangulationSnapshotOut(BaseModel):
+    ts: datetime
+    source_zone_id: str | None
+    source_x: float | None
+    source_y: float | None
+    confidence: float
+    method: str
+    n_contributors: int
+    airflow_applied: bool
+    contributors: list[TriangulationContributor]
+
+
+class TriangulationHistoryOut(BaseModel):
+    incident_id: str
+    snapshots: list[TriangulationSnapshotOut]  # oldest first, <= 500
+
+
+class EscalationOut(BaseModel):
+    """One escalation webhook event, summarized over its delivery attempts."""
+
+    event_id: str
+    state: str  # incident state it reported: escalation | evacuation | resolution
+    attempts: int
+    last_status: int | None  # HTTP status of the last attempt; None on timeout / network error
+    last_error: str | None
+    delivered: bool
+    ts: datetime  # last attempt
 
 
 class TriangulationOut(BaseModel):
@@ -332,12 +716,43 @@ class NodeAnalysisOut(BaseModel):
     indicators: list[IndicatorOut]
 
 
+# --------------------------------------------------------------------------- #
+# Device commands (docs/HARDWARE.md section 4)
+# --------------------------------------------------------------------------- #
+class CommandIn(BaseModel):
+    command: Literal["TEST", "SILENCE", "OPEN", "CLOSE"]
+
+
+class CommandSentOut(BaseModel):
+    command_id: str
+    node_id: str
+    command: str
+    status: str  # "sent"
+    sent_ts: datetime
+
+
+class CommandOut(BaseModel):
+    command_id: str
+    command: str
+    status: str  # sent | accepted | rejected | timeout
+    detail: str | None  # firmware result: `state` when accepted, `error` when rejected
+    requested_by_name: str | None
+    sent_ts: datetime
+    result_ts: datetime | None
+
+
+class SummaryNodeOut(NodeAnalysisOut):
+    last_command: CommandOut | None = None
+
+
 class ZoneSummaryOut(BaseModel):
     zone_id: str
     zone_label: str
+    unit_id: str | None = None  # the zone's flat / common unit
+    unit_label: str | None = None
     status: str
     occupied: bool | None
-    nodes: list[NodeAnalysisOut]
+    nodes: list[SummaryNodeOut]
 
 
 class BuildingSummaryOut(BaseModel):
@@ -368,6 +783,8 @@ class NodeOut(BaseModel):
     boot_epoch: int
     status: dict | None
     analysis: NodeAnalysisOut
+    last_command: CommandOut | None = None
+    is_new: bool = False  # registered itself, not placed in a room yet (technician inbox)
 
 
 class NodeUpdate(BaseModel):

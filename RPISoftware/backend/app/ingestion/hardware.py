@@ -27,10 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.analytics.environment import finite_number
 from app.analytics.nodes import broadcast_node, device_ids
 from app.config import settings
-from app.db import SessionLocal
+from app.db import SessionLocal, engine
 from app.enums import NODE_CHANNELS, EdgeState, NodeKind, SensorType
 from app.ingestion.pipeline import ingest_telemetry
-from app.models import Device, Node, NodeStatus, Zone
+from app.models import Device, Node, NodeInbox, NodeStatus, Zone
 from app.schemas import Location, ReadingThresholds, Signal, TelemetryPayload
 
 log = logging.getLogger("canary.hardware")
@@ -62,6 +62,12 @@ def reset_state() -> None:
     """Forget the in-memory state (tests)."""
     _pending_availability.clear()
     _last_presence.clear()
+
+
+def forget_node(node_id: str, base: str) -> None:
+    """Drop a deleted node's in-memory state, so its base topic registers afresh."""
+    _pending_availability.pop(base, None)
+    _last_presence.pop(node_id, None)
 
 
 # --------------------------------------------------------------------------- #
@@ -223,11 +229,14 @@ def status_to_payloads(
 # --------------------------------------------------------------------------- #
 # MQTT handlers
 # --------------------------------------------------------------------------- #
-async def handle_hardware_message(topic: str, raw: bytes, *, retain: bool = False) -> None:
+async def handle_hardware_message(
+    topic: str, raw: bytes, *, retain: bool = False, received_ts: float | None = None
+) -> None:
     """Handle `<base>/status` or `<base>/availability`; other topics are ignored.
 
     `retain` is the MQTT retained flag (a re-delivered stored message, e.g. on hub
-    reconnect). Logs and drops bad input; never raises.
+    reconnect). `received_ts` (epoch s) is when the MQTT client received it, so a processing
+    backlog never ages `last_seen`; default now. Logs and drops bad input; never raises.
     """
     try:
         if topic.endswith("/status"):
@@ -239,12 +248,13 @@ async def handle_hardware_message(topic: str, raw: bytes, *, retain: bool = Fals
         if not base or len(base) > MAX_BASE_LEN:
             log.warning("dropping message on %r: unusable base topic", topic[:200])
             return
-        await handler(base, raw, retain)
+        received = datetime.fromtimestamp(received_ts, timezone.utc) if received_ts else datetime.now(timezone.utc)
+        await handler(base, raw, retain, received)
     except Exception:  # noqa: BLE001 - trust boundary: never crash the consumer
         log.exception("dropping message on %r", topic[:200])
 
 
-async def _handle_status(base: str, raw: bytes, retain: bool) -> None:
+async def _handle_status(base: str, raw: bytes, retain: bool, now: datetime) -> None:
     doc = parse_document(raw)
     kind = detect_kind(doc)
     if kind is None or not isinstance(doc, dict):
@@ -255,13 +265,20 @@ async def _handle_status(base: str, raw: bytes, retain: bool) -> None:
         log.warning("dropping %s status from %r: missing or invalid uptime_ms", kind.value, base)
         return
 
-    now = datetime.now(timezone.utc)
-    async with SessionLocal() as session:
-        node = await session.scalar(select(Node).where(Node.mqtt_base == base))
+    # One connection + session for the whole document (the status row, then one transaction per
+    # channel): on a Pi every pool checkout and statement is a thread round trip.
+    async with engine.connect() as conn, AsyncSession(bind=conn, expire_on_commit=False) as session:
+        row = (
+            await session.execute(
+                select(Node, Zone).outerjoin(Zone, Zone.id == Node.zone_id).where(Node.mqtt_base == base)
+            )
+        ).first()
+        node, zone = row if row is not None else (None, None)
         if node is None:
             node = await _register(session, base, kind, doc, now)
             if node is None:
                 return
+            zone = await session.get(Zone, node.zone_id)
         elif node.kind != kind.value:
             log.warning("dropping %s status from %r: node %s is %s (base topics must be unique)",
                         kind.value, base, node.id, node.kind)
@@ -279,36 +296,42 @@ async def _handle_status(base: str, raw: bytes, retain: bool) -> None:
             node.online = True
             node.last_seen_ts = now
         session.add(NodeStatus(node_id=node.id, ts=now, uptime_ms=uptime, payload=doc))
-        zone = await session.get(Zone, node.zone_id)
+        await session.execute(_device_liveness(node))  # mirror liveness onto the node's Device rows
         await session.commit()
+        session.expunge(node)  # keep the loaded node usable after the channel transactions
 
-    if zone is None:
-        log.warning("node %s: zone %s not found; raw status stored, no readings", node.id, node.zone_id)
-        payloads = []
-    else:
-        location = Location(building_id=zone.building_id, floor_id=zone.floor_id, unit_id=zone.unit_id, zone_id=zone.id)
-        payloads = status_to_payloads(kind, doc, node_id=node.id, location=location, epoch=node.boot_epoch, seq=uptime)
+        if zone is None:
+            log.warning("node %s: zone %s not found; raw status stored, no readings", node.id, node.zone_id)
+            payloads = []
+        else:
+            location = Location(building_id=zone.building_id, floor_id=zone.floor_id, unit_id=zone.unit_id,
+                                zone_id=zone.id)
+            payloads = status_to_payloads(kind, doc, node_id=node.id, location=location, epoch=node.boot_epoch,
+                                          seq=uptime)
 
-    for payload in payloads:
-        presence = payload.sensor_type == SensorType.radar_presence
-        if presence and not _presence_due(node.id, payload.value):
-            continue
-        try:
-            async with SessionLocal() as session:
-                result = await ingest_telemetry(session, payload)
-        except Exception:  # noqa: BLE001 - one failing channel must not block the others
-            log.exception("ingest failed for %s", payload.device_id)
-            continue
-        if presence:
-            _last_presence[node.id] = (payload.value, time.monotonic())
-        if result.incident_state:
-            log.info("incident %s -> %s (%s)", result.incident_id, result.incident_state, payload.device_id)
+        for payload in payloads:
+            presence = payload.sensor_type == SensorType.radar_presence
+            if presence and not _presence_due(node.id, payload.value):
+                continue
+            try:
+                # Already deduplicated by uptime above, and liveness is set; each channel commits on
+                # its own, and expire_all() makes the next one read fresh rows like a new session.
+                result = await ingest_telemetry(session, payload, dedupe=False, touch_device=False, received_ts=now)
+            except Exception:  # noqa: BLE001 - one failing channel must not block the others
+                await session.rollback()
+                log.exception("ingest failed for %s", payload.device_id)
+                continue
+            finally:
+                session.expire_all()
+            if presence:
+                _last_presence[node.id] = (payload.value, time.monotonic())
+            if result.incident_state:
+                log.info("incident %s -> %s (%s)", result.incident_id, result.incident_state, payload.device_id)
 
-    await _sync_devices(node)
     await broadcast_node(node)
 
 
-async def _handle_availability(base: str, raw: bytes, retain: bool) -> None:
+async def _handle_availability(base: str, raw: bytes, retain: bool, now: datetime) -> None:
     text = raw.strip().decode("ascii", "replace") if len(raw) <= 32 else ""
     if text not in ("online", "offline"):
         log.debug("ignoring availability payload on %r", base)
@@ -357,6 +380,7 @@ async def _register(session: AsyncSession, base: str, kind: NodeKind, doc: dict,
         created_ts=now,
     )
     session.add(node)
+    session.add(NodeInbox(node_id=node_id, ts=now))  # waits for a technician to place it
     for channel, sensor_type in NODE_CHANNELS[kind]:
         await session.merge(
             Device(
@@ -385,19 +409,19 @@ async def _landing_zone(session: AsyncSession) -> Zone | None:
     )
 
 
+def _device_liveness(node: Node):
+    """UPDATE mirroring the node's liveness onto its Device rows (a retained document never
+    refreshes last_seen_ts: the node's own value is copied)."""
+    return (
+        update(Device)
+        .where(Device.id.in_(device_ids(node.id, node.kind)))
+        .values(status="ok" if node.online else "offline", last_seen_ts=node.last_seen_ts, fw_version=node.firmware)
+    )
+
+
 async def _sync_devices(node: Node) -> None:
-    """Mirror the node's liveness onto its Device rows (after ingestion, which touches
-    their last_seen_ts, so a retained document never refreshes it)."""
     async with SessionLocal() as session:
-        await session.execute(
-            update(Device)
-            .where(Device.id.in_(device_ids(node.id, node.kind)))
-            .values(
-                status="ok" if node.online else "offline",
-                last_seen_ts=node.last_seen_ts,
-                fw_version=node.firmware,
-            )
-        )
+        await session.execute(_device_liveness(node))
         await session.commit()
 
 

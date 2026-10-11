@@ -19,12 +19,16 @@ from app.models import (
     ExternalIntegration,
     Floor,
     ResidentUnit,
+    StaffBuilding,
     Unit,
     User,
     Zone,
 )
 
 BUILDING_ID = "bld_007"
+
+
+TECH_ID = "usr_tech"
 
 
 async def seed(session: AsyncSession) -> None:
@@ -40,14 +44,14 @@ async def seed(session: AsyncSession) -> None:
     session.add(Unit(id="unit_0312", building_id=BUILDING_ID, floor_id="flr_03", label="Ap. 12", kind="residential"))
     session.add(Unit(id="unit_0313", building_id=BUILDING_ID, floor_id="flr_03", label="Ap. 13", kind="residential"))
     session.add(Unit(id="unit_0314", building_id=BUILDING_ID, floor_id="flr_03", label="Ap. 14", kind="residential"))
-    session.add(Unit(id="common", building_id=BUILDING_ID, floor_id="flr_03", label="Comun Etaj 3", kind="common"))
+    session.add(Unit(id="common", building_id=BUILDING_ID, floor_id="flr_03", label="Spații comune", kind="common"))
 
     # pos_x/pos_y: simple floor-3 layout in metres (arbitrary origin) for triangulation.
     zones = [
-        Zone(id="zone_kitchen", building_id=BUILDING_ID, floor_id="flr_03", unit_id="unit_0312", label="Bucatarie", kind="kitchen", pos_x=2.0, pos_y=2.0),
+        Zone(id="zone_kitchen", building_id=BUILDING_ID, floor_id="flr_03", unit_id="unit_0312", label="Bucătărie", kind="kitchen", pos_x=2.0, pos_y=2.0),
         Zone(id="zone_bedroom", building_id=BUILDING_ID, floor_id="flr_03", unit_id="unit_0312", label="Dormitor", kind="bedroom", pos_x=8.0, pos_y=2.0),
-        Zone(id="zone_hallway", building_id=BUILDING_ID, floor_id="flr_03", unit_id="common", label="Hol", kind="hallway", pos_x=5.0, pos_y=5.0),
-        Zone(id="zone_boiler", building_id=BUILDING_ID, floor_id="flr_03", unit_id="common", label="Centrala", kind="boiler", pos_x=2.0, pos_y=8.0),
+        Zone(id="zone_hallway", building_id=BUILDING_ID, floor_id="flr_03", unit_id="common", label="Hol scară", kind="hallway", pos_x=5.0, pos_y=5.0),
+        Zone(id="zone_boiler", building_id=BUILDING_ID, floor_id="flr_03", unit_id="common", label="Centrală termică", kind="boiler", pos_x=2.0, pos_y=8.0),
     ]
     for z in zones:
         session.add(z)
@@ -82,6 +86,7 @@ async def seed(session: AsyncSession) -> None:
         User(id="usr_mihai", username="mihai", display_name="Mihai (administrator)", role=Role.hoa_manager.value),
         User(id="usr_disp", username="dispecer", display_name="Dispecer ARC", role=Role.dispatcher_external.value),
         User(id="usr_admin", username="admin", display_name="System Admin", role=Role.system_admin.value),
+        User(id=TECH_ID, username="tehnician", display_name="Tehnician Canary", role=Role.technician.value),
     ]
     for u in users:
         session.add(u)
@@ -94,6 +99,8 @@ async def seed(session: AsyncSession) -> None:
     ]
     for user_id, unit_id in resident_units:
         session.add(ResidentUnit(user_id=user_id, unit_id=unit_id, building_id=BUILDING_ID))
+    # the HOA manager runs this building (admin API scope)
+    session.add(StaffBuilding(user_id="usr_mihai", building_id=BUILDING_ID))
 
     session.add(AssemblyPoint(id="ap_main", building_id=BUILDING_ID, label="Punct adunare - parcare fata", lat=44.4268, lon=26.1025))
     session.add(
@@ -151,3 +158,8 @@ async def seed_if_empty() -> None:
         existing = await session.scalar(select(Building.id).limit(1))
         if existing is None:
             await seed(session)
+        elif await session.get(Building, BUILDING_ID) is not None and await session.get(User, TECH_ID) is None:
+            # demo hubs seeded before the technician role existed get the login too
+            session.add(User(id=TECH_ID, username="tehnician", display_name="Tehnician Canary",
+                             role=Role.technician.value))
+            await session.commit()

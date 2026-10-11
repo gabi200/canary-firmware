@@ -1,10 +1,12 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext";
+import { JoinPage } from "./auth/JoinPage";
 import { LoginPage } from "./auth/LoginPage";
 import { RequireAuth } from "./auth/RequireAuth";
 import { Topbar } from "./components/Topbar";
 import { useIncidentSocket } from "./realtime/useIncidentSocket";
+import { AdminView } from "./views/AdminView";
 import { DispatchView } from "./views/DispatchView";
 import { ManagerView } from "./views/ManagerView";
 import { SensorsView } from "./views/SensorsView";
@@ -25,13 +27,16 @@ function AuthedLayout() {
 function HomeRedirect() {
   const { session } = useAuth();
   if (!session) return <Navigate to="/login" replace />;
-  return <Navigate to={session.role === "dispatcher_external" ? "/dispatch" : "/manager"} replace />;
+  const home: Record<string, string> = { dispatcher_external: "/dispatch", technician: "/admin/rooms" };
+  return <Navigate to={home[session.role] ?? "/manager"} replace />;
 }
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* public: household invitation links opened on phones (no login, no API calls) */}
+      <Route path="/join/:code" element={<JoinPage />} />
       <Route element={<AuthedLayout />}>
         <Route
           path="/manager"
@@ -56,9 +61,19 @@ export default function App() {
         <Route
           path="/sensors"
           element={
-            <RequireAuth roles={["hoa_manager", "dispatcher_external"]}>
+            <RequireAuth roles={["hoa_manager", "dispatcher_external", "technician"]}>
               <div className="content">
                 <SensorsView />
+              </div>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/*"
+          element={
+            <RequireAuth roles={["hoa_manager", "technician"]}>
+              <div className="content">
+                <AdminView />
               </div>
             </RequireAuth>
           }
