@@ -1,0 +1,28 @@
+# Canary three-Pi hub, AI Pi only: hailo-ollama serves an LLM on the Raspberry Pi AI HAT+ 2
+# (Hailo-10H) for the incident briefs. RUNME.md section 3.4 installs it:
+#
+#   sudo cp cluster/hailo-ollama.service /etc/systemd/system/
+#   sudo sed -i "s/^User=.*/User=$USER/" /etc/systemd/system/hailo-ollama.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now hailo-ollama
+#
+# hailo-ollama comes with Hailo's "Model Zoo GenAI" package. Check its path with
+# `command -v hailo-ollama` and fix ExecStart below if it differs (/usr/bin is not verified).
+# It listens on 0.0.0.0:8000 by default, the Canary backend's port, so it is moved to 11434: the
+# backend reaches it as CANARY_LLM_URL=http://host.docker.internal:11434.
+
+[Unit]
+Description=hailo-ollama LLM server on the AI HAT+ 2 (Canary incident briefs)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# A normal login user, not root: the sed command above puts in yours.
+User=pi
+Environment=OLLAMA_HOST=0.0.0.0:11434
+ExecStart=/usr/bin/hailo-ollama
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

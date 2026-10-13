@@ -8,6 +8,8 @@
 #   API          http://<pi-ip>:8000      (REST + WebSocket, e.g. for the mobile app)
 #   simulators   docker compose --profile sim run --rm hw-sim --scenario co --fast
 #   logs         docker compose logs -f backend mosquitto
+#   three Pis    scripts/pi_setup.sh --cluster <vip> <processing-ip> <web-ip> <ai-ip>: adds profile
+#                "cluster" (etcd, postgres, pgproxy, keepalived) through .env (RUNME.md section 3)
 #
 # RUNME.md walks through all of it; docs/HARDWARE.md is the MQTT/API contract.
 
@@ -20,9 +22,10 @@ x-logging: &logging
     max-size: "10m"
     max-file: "3"
 
-# The simulators log in as the backend's broker user "hub".
+# The simulators log in as the backend's broker user "hub". Three Pis: the broker behind the
+# floating IP (CANARY_MQTT_HOST), the one the processing Pi reads, whichever Pi they run on.
 x-sim-env: &sim-env
-  MQTT_HOST: mosquitto
+  MQTT_HOST: ${CANARY_MQTT_HOST:-mosquitto}
   MQTT_PORT: "1883"
   MQTT_USERNAME: hub
   MQTT_PASSWORD: ${CANARY_MQTT_PASSWORD:?run scripts/pi_setup.sh first}
@@ -51,17 +54,24 @@ services:
     depends_on:
       mosquitto:
         condition: service_healthy
+      pgproxy:   # three Pis only (profile "cluster"); ignored on one Pi
+        condition: service_started
+        required: false
     # Secrets written by scripts/pi_setup.sh. Any other backend setting
     # (CANARY_*, docs/HARDWARE.md section 6) can be added to .env as well.
     env_file:
       - path: .env
         required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # hailo-ollama on the AI Pi's host (CANARY_LLM_URL)
     environment:
       # SQLite on a named volume. To use Postgres instead, set in .env e.g.
       #   CANARY_DATABASE_URL=postgresql+asyncpg://canary:<password>@<host>:5432/canary
+      # (three Pis: scripts/pi_setup.sh --cluster points it at pgproxy, below).
       CANARY_DATABASE_URL: ${CANARY_DATABASE_URL:-sqlite+aiosqlite:////data/canary.db}
       CANARY_MQTT_ENABLED: "true"
-      CANARY_MQTT_HOST: mosquitto
+      # Three Pis: the floating IP, so every Pi's backend uses the front door's broker.
+      CANARY_MQTT_HOST: ${CANARY_MQTT_HOST:-mosquitto}
       CANARY_MQTT_PORT: "1883"
       CANARY_MQTT_USERNAME: hub
       # Required: refuse to start rather than fall back to insecure defaults.
@@ -69,6 +79,7 @@ services:
       CANARY_JWT_SECRET: ${CANARY_JWT_SECRET:?run scripts/pi_setup.sh first}
     volumes:
       - backend_data:/data
+      - cluster_state:/run/canary:ro   # three Pis: keepalived's VRRP state (vrrp_state)
     ports:
       - "8000:8000"   # REST + WebSocket for the mobile app (the dashboard uses port 80)
     healthcheck:
@@ -91,6 +102,128 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    logging: *logging
+
+  # --- Three Pis: profile "cluster", switched on by COMPOSE_PROFILES=cluster in .env ---
+  # scripts/pi_setup.sh --cluster writes their settings (RUNME.md section 3). Every Pi runs all
+  # four; etcd, postgres and keepalived in the host's network namespace, where they reach the other
+  # Pis at their LAN addresses. The empty defaults are deliberate: compose interpolates disabled
+  # services too, so `:?` here would break the one-Pi hub. postgres, pgproxy and keepalived check
+  # their settings themselves.
+
+  # Patroni's consensus store. Survives one Pi down; with two down there is no quorum and
+  # Postgres stops taking writes instead of splitting. Ports 2379 (clients) and 2380 (peers).
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.34
+    profiles: ["cluster"]
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - etcd
+      - --name=${CANARY_NODE_NAME:-}
+      - --data-dir=/var/lib/etcd/data   # etcd creates it with mode 0700
+      - --listen-peer-urls=http://${CANARY_NODE_IP:-}:2380
+      - --initial-advertise-peer-urls=http://${CANARY_NODE_IP:-}:2380
+      - --listen-client-urls=http://${CANARY_NODE_IP:-}:2379,http://127.0.0.1:2379
+      - --advertise-client-urls=http://${CANARY_NODE_IP:-}:2379
+      - --initial-cluster=processing=http://${CANARY_PROCESSING_IP:-}:2380,web=http://${CANARY_WEB_IP:-}:2380,ai=http://${CANARY_AI_IP:-}:2380
+      - --initial-cluster-token=canary
+      # Only read while the data directory is empty. A Pi rebuilt with an empty disk joins the
+      # running cluster once with CANARY_ETCD_STATE=existing (DEBUG.md section 9).
+      - --initial-cluster-state=${CANARY_ETCD_STATE:-new}
+      # Slower than etcd's defaults (100 / 1000 ms): SD cards and busy Pis stall for longer.
+      - --heartbeat-interval=250
+      - --election-timeout=2500
+      # Without compaction the key history grows until etcd stops accepting writes.
+      - --auto-compaction-mode=periodic
+      - --auto-compaction-retention=1h
+      - --snapshot-count=10000
+    volumes:
+      - etcd_data:/var/lib/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  # PostgreSQL 16 under Patroni (cluster/patroni): one primary, a synchronous standby and a
+  # replica; Patroni promotes a replica when the primary's Pi fails. The backend reaches the primary
+  # through pgproxy. Ports 5432 (PostgreSQL), 8008 (Patroni REST API).
+  postgres:
+    build: ./cluster/patroni
+    profiles: ["cluster"]
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - etcd
+    stop_grace_period: 30s   # a clean stop hands the primary role over at once
+    environment:
+      # Checked by cluster/patroni/entrypoint.sh before Patroni starts.
+      CANARY_NODE_NAME: ${CANARY_NODE_NAME:-}
+      CANARY_NODE_IP: ${CANARY_NODE_IP:-}
+      CANARY_DB_PASSWORD: ${CANARY_DB_PASSWORD:-}   # role "canary" (post_bootstrap)
+      # This Pi's part of Patroni's settings; the shared part is cluster/patroni/patroni.yml.
+      PATRONI_NAME: ${CANARY_NODE_NAME:-}
+      PATRONI_RESTAPI_LISTEN: ${CANARY_NODE_IP:-}:8008
+      PATRONI_RESTAPI_CONNECT_ADDRESS: ${CANARY_NODE_IP:-}:8008
+      PATRONI_RESTAPI_USERNAME: patroni
+      PATRONI_RESTAPI_PASSWORD: ${CANARY_PG_SUPERUSER_PASSWORD:-}
+      PATRONI_POSTGRESQL_LISTEN: ${CANARY_NODE_IP:-}:5432
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: ${CANARY_NODE_IP:-}:5432
+      PATRONI_ETCD3_HOSTS: "'${CANARY_PROCESSING_IP:-}:2379','${CANARY_WEB_IP:-}:2379','${CANARY_AI_IP:-}:2379'"
+      PATRONI_SUPERUSER_PASSWORD: ${CANARY_PG_SUPERUSER_PASSWORD:-}
+      PATRONI_REPLICATION_PASSWORD: ${CANARY_PG_REPLICATION_PASSWORD:-}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      # Patroni's REST API: 200 while PostgreSQL runs on this Pi (primary or replica).
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://${CANARY_NODE_IP:-127.0.0.1}:8008/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    logging: *logging
+
+  # The backend's database address (pgproxy:5432 in CANARY_DATABASE_URL). HAProxy asks every Pi's
+  # Patroni which one is the primary (every 2 s) and forwards there; after a failover it cuts the
+  # sessions to the old primary at once (cluster/haproxy/haproxy.cfg). On the compose network like
+  # the backend, not published: the host's port 5432 is this Pi's Postgres.
+  pgproxy:
+    image: haproxy:3.0.29-alpine
+    profiles: ["cluster"]
+    restart: unless-stopped
+    environment:
+      CANARY_PROCESSING_IP: ${CANARY_PROCESSING_IP:-}
+      CANARY_WEB_IP: ${CANARY_WEB_IP:-}
+      CANARY_AI_IP: ${CANARY_AI_IP:-}
+    volumes:
+      - ./cluster/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    logging: *logging
+
+  # The floating IP (CANARY_VIP): the sensors' MQTT host and the dashboard/app address. VRRP
+  # between the three Pis (IP protocol 112, unicast) keeps it on the best Pi whose dashboard and
+  # broker answer: web, else processing, else ai (cluster/keepalived).
+  keepalived:
+    build: ./cluster/keepalived
+    profiles: ["cluster"]
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    environment:
+      CANARY_NODE_NAME: ${CANARY_NODE_NAME:-}
+      CANARY_NODE_IP: ${CANARY_NODE_IP:-}
+      CANARY_PROCESSING_IP: ${CANARY_PROCESSING_IP:-}
+      CANARY_WEB_IP: ${CANARY_WEB_IP:-}
+      CANARY_AI_IP: ${CANARY_AI_IP:-}
+      CANARY_VIP: ${CANARY_VIP:-}
+      CANARY_VRRP_PASSWORD: ${CANARY_VRRP_PASSWORD:-}
+      CANARY_HTTP_PORT: ${CANARY_HTTP_PORT:-80}
+    volumes:
+      - cluster_state:/run/canary   # vrrp_state: MASTER | BACKUP | FAULT | STOP, read by the backend
     logging: *logging
 
   # --- Simulators: profile "sim", never started by a plain `docker compose up` ---
@@ -160,3 +293,6 @@ services:
 volumes:
   mosquitto_data:
   backend_data:
+  cluster_state:   # keepalived -> backend (three Pis; stays empty on one Pi)
+  etcd_data:
+  pg_data:

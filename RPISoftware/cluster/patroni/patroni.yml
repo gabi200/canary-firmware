@@ -1,0 +1,80 @@
+# Canary three-Pi hub: the Patroni settings every Pi shares (RUNME.md section 3).
+#
+# The per-node values (name, addresses, etcd endpoints, passwords) are PATRONI_* environment
+# variables that docker-compose.yml fills in from .env. bootstrap.dcs is copied into etcd once, by
+# the Pi that initialises the cluster: change it later with `patronictl edit-config`, not here.
+#
+#   docker compose exec postgres patronictl list     # members, leader, sync standby, lag
+
+scope: canary
+
+# listen / connect_address: PATRONI_RESTAPI_LISTEN / _CONNECT_ADDRESS (CANARY_NODE_IP:8008).
+# Basic auth (PATRONI_RESTAPI_USERNAME / _PASSWORD) guards the unsafe endpoints: switchover,
+# restart, reinitialize. GET /health, /cluster and friends stay open.
+restapi: {}
+
+# hosts: PATRONI_ETCD3_HOSTS, the etcd of all three Pis (port 2379).
+etcd3:
+  protocol: http
+
+bootstrap:
+  dcs:
+    # A primary that vanishes loses its leader key after ttl seconds, and a replica takes over
+    # within the next loop: about 20-30 s. loop_wait + 2 x retry_timeout must stay below ttl.
+    ttl: 20
+    loop_wait: 5
+    retry_timeout: 5
+    maximum_lag_on_failover: 1048576
+    # A commit returns only once a second Pi has it on disk, so a failover never loses a write
+    # the backend saw succeed.
+    synchronous_mode: true
+    postgresql:
+      use_pg_rewind: true # a returning ex-primary rejoins as a replica without a full copy
+      use_slots: true
+      parameters:
+        # Sized for a Raspberry Pi that also runs the rest of the hub.
+        max_connections: 100
+        shared_buffers: 128MB
+        effective_cache_size: 512MB
+        maintenance_work_mem: 64MB
+        wal_level: replica
+        hot_standby: "on"
+        wal_log_hints: "on" # pg_rewind needs it
+        max_wal_senders: 10
+        max_replication_slots: 10
+        wal_keep_size: 256MB # a replica that was away briefly catches up from WAL
+        max_slot_wal_keep_size: 2GB # a Pi that stays down cannot fill the others' disks
+  initdb:
+    - encoding: UTF8
+    - locale: C.UTF-8
+    - data-checksums # reports storage corruption instead of returning bad rows
+  # Role and database "canary" for the backend (CANARY_DB_PASSWORD).
+  post_bootstrap: /usr/local/bin/canary-post-bootstrap
+
+postgresql:
+  # listen / connect_address: PATRONI_POSTGRESQL_LISTEN / _CONNECT_ADDRESS (CANARY_NODE_IP:5432).
+  data_dir: /var/lib/postgresql/data/pgdata
+  bin_dir: /usr/lib/postgresql/16/bin
+  pgpass: /tmp/pgpass
+  use_unix_socket: true
+  # A new or rebuilt replica copies the primary right away instead of waiting for a spread
+  # checkpoint, which takes minutes on an idle hub.
+  basebackup:
+    checkpoint: fast
+  authentication:
+    superuser:
+      username: postgres # password: PATRONI_SUPERUSER_PASSWORD
+    replication:
+      username: replicator # password: PATRONI_REPLICATION_PASSWORD
+  # Remote logins need a password (scram-sha-256) but may come from any address: the other Pis,
+  # and the backend containers behind Docker's NAT. The hub runs on a trusted LAN / VLAN only
+  # (RUNME.md section 1.10).
+  pg_hba:
+    - local all postgres trust
+    - host replication replicator 0.0.0.0/0 scram-sha-256
+    - host postgres postgres 0.0.0.0/0 scram-sha-256 # pg_rewind against the new primary
+    - host canary canary 0.0.0.0/0 scram-sha-256
+
+# There is no hardware watchdog inside a container.
+watchdog:
+  mode: "off"
