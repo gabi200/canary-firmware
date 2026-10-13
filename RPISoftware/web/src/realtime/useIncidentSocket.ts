@@ -140,9 +140,16 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
     };
 
     connect();
+    // Three-Pi hub: the socket runs through the floating hub address. If the Pi behind it dies, an
+    // idle socket never notices; a small frame every 25 s meets a reset from the Pi that took the
+    // address over, which closes it and reconnects. The server ignores client frames.
+    const ping = window.setInterval(() => {
+      if (ws?.readyState === WebSocket.OPEN) ws.send("ping");
+    }, 25_000);
     return () => {
       stopped = true;
       setConnected(false);
+      window.clearInterval(ping);
       if (timer) window.clearTimeout(timer);
       refreshNodes.cancel();
       refreshHistory.cancel();

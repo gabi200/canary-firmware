@@ -11,6 +11,7 @@ import { Card } from "../components/Card";
 import { EscalationLine } from "../components/EscalationLine";
 import { HazardMap } from "../components/HazardMap";
 import { IncidentActions } from "../components/IncidentActions";
+import { IncidentBriefCard } from "../components/IncidentBrief";
 import { IncidentTimeline } from "../components/IncidentTimeline";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentRoster } from "../components/ResidentRoster";
@@ -167,6 +168,8 @@ export function DispatchView() {
               <div className="muted small">{t("dispatch.awaitingSensors")}</div>
             )}
           </Card>
+
+          <IncidentBriefCard incidentId={incident.id} />
 
           <Card title={t("dispatch.progress")}>
             <div className="progress">

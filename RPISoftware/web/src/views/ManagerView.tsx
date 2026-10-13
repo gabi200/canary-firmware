@@ -12,6 +12,7 @@ import { DeviceHealthCard } from "../components/DeviceHealthCard";
 import { EnvironmentCard } from "../components/EnvironmentCard";
 import { EscalationLine } from "../components/EscalationLine";
 import { HazardMap } from "../components/HazardMap";
+import { HubBanner } from "../components/HubStatus";
 import { IncidentActions } from "../components/IncidentActions";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentList, ResidentRoster } from "../components/ResidentRoster";
@@ -68,6 +69,7 @@ export function ManagerView() {
 
   return (
     <>
+      <HubBanner />
       {primary?.state === "evacuation" && (
         <div className="sitrep evac" style={{ marginBottom: 16 }}>
           <div className="sitrep-head">

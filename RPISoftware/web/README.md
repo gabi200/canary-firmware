@@ -7,10 +7,17 @@ over WebSocket:
 - **Manager / HOA** (`/manager`) — building floor plan with live sensor status,
   device health, a compact **Environment** summary (building status + one line per
   hardware node), environmental trends (gas/CO, one chart per unit), active incidents
-  with actions, and a demo "simulate gas leak" trigger.
+  with actions, and a demo "simulate gas leak" trigger. While a three-Pi hub runs
+  degraded, a warning line on top links to Administration → Hub.
 - **Dispatch / emergency services** (`/dispatch`) — incident-centric: hazard source on
   the floor plan, live occupancy + **unaccounted-occupant count**, last-known occupied
-  zones, evacuation progress, and the incident timeline + actions.
+  zones, evacuation progress, and the incident timeline + actions. **Incident brief**:
+  a short text summary generated on demand (`GET /incidents/{id}/brief`, never polled):
+  the LLM on the AI HAT+ 2 (up to a minute) or a template without one.
+- **Administration → Hub** (`/admin/hub`; managers, technicians, system admin) — the
+  hub's Raspberry Pis (`GET /cluster`, every 10 s): one Pi running every role, or three
+  redundant Pis (processing / web = the hub address / AI) with who runs which role now,
+  failovers in plain words and the AI HAT+ 2 state.
 - **Sensors** (`/sensors`) — the real ESP32 hardware (air + water nodes), showing both
   what the devices report and what the hub makes of it:
   - **Analysis**: building status banner (status, headline, nodes online, active

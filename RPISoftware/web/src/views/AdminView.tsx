@@ -1,7 +1,8 @@
 /**
  * Administration (system_admin, hoa_manager; technician without accounts): accounts, rooms
- * (floor plan editor) and devices (new sensors, hardware test). Tabs are routes: /admin/accounts, /admin/rooms, /admin/devices. The scope bar
- * on top (apartment / room) applies to every tab.
+ * (floor plan editor), devices (new sensors, hardware test) and the hub's Pis. Tabs are routes:
+ * /admin/accounts, /admin/rooms, /admin/devices, /admin/hub. The scope bar on top (apartment /
+ * room) applies to every tab but Hub.
  */
 import { NavLink, Navigate, useParams } from "react-router-dom";
 
@@ -10,12 +11,14 @@ import { ScopeBar } from "../components/ScopeBar";
 import { useT, type MsgKey } from "../i18n";
 import { AccountsTab } from "./admin/AccountsTab";
 import { DevicesTab } from "./admin/DevicesTab";
+import { HubTab } from "./admin/HubTab";
 import { RoomsTab } from "./admin/RoomsTab";
 
 const TABS: { id: string; label: MsgKey }[] = [
   { id: "accounts", label: "admin.tabAccounts" },
   { id: "rooms", label: "admin.tabRooms" },
   { id: "devices", label: "admin.tabDevices" },
+  { id: "hub", label: "admin.tabHub" },
 ];
 
 export function AdminView() {
@@ -27,8 +30,8 @@ export function AdminView() {
 
   return (
     <>
-      {/* accounts belong to apartments, not rooms: no room row there */}
-      <ScopeBar rooms={tab !== "accounts"} />
+      {/* accounts belong to apartments, not rooms: no room row there; the hub's Pis to no apartment */}
+      {tab !== "hub" && <ScopeBar rooms={tab !== "accounts"} />}
       <div className="page-head">
         <h2>{t("admin.title")}</h2>
         <span className="muted">{t("admin.subtitle", { id: buildingId })}</span>
@@ -43,6 +46,7 @@ export function AdminView() {
       {tab === "accounts" && <AccountsTab />}
       {tab === "rooms" && <RoomsTab />}
       {tab === "devices" && <DevicesTab />}
+      {tab === "hub" && <HubTab />}
     </>
   );
 }

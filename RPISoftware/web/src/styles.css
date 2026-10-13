@@ -878,3 +878,42 @@ select.input { padding-right: 6px; }
 .ri-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12.5px; white-space: nowrap; }
 .ri-people { display: inline-flex; align-items: center; gap: 3px; }
 .ri-people .icon { width: 13px; height: 13px; }
+
+/* hub Pis (Administration: Hub tab; manager banner) */
+.hub-mode { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.hub-mode > .icon { width: 26px; height: 26px; color: var(--accent); }
+.hub-mode > div { min-width: 0; overflow-wrap: anywhere; }
+.hub-mode-title { font-size: 18px; font-weight: 800; margin-bottom: 2px; }
+.hub-mode .err { margin: 6px 0 0; }
+.hub-lines { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.hub-line { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-left: 5px solid var(--muted); border-radius: 12px; overflow-wrap: anywhere; }
+.hub-line > .icon { width: 20px; height: 20px; margin-top: 1px; }
+.hub-line-main { font-weight: 700; }
+.hub-line.ok { border-left-color: var(--green); }
+.hub-line.ok > .icon { color: var(--green); }
+.hub-line.info { border-left-color: var(--accent); }
+.hub-line.info > .icon { color: var(--accent); }
+.hub-line.attention { border-left-color: var(--amber); }
+.hub-line.attention > .icon { color: var(--amber); }
+.hub-line.danger { border-color: var(--red); }
+.hub-line.danger > .icon { color: var(--red); }
+.hub-banner { margin-bottom: 16px; }
+/* the link sits at the right end, or under the text (not the icon) once it wraps */
+.hub-banner-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.hub-card .dev-facts .wide { grid-column: 1 / -1; }
+.hub-roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.hub-accel { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.hub-note { margin-top: 10px; font-weight: 600; }
+
+/* incident brief (dispatch) */
+.brief-status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted); font-size: 14px; }
+.brief-text { margin: 0 0 8px; white-space: pre-line; line-height: 1.55; overflow-wrap: anywhere; }
+.brief.stale { opacity: 0.55; }
+.brief-actions { margin-top: 12px; }
+
+/* phone: four admin tabs fit (or scroll sideways) instead of widening the page */
+@media (max-width: 640px) {
+  .admin-tabs { overflow-x: auto; scrollbar-width: none; }
+  .admin-tabs::-webkit-scrollbar { display: none; }
+  .admin-tabs a { padding: 10px 12px; white-space: nowrap; }
+}

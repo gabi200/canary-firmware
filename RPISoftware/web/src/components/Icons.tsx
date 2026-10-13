@@ -397,3 +397,22 @@ export const FlameIcon = (p: IconProps) => (
     <path d="M12 3.5c3 2.6 5.5 6 5.5 9.5a5.5 5.5 0 0 1-11 0c0-2 .9-3.8 2.3-5.2.2 1.7.9 2.8 1.9 3.3-.2-2.8.3-5.4 1.3-7.6z" />
   </Icon>
 );
+
+/** Two stacked server units (a hub Pi). */
+export const ServerIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="4.5" width="16" height="6.5" rx="1.8" />
+    <rect x="4" y="13" width="16" height="6.5" rx="1.8" />
+    <path d="M7.5 7.75h.01M7.5 16.25h.01" />
+    <path d="M11 7.75h5.5M11 16.25h5.5" />
+  </Icon>
+);
+
+/** Processor chip with pins (the AI HAT+ 2 accelerator). */
+export const ChipIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="6.5" y="6.5" width="11" height="11" rx="1.8" />
+    <rect x="9.5" y="9.5" width="5" height="5" rx="0.8" />
+    <path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3" />
+  </Icon>
+);

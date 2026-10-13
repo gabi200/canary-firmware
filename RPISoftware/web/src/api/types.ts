@@ -573,3 +573,67 @@ export interface AdminZoneCreate {
 }
 
 export type AdminZonePatch = Partial<AdminZoneCreate>;
+
+// --------------------------------------------------------------------------- //
+// Hub Pis (GET /cluster): one Pi, or three redundant Pis; incident brief
+// --------------------------------------------------------------------------- //
+
+/** What a hub Pi can run: web = holds the hub address (the sensors' MQTT host, the dashboard
+ *  and app URL), processing = the sensor pipeline (ingestion -> detection -> incidents ->
+ *  notifications), ai = AI tasks (triangulation, incident brief). */
+export type ClusterRole = "web" | "processing" | "ai";
+
+/** The AI HAT+ 2 LLM server (hailo-ollama) of a Pi. */
+export interface ClusterAccelerator {
+  kind: string;
+  online: boolean;
+  model: string | null;
+}
+
+export interface ClusterNode {
+  /** processing | web | ai (= its home role); "hub" in single mode */
+  name: string;
+  /** null in single mode */
+  ip: string | null;
+  /** heard from within the last 10 s */
+  alive: boolean;
+  last_seen: string | null;
+  /** what it runs now */
+  roles: (ClusterRole | string)[];
+  /** the role it was set up for; null in single mode */
+  home_role: ClusterRole | string | null;
+  /** holds the hub address (null in single mode) */
+  vip: boolean | null;
+  /** null: no AI HAT+ 2 configured on that Pi */
+  accelerator: ClusterAccelerator | null;
+  /** This Pi's clock minus the database's, seconds (null: down, or an older hub). */
+  clock_skew_s?: number | null;
+}
+
+/** GET /cluster (system_admin, hoa_manager, technician). */
+export interface ClusterStatus {
+  mode: "single" | "triple";
+  /** the Pi that answered */
+  node: string;
+  /** the hub address sensors, dashboard and app use (null in single mode) */
+  vip: string | null;
+  /** null: no Pi processes sensor data (critical) */
+  processing_node: string | null;
+  ai_node: string | null;
+  /** a Pi is down, a role runs away from its home Pi, or nobody processes */
+  degraded: boolean;
+  nodes: ClusterNode[];
+}
+
+/** GET /incidents/{id}/brief: a short summary written from database facts only (no names,
+ *  notes or phone numbers), in the request's language. */
+export interface IncidentBrief {
+  incident_id: string;
+  text: string;
+  /** llm: written by the AI HAT+ 2; template: the fixed fallback */
+  source: "llm" | "template";
+  model: string | null;
+  /** the Pi that wrote it */
+  node: string;
+  generated_ts: string;
+}

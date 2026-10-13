@@ -1,15 +1,19 @@
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "../auth/AuthContext";
+import { useT } from "../i18n";
+import { canSeeCluster } from "../lib/cluster";
 import { api } from "./client";
 import type {
   Accounting,
   Building,
   BuildingSummary,
+  ClusterStatus,
   Device,
   Evacuation,
   Incident,
   IncidentAction,
+  IncidentBrief,
   IncidentEvent,
   Escalation,
   NodeHistory,
@@ -124,6 +128,36 @@ export function useEscalations(incidentId: string | null) {
     enabled: !!incidentId,
     queryFn: () => api.get<Escalation[]>(`/api/v1/incidents/${incidentId}/escalations`, token),
     refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
+/** Incident brief (GET /incidents/{id}/brief), made only on demand: `enabled: false`, the card's
+ *  button calls `refetch()`. The AI HAT+ 2 may take up to a minute, so no retry (a failure must
+ *  not start another minute-long run) and no client timeout (fetch sets none; the hub bounds the
+ *  wait). Keyed by language: the text comes back in the dashboard's language. */
+export function useIncidentBrief(incidentId: string | null) {
+  const { token } = useCtx();
+  const { lang } = useT();
+  return useQuery({
+    queryKey: ["brief", incidentId, lang],
+    queryFn: () => api.get<IncidentBrief>(`/api/v1/incidents/${incidentId}/brief`, token),
+    enabled: false,
+    retry: false,
+    // costly to make: keep it while the incident is being handled
+    gcTime: 30 * 60_000,
+  });
+}
+
+/** The hub's Pis and the roles each runs now (one Pi, or three redundant Pis). Asked only for
+ *  the roles the hub answers; 404 on older backends. */
+export function useCluster() {
+  const { token, session } = useAuth();
+  return useQuery({
+    queryKey: ["cluster"],
+    queryFn: () => api.get<ClusterStatus>(`/api/v1/cluster`, token),
+    enabled: canSeeCluster(session?.role),
+    refetchInterval: 10_000,
     retry: false,
   });
 }
