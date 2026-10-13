@@ -21,6 +21,7 @@ class WsClient {
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
   Timer? _retry;
+  Timer? _ping;
   bool _closed = false;
   Duration _backoff = const Duration(seconds: 1);
 
@@ -44,6 +45,18 @@ class WsClient {
         _backoff = const Duration(seconds: 1);
         _status.add(true);
       }, onError: (Object _) {});
+      // Three-Pi hub: the socket runs through the floating hub address. If the Pi behind it
+      // dies, an idle socket never notices; a small frame every 25 s meets a reset from the Pi
+      // that took the address over, which ends the stream and reconnects. The hub ignores it.
+      _ping?.cancel();
+      _ping = Timer.periodic(const Duration(seconds: 25), (_) {
+        if (_channel != channel) return;
+        try {
+          channel.sink.add('ping');
+        } catch (_) {
+          // closed meanwhile: the stream's onDone/onError reconnects
+        }
+      });
       _sub = channel.stream.listen(
         (data) {
           _backoff = const Duration(seconds: 1);
@@ -64,6 +77,7 @@ class WsClient {
   }
 
   void _scheduleReconnect() {
+    _ping?.cancel();
     if (_closed) return;
     _status.add(false);
     _sub?.cancel();
@@ -76,6 +90,7 @@ class WsClient {
   Future<void> dispose() async {
     _closed = true;
     _retry?.cancel();
+    _ping?.cancel();
     await _sub?.cancel();
     await _channel?.sink.close();
     await _controller.close();
