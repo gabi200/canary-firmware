@@ -677,6 +677,17 @@ class TriangulationOut(BaseModel):
     contributors: list[TriangulationContributor]
 
 
+class IncidentBriefOut(BaseModel):
+    """A few sentences for responders, written from database facts only (app.ai.brief)."""
+
+    incident_id: str
+    text: str
+    source: Literal["llm", "template"]
+    model: str | None  # the LLM that wrote it; None for the template
+    node: str  # the hub node that wrote it ("hub" in single mode)
+    generated_ts: datetime
+
+
 class ReadingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     device_id: str

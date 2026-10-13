@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from tests.conftest import auth_token, telemetry
 
 
@@ -181,3 +183,13 @@ async def test_timestamps_are_utc_aware_on_sqlite(client):
                                  headers=await _hdr(client, "mihai"))).json()
     for ts in (incident["opened_ts"], incident["updated_ts"], readings[0]["ts"]):
         assert ts.endswith(("Z", "+00:00")), ts
+
+
+async def test_an_infinite_reading_still_raises_the_alarm(client):
+    # The transition's event payload carries the value; Postgres' json type has no Infinity token.
+    body = telemetry("dev_gas_kitchen", "combustible_gas", float("inf"), zone_id="zone_kitchen",
+                     unit_id="unit_0312", edge_state="alarm")
+    resp = await client.post("/api/v1/telemetry", content=json.dumps(body),  # httpx's json= refuses inf
+                             headers={"content-type": "application/json"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["incident_state"] == "evacuation"

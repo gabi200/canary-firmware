@@ -1,5 +1,6 @@
 """Test config: SQLite-backed app, no MQTT. Env is set BEFORE importing app modules
-so the cached Settings pick up the test database."""
+so the cached Settings pick up the test database. A CANARY_DATABASE_URL of
+postgresql+asyncpg://... runs the same suite against Postgres."""
 
 from __future__ import annotations
 
@@ -16,7 +17,8 @@ os.environ["CANARY_CARE_KEY"] = "dGVzdC1vbmx5LWNhcmUta2V5LTMyLWJ5dGVzLWxvbmc="  
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
-from app.db import SessionLocal, engine, init_db  # noqa: E402
+from app.config import settings  # noqa: E402
+from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed  # noqa: E402
 
@@ -29,9 +31,18 @@ def _remove_db_files() -> None:
         path.unlink(missing_ok=True)
 
 
+async def _drop_tables() -> None:
+    """Postgres has no file to delete: drop every table, init_db then creates them afresh."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
 @pytest_asyncio.fixture
 async def client() -> AsyncClient:
-    _remove_db_files()
+    if settings.is_postgres:
+        await _drop_tables()
+    else:
+        _remove_db_files()
     await init_db()
     async with SessionLocal() as session:
         await seed(session)

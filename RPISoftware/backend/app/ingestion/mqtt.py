@@ -6,6 +6,10 @@
 - anything else is ignored. The connected client is shared (app.ingestion.broker) so the API
   can publish device commands to the same local broker.
 
+Three-Pi mode: every node keeps a publish-only connection (`subscribe=False`, device commands from
+the API) and only the processing node subscribes, as client id `canary-processing`: the broker
+disconnects an older client with the same id, so two Pis can never both consume.
+
 aiomqtt is imported lazily so the rest of the app (and the test suite) imports
 cleanly even when the MQTT client / broker is absent. The consumer reconnects with
 backoff; a broker outage degrades cloud detection but never the edge-local alarm
@@ -65,10 +69,14 @@ async def dispatch(topic: str, raw: bytes, retain: bool = False, received_ts: fl
         log.exception("error handling MQTT message on %r", topic[:200])
 
 
-async def run_mqtt_consumer(stop: asyncio.Event) -> None:
+PROCESSING_CLIENT_ID = "canary-processing"
+
+
+async def run_mqtt_consumer(stop: asyncio.Event, subscribe: bool = True) -> None:
     import aiomqtt  # lazy import
 
     topic = settings.mqtt_subscribe
+    fenced = subscribe and settings.cluster_mode == "triple"
     backoff = 1.0
     while not stop.is_set():
         try:
@@ -77,10 +85,16 @@ async def run_mqtt_consumer(stop: asyncio.Event) -> None:
                 port=settings.mqtt_port,
                 username=settings.mqtt_username,
                 password=settings.mqtt_password,
+                identifier=PROCESSING_CLIENT_ID if fenced else None,
+                # three Pis: notice a dead broker (the hub address moved to another Pi) quickly
+                keepalive=15 if settings.cluster_mode == "triple" else 60,
                 queue_type=broker.StampedQueue,  # stamps each message's receive time
             ) as client:
-                await client.subscribe(topic, qos=1)
-                log.info("MQTT consumer subscribed to %s", topic)
+                if subscribe:
+                    await client.subscribe(topic, qos=1)
+                    log.info("MQTT consumer subscribed to %s", topic)
+                else:
+                    log.info("MQTT publish-only connection to %s", settings.mqtt_host)
                 backoff = 1.0
                 broker.client = client
                 try:
@@ -90,7 +104,8 @@ async def run_mqtt_consumer(stop: asyncio.Event) -> None:
                         if stop.is_set():
                             break
                 finally:
-                    broker.client = None
+                    if broker.client is client:  # a newer connection may already have replaced it
+                        broker.client = None
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - reconnect on any broker/network error

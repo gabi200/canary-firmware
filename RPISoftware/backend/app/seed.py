@@ -38,13 +38,18 @@ async def seed(session: AsyncSession) -> None:
     session.add(
         Building(id=BUILDING_ID, name="Bloc A1", address="Str. Exemplu 12, Bucuresti", timezone="Europe/Bucharest")
     )
+    # Postgres enforces foreign keys, and with no relationship()s a flush orders its INSERTs by
+    # class name, not by dependency: flush each level before adding the rows that point at it.
+    await session.flush()
     session.add(Floor(id="flr_03", building_id=BUILDING_ID, level=3, label="Etaj 3"))
+    await session.flush()
 
     # residential units + one common-area unit on floor 3
     session.add(Unit(id="unit_0312", building_id=BUILDING_ID, floor_id="flr_03", label="Ap. 12", kind="residential"))
     session.add(Unit(id="unit_0313", building_id=BUILDING_ID, floor_id="flr_03", label="Ap. 13", kind="residential"))
     session.add(Unit(id="unit_0314", building_id=BUILDING_ID, floor_id="flr_03", label="Ap. 14", kind="residential"))
     session.add(Unit(id="common", building_id=BUILDING_ID, floor_id="flr_03", label="Spații comune", kind="common"))
+    await session.flush()
 
     # pos_x/pos_y: simple floor-3 layout in metres (arbitrary origin) for triangulation.
     zones = [
@@ -55,6 +60,7 @@ async def seed(session: AsyncSession) -> None:
     ]
     for z in zones:
         session.add(z)
+    await session.flush()
 
     devices = [
         ("dev_gas_kitchen", "zone_kitchen", "unit_0312", SensorType.combustible_gas),
@@ -90,6 +96,7 @@ async def seed(session: AsyncSession) -> None:
     ]
     for u in users:
         session.add(u)
+    await session.flush()
     # Resident -> home unit. ana & ioana share Ap. 12; radu in Ap. 13; elena in Ap. 14.
     resident_units = [
         ("usr_ana", "unit_0312"),
@@ -103,6 +110,7 @@ async def seed(session: AsyncSession) -> None:
     session.add(StaffBuilding(user_id="usr_mihai", building_id=BUILDING_ID))
 
     session.add(AssemblyPoint(id="ap_main", building_id=BUILDING_ID, label="Punct adunare - parcare fata", lat=44.4268, lon=26.1025))
+    await session.flush()
     session.add(
         EvacuationRoute(
             id="er_flr03",

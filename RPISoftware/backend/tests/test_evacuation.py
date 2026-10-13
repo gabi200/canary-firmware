@@ -109,6 +109,7 @@ async def test_evacuation_returns_empty_route_when_every_waypoint_is_invalid(cli
 async def test_evacuation_orders_routes_by_floor_and_id(client):
     async with SessionLocal() as session:
         session.add(Floor(id="flr_02", building_id="bld_007", level=2, label="Etaj 2"))
+        await session.flush()  # the floor first: Postgres checks foreign keys, a flush orders by class name
         session.add_all(
             [
                 EvacuationRoute(

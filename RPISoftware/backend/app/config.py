@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -46,6 +47,20 @@ class Settings(BaseSettings):
     # --- detection tuning ---
     clear_hold_samples: int = 3  # consecutive below-clear samples before resolution/false_alarm
     escalation_persist_seconds: int = 120
+
+    # --- cluster: one Pi ("single") or three redundant Pis ("triple"), RUNME.md section 3 ---
+    cluster_mode: Literal["single", "triple"] = "single"
+    node_name: str = "hub"  # triple: this Pi's home role, processing | web | ai
+    processing_ip: str = ""  # triple: the three Pis' LAN addresses (the same on every Pi)
+    web_ip: str = ""
+    ai_ip: str = ""
+    vip: str = ""  # triple: the floating address of the hub (sensors, dashboard, app)
+    cluster_secret: str = ""  # triple: node-to-node API key, written by scripts/pi_setup.sh --cluster
+    vrrp_state_file: str = "/run/canary/vrrp_state"  # keepalived writes MASTER / BACKUP / FAULT here
+
+    # --- AI accelerator: Raspberry Pi AI HAT+ 2 serving an LLM through hailo-ollama ---
+    llm_url: str = ""  # e.g. http://host.docker.internal:11434; empty: incident briefs use a template
+    llm_model: str = "qwen2.5-instruct:1.5b"
 
     # --- bootstrap ---
     auto_create_schema: bool = True

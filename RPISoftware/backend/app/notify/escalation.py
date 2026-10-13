@@ -165,7 +165,10 @@ async def queue(session: AsyncSession, incident: Incident, state: IncidentState)
 
 
 def _spawn(event_id: str) -> None:
-    task = asyncio.get_running_loop().create_task(deliver(event_id))
+    name = f"escalation:{event_id}"
+    if any(t.get_name() == name for t in _tasks):
+        return  # already being delivered here (resume_pending runs again at each processing takeover)
+    task = asyncio.get_running_loop().create_task(deliver(event_id), name=name)
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
 

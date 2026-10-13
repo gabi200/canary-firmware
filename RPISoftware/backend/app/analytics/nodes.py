@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, func, literal, select, update
+from sqlalchemy import Float, cast, delete, func, literal, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analytics.environment import (
@@ -232,7 +232,8 @@ class NodeService:
         if self.session.bind.dialect.name == "sqlite":
             anchor = literal(utc(since).strftime("%Y-%m-%d %H:%M:%S.%f"))
             return (func.julianday(column) - func.julianday(anchor)) * 86400.0
-        return func.extract("epoch", column - literal(utc(since)))
+        # EXTRACT is numeric on Postgres: the driver's Decimal sums would not mix with the float ones
+        return cast(func.extract("epoch", column - literal(utc(since))), Float)
 
     async def analyses(self, nodes: Sequence[Node], now: datetime) -> dict[str, NodeAnalysis]:
         history = await self._trend_history(nodes, now)

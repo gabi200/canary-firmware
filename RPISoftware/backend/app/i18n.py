@@ -151,6 +151,26 @@ RO: dict[str, str] = {
     "evacuation": "evacuare",
     "resolution": "rezolvat",
     "false_alarm": "alarmă falsă",
+    # incident brief template (app.ai.brief): sentences, then the words put into them
+    "{hazard} in {zone} since {time}; state: {state}, severity: {severity}.":
+        "{hazard} în {zone} din {time}; stare: {state}, severitate: {severity}.",
+    "Estimated source: {zone}, confidence {confidence}%.": "Sursa estimată: {zone}, încredere {confidence}%.",
+    "The sensor pattern resembles {signature}.": "Tiparul senzorilor seamănă cu {signature}.",
+    "People present (estimate): {present_estimate}; confirmed safe: {confirmed_safe}; "
+    "need help: {need_help}; unaccounted: {unaccounted}.":
+        "Persoane prezente (estimare): {present_estimate}; în siguranță: {confirmed_safe}; "
+        "cer ajutor: {need_help}; neconfirmate: {unaccounted}.",
+    "an unknown zone": "o zonă necunoscută",
+    "false alarm": "alarmă falsă",
+    "info": "informare",
+    "warning": "avertizare",
+    "critical": "critică",
+    "a smouldering fire": "un foc mocnit",
+    "a flaming fire": "un incendiu cu flacără",
+    "a gas leak": "o scurgere de gaz",
+    "steam": "abur",
+    "cooking fumes": "fumul de la gătit",
+    "an aerosol spray": "un spray cu aerosoli",
 }
 
 
@@ -168,6 +188,11 @@ def translate(lang: str, text: str, **values: object) -> str:
 def tr(text: str, **values: object) -> str:
     """`text` in the current request's language, then formatted with `values`."""
     return translate(_lang.get(), text, **values)
+
+
+def current_language() -> str:
+    """The current request's language (ro | en), for text written elsewhere (e.g. on the AI node)."""
+    return _lang.get()
 
 
 class LanguageMiddleware:

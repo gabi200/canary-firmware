@@ -283,6 +283,8 @@ async def _handle_status(base: str, raw: bytes, retain: bool, now: datetime) -> 
             log.warning("dropping %s status from %r: node %s is %s (base topics must be unique)",
                         kind.value, base, node.id, node.kind)
             return
+        elif retain and settings.cluster_mode == "triple":
+            return  # another Pi's broker may hold an old copy; the next live document follows within 15-60 s
         elif uptime == node.last_uptime_ms:
             return  # duplicate: retained re-delivery of a document already stored
         elif node.last_uptime_ms is not None and uptime < node.last_uptime_ms:
@@ -337,6 +339,8 @@ async def _handle_availability(base: str, raw: bytes, retain: bool, now: datetim
         log.debug("ignoring availability payload on %r", base)
         return
     online = text == "online"
+    if retain and online and settings.cluster_mode == "triple":
+        return  # may be an old copy on another Pi's broker; a live status document proves "online"
     async with SessionLocal() as session:
         node = await session.scalar(select(Node).where(Node.mqtt_base == base))
         if node is None:

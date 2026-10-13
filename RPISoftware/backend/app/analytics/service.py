@@ -1,4 +1,9 @@
-"""Analytics service: runs triangulation and the hazard signature classifier from live DB state."""
+"""Analytics service: runs triangulation and the hazard signature classifier from live DB state.
+
+The pure estimates (triangulation, the signature shadow model) go through app.ai.offload: the AI
+node computes them in three-Pi mode, this process otherwise. The signature rules, which may hold
+or release an escalation, always run here.
+"""
 
 from __future__ import annotations
 
@@ -8,10 +13,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.analytics.signature import model as signature_model
+from app.ai import offload
 from app.analytics.signature.features import extract_features, parse_snapshot
 from app.analytics.signature.rules import SignatureAssessment, assess
-from app.analytics.triangulation import SensorPoint, TriangulationResult, triangulate
+from app.analytics.triangulation import SensorPoint, TriangulationResult
 from app.detection.thresholds import thresholds_for
 from app.enums import NodeKind, SensorType
 from app.models import Incident, Node, NodeStatus, SensorReading, SignatureAssessmentRow, TriangulationSnapshot, Zone
@@ -101,7 +106,7 @@ class AnalyticsService:
                 )
             )
 
-        result = triangulate(sensors, zones)
+        result = await offload.triangulate(sensors, zones)
         if result.source_zone_id is None:
             return None
 
@@ -159,7 +164,7 @@ class AnalyticsService:
         ).all()
         features = extract_features([parse_snapshot(_epoch(r.ts), r.payload) for r in rows])
         assessment = assess(features)
-        shadow = signature_model.predict(features)
+        shadow = await offload.signature_shadow(features)  # never raises: a failing AI node means here
         if shadow is not None and shadow.label != assessment.label:
             log.info("signature %s: rules %s (%.2f), shadow %s (%.2f)", node_id, assessment.label,
                      assessment.confidence, shadow.label, shadow.confidence)

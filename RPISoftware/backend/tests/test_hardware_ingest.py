@@ -328,13 +328,15 @@ async def test_nodes_and_history_are_for_managers_and_dispatchers(client):
 async def _other_building_resident(client) -> dict:
     """Auth headers of `vlad`, a resident of a second building (bld_008)."""
     async with SessionLocal() as s:
-        s.add_all([
+        for row in (
             Building(id="bld_008", name="Bloc B"),
             Floor(id="flr_b1", building_id="bld_008", level=1),
             Unit(id="unit_b11", building_id="bld_008", floor_id="flr_b1", label="Ap. 1"),
             User(id="usr_vlad", username="vlad", role="resident"),
             ResidentUnit(user_id="usr_vlad", unit_id="unit_b11", building_id="bld_008"),
-        ])
+        ):
+            s.add(row)
+            await s.flush()  # in order: Postgres checks foreign keys, a flush orders by class name
         await s.commit()
     return await _hdr(client, "vlad")
 

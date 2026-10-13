@@ -3,7 +3,9 @@
 Lifespan: create schema -> seed demo data -> start the MQTT consumer (if enabled)
 and the hourly retention task. The MQTT task is best-effort: if the broker / aiomqtt
 is unavailable the API still serves and the HTTP telemetry ingress remains usable
-for testing.
+for testing. Three-Pi mode (app.cluster): every node serves the API and keeps a publish-only
+broker connection; the MQTT subscription and retention run only while this node holds the
+processing lease.
 """
 
 from __future__ import annotations
@@ -12,24 +14,31 @@ import asyncio
 import contextlib
 import logging
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Coroutine
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.admin import router as admin_router
+from app.api.ai import router as ai_router
+from app.api.cluster import router as cluster_router
 from app.api.device_commands import router as commands_router
 from app.api.household import router as household_router
 from app.api.routes import router
+from app import cluster
 from app.care.service import CareUnavailable
 from app.config import settings
 from app.db import init_db
 from app.i18n import LanguageMiddleware
+from app.realtime.ws import manager
 from app.retention import run_retention
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("canary")
+
+CANCEL_WAIT_S = 3.0
 
 
 class RedactTokens(logging.Filter):
@@ -47,41 +56,93 @@ for _name in ("uvicorn.access", "uvicorn.error"):
     logging.getLogger(_name).addFilter(RedactTokens())
 
 
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    if settings.auto_create_schema:
-        await init_db()
-    if settings.auto_seed:
-        from app.seed import seed_if_empty
+class _Workloads:
+    """This process's background tasks. The processing ones (MQTT subscription, retention,
+    escalation resume) run for the life of a single hub, and in three-Pi mode only while this
+    node holds the processing lease."""
 
-        await seed_if_empty()
+    def __init__(self, stop: asyncio.Event) -> None:
+        self.stop = stop
+        self.tasks: dict[str, asyncio.Task] = {}
 
-    from app.notify import escalation
+    def spawn(self, name: str, coro: Coroutine[Any, Any, None]) -> None:
+        self.tasks[name] = asyncio.create_task(coro, name=name)
 
-    await escalation.resume_pending()  # escalation retries survive a restart
+    async def cancel(self, name: str) -> None:
+        task = self.tasks.pop(name, None)
+        if task is not None:
+            task.cancel()
+            # Bounded, and our own cancellation still propagates: a task cancelled mid-query can
+            # spend a query timeout closing its session; it is stopped, waiting adds nothing.
+            await asyncio.wait({task}, timeout=CANCEL_WAIT_S)
 
-    stop = asyncio.Event()
-    retention_task = asyncio.create_task(run_retention(stop))
-    mqtt_task: asyncio.Task | None = None
-    if settings.mqtt_enabled:
+    async def mqtt(self, subscribe: bool) -> None:
+        """(Re)connect to the broker, subscribed or publish-only."""
+        await self.cancel("mqtt")
+        if not settings.mqtt_enabled:
+            return
         try:
             from app.ingestion.mqtt import run_mqtt_consumer
 
-            mqtt_task = asyncio.create_task(run_mqtt_consumer(stop))
-            log.info("MQTT consumer task started")
+            self.spawn("mqtt", run_mqtt_consumer(self.stop, subscribe=subscribe))
+            log.info("MQTT %s task started", "consumer" if subscribe else "publisher")
         except Exception as exc:  # noqa: BLE001 - never block API startup on MQTT
             log.warning("MQTT consumer not started: %s", exc)
+
+    async def start_processing(self) -> None:
+        from app.ingestion import hardware
+        from app.notify import escalation
+
+        hardware.reset_state()  # in-memory state from an earlier turn as processing node is stale
+        await escalation.resume_pending()  # escalation retries survive a restart or a failover
+        self.spawn("retention", run_retention(self.stop))
+        await self.mqtt(subscribe=True)
+
+    async def stop_processing(self) -> None:
+        await self.mqtt(subscribe=False)  # the consumer first: it is what must not run twice
+        await self.cancel("retention")
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    cluster.check_config()
+    if cluster.triple():
+        await cluster.wait_for_db()  # Patroni may still be electing a primary
+    async with cluster.schema_lock():  # three Pis booting together: one creates and seeds at a time
+        if settings.auto_create_schema:
+            await init_db()
+        if settings.auto_seed:
+            from app.seed import seed_if_empty
+
+            await seed_if_empty()
+
+    from app.notify import escalation
+
+    stop = asyncio.Event()
+    work = _Workloads(stop)
+    if settings.llm_url:
+        from app.ai.llm import run_probe
+
+        work.spawn("llm_probe", run_probe(stop))
+    if cluster.triple():
+        manager.forwarder = cluster.forward
+        await work.mqtt(subscribe=False)
+        work.spawn("cluster", cluster.run(stop, work.start_processing, work.stop_processing))
+    else:
+        await work.start_processing()
 
     try:
         yield
     finally:
         stop.set()
+        lease_task = work.tasks.pop("cluster", None)
+        if lease_task is not None:  # let it stop processing and hand the lease on
+            await asyncio.wait({lease_task}, timeout=5)
+            lease_task.cancel()
         await escalation.stop()
-        for task in (mqtt_task, retention_task):
-            if task is not None:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
+        for name in list(work.tasks):
+            await work.cancel(name)
+        manager.forwarder = None
 
 
 app = FastAPI(
@@ -104,6 +165,8 @@ app.include_router(router)
 app.include_router(household_router)
 app.include_router(commands_router)
 app.include_router(admin_router)
+app.include_router(ai_router)
+app.include_router(cluster_router)
 
 
 @app.exception_handler(CareUnavailable)
@@ -114,10 +177,13 @@ async def care_unavailable(_: Request, exc: CareUnavailable) -> JSONResponse:
 
 @app.get("/health", tags=["meta"])
 async def health() -> dict:
-    """`ingest`: MQTT messages waiting to be processed and the oldest one's wait (s)."""
+    """`ingest`: MQTT messages waiting to be processed and the oldest one's wait (s). `cluster`: this
+    node, and whether it runs the processing workloads (always in single mode)."""
     from app.ingestion.broker import ingest_stats
 
-    return {"status": "ok", "service": "canary-backend", "version": "0.1.0", "ingest": ingest_stats()}
+    return {"status": "ok", "service": "canary-backend", "version": "0.1.0", "ingest": ingest_stats(),
+            "cluster": {"mode": settings.cluster_mode, "node": cluster.node_name(),
+                        "processing": cluster.holds_processing()}}
 
 
 @app.get("/", tags=["meta"])

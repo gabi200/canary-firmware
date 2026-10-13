@@ -7,6 +7,8 @@ are plain tables so the rest of the app is storage-agnostic.
 
 from __future__ import annotations
 
+import json
+import math
 from collections.abc import AsyncIterator
 
 from sqlalchemy import event, text
@@ -25,10 +27,34 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
+def _finite(value):
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _finite(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_finite(v) for v in value]
+    return value
+
+
+def _json_dumps(value) -> str:
+    """JSON columns. json.dumps writes NaN/Infinity as bare tokens, which Postgres' json type refuses
+    (SQLite stores them): they become null, as the API already renders them."""
+    return json.dumps(_finite(value))
+
+
 # pre-ping guards against dropped server connections; a local SQLite file has none, and on the
 # Pi every ping is one more thread round trip per session.
-engine = create_async_engine(settings.database_url, future=True, pool_pre_ping=not settings.database_url.startswith(
-    "sqlite"))
+engine = create_async_engine(
+    settings.database_url, future=True, json_serializer=_json_dumps,
+    pool_pre_ping=not settings.database_url.startswith("sqlite"),
+    # Postgres (three-Pi mode): a query to a primary that lost power gets no TCP reset and would
+    # wait for minutes; time out instead, so the pool reconnects to the newly promoted primary.
+    # Connecting too: asyncpg waits 60 s by default, and a connect started in the seconds before
+    # pgproxy marks a dead primary down hangs that long, well after the new primary is up (drill:
+    # the lease loop stalled 40 s that way). pgproxy is local, so 5 s is plenty.
+    connect_args={"timeout": 5, "command_timeout": 30} if settings.is_postgres else {},
+)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 if engine.dialect.name == "sqlite":
@@ -78,15 +104,18 @@ async def init_db() -> None:
         if settings.is_postgres:
             # TimescaleDB extension + hypertables (idempotent, best-effort).
             try:
-                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb"))
-                for table, time_col in _HYPERTABLES:
-                    await conn.execute(
-                        text(
-                            "SELECT create_hypertable("
-                            f"'{table}', '{time_col}', if_not_exists => TRUE, "
-                            "migrate_data => TRUE)"
+                # In a savepoint: a failed statement aborts the whole Postgres transaction, and the
+                # commit would then silently roll back the tables created above.
+                async with conn.begin_nested():
+                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb"))
+                    for table, time_col in _HYPERTABLES:
+                        await conn.execute(
+                            text(
+                                "SELECT create_hypertable("
+                                f"'{table}', '{time_col}', if_not_exists => TRUE, "
+                                "migrate_data => TRUE)"
+                            )
                         )
-                    )
             except Exception:  # pragma: no cover - timescaledb may be absent
                 # Plain Postgres without the extension still works; hypertables are an
                 # optimization, not a correctness requirement.

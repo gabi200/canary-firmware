@@ -46,8 +46,9 @@ class UTCDateTime(TypeDecorator):
     cache_ok = True
 
     def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
-        if value is not None and value.tzinfo is not None:
-            value = value.astimezone(timezone.utc)
+        if value is not None:
+            # naive is UTC, as on read (asyncpg would take a naive value as the hub's local time)
+            value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
         return value
 
     def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
@@ -540,3 +541,26 @@ class SignatureAssessmentRow(Base):
     shadow_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_version: Mapped[str | None] = mapped_column(String, nullable=True)
     ts: Mapped[datetime] = _ts_col(index=True)
+
+
+# --------------------------------------------------------------------------- #
+# Three-Pi cluster (app.cluster); unused in single mode
+# --------------------------------------------------------------------------- #
+class ClusterNode(Base):
+    """One row per Pi, heartbeated every couple of seconds. Times are the DB server's clock."""
+
+    __tablename__ = "cluster_nodes"
+    name: Mapped[str] = mapped_column(String, primary_key=True)  # processing | web | ai
+    last_seen_ts: Mapped[datetime] = mapped_column(UTCDateTime)
+    up_since_ts: Mapped[datetime] = mapped_column(UTCDateTime)  # this process's first heartbeat
+    info: Mapped[dict] = mapped_column(JSON, default=dict)  # {"vip": bool, "accelerator": {...} | None}
+
+
+class ClusterLease(Base):
+    """A singleton role (today only `processing`): held by `holder` until `expires_ts` (DB clock)."""
+
+    __tablename__ = "cluster_leases"
+    role: Mapped[str] = mapped_column(String, primary_key=True)
+    holder: Mapped[str | None] = mapped_column(String, nullable=True)
+    expires_ts: Mapped[datetime] = mapped_column(UTCDateTime)
+    acquired_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
