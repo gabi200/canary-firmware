@@ -19,9 +19,11 @@ contract: [`docs/HARDWARE.md`](./docs/HARDWARE.md).
 | 5 | E2E | §5 below | incident reaches `evacuation`, unaccounted drops |
 | 6 | Hub stack (Docker) | `docker compose up -d --build --wait` | exit 0; `docker compose ps` shows 3 × `(healthy)` |
 | 7 | Hardware path | `docker compose --profile sim run --rm hw-sim --scenario smoke --fast --exit` | exit 0; the summary goes `ok` → `attention` → `danger` (§7.2) |
+| 8 | Three-Pi hub | `docker compose exec postgres patronictl list` (§9) | one `Leader`, one `Sync Standby`, one `Replica` |
 
 Checks 1–3 need no Docker/Flutter. Check 4 needs Flutter. Check 5 needs the backend
-running. Checks 6–7 need Docker and `scripts/pi_setup.sh` run once.
+running. Checks 6–7 need Docker and `scripts/pi_setup.sh` run once. Check 8 only applies to
+the three-Pi hub (RUNME §3).
 
 ---
 
@@ -350,3 +352,58 @@ device simply re-publishes on its next heartbeat. To drop **all** retained messa
 Commands (`<base>/valve/set`, `<base>/buzzer/set`) must never be retained: a retained
 command is executed again on every reconnect. If one was published with `-r`, clear it
 the same way: `mosquitto_pub -o /tmp/hub.opts -r -n -t '<base>/valve/set'`.
+
+---
+
+## 9. Three-Pi hub (RUNME §3)
+
+On any of the three Pis, from `RPISoftware/`. Each Pi runs, besides mosquitto, backend and web:
+`etcd` (consensus), `postgres` (PostgreSQL under Patroni, config `/etc/patroni/patroni.yml` in the
+container), `pgproxy` (HAProxy: the backend's `pgproxy:5432`, forwards to the primary) and
+`keepalived` (the floating IP, VIP).
+
+### 9.1 Health
+```bash
+docker compose ps                                            # etcd, postgres "(healthy)"; pgproxy, keepalived "Up"
+docker compose exec postgres patronictl list                 # one Leader, one Sync Standby, one Replica; same TL, Lag 0
+docker compose exec etcd etcdctl endpoint health --cluster   # three "is healthy"
+docker compose exec keepalived cat /run/canary/vrrp_state    # MASTER on the VIP holder, BACKUP on the other two
+docker compose logs pgproxy | grep -E "is (UP|DOWN)" | tail -1   # "Server postgres/<the Leader> is UP"
+curl -s localhost/health                                     # "cluster": {"mode": "triple", "node": ..., "processing": ...}
+```
+- `vrrp_state`: `MASTER` = this Pi holds the VIP. `BACKUP` = healthy, standing by. `FAULT` = this
+  Pi's front door check fails (nginx → backend `/health` on port 80, or the broker on 1883, does not
+  answer here), so it will not take the VIP. `STOP` = keepalived stopped or not started yet.
+- pgproxy marks every server but the primary DOWN (`Layer7 wrong status, code: 503`): normal.
+- With a Pi down, `patronictl` first prints `ERROR ... Max retries exceeded` about that Pi's etcd:
+  harmless. keepalived's `WARNING - keepalived was built for newer Linux` and `max_auto_priority`
+  NOTICE at start are harmless too.
+- `ttl`, `loop_wait` and the other `bootstrap.dcs` values of `cluster/patroni/patroni.yml` are
+  read once, when the cluster is created; change them later with
+  `docker compose exec postgres patronictl edit-config`.
+
+### 9.2 Common problems
+| Symptom | Cause | Fix |
+|---|---|---|
+| `postgres` / `keepalived` keep restarting; log `CANARY_NODE_IP ... is not an address of this Pi` | `.env` copied from another Pi without re-running `scripts/pi_setup.sh` here, or the Pi did not get its reserved address | `scripts/pi_setup.sh` on this Pi (check `hostname -I`), then `docker compose up -d` |
+| log `... is not set in .env` (postgres, keepalived) or `... must be set in .env` (pgproxy) | the three-Pi lines are missing | `scripts/pi_setup.sh --cluster ...` on one Pi, copy its `.env`, `scripts/pi_setup.sh` here |
+| etcd log `bind: cannot assign requested address` or `expected IP in URL for binding (http://:2380)` | the same two causes, reported by etcd itself | same fixes |
+| `patronictl list`: members `stopped` / `creating replica` | first start, or a replica copying the primary | wait a minute; `docker compose logs postgres` |
+| no `Leader` in `patronictl list`; backend logs database errors; pgproxy log `proxy 'postgres' has no server available!` | two Pis down: etcd has no majority, Postgres is read-only on purpose | bring one back: the cluster recovers by itself |
+| a replica never catches up, log `requested WAL segment ... has already been removed` | its Pi was away longer than the WAL the others keep for it (2 GB) | `docker compose exec postgres patronictl reinit canary <its name>` (copies the primary again) |
+| no VIP anywhere, every `vrrp_state` is `FAULT` | no Pi's front door works: the backend waits for the database (no Patroni primary), or the brokers are down | `patronictl list`, `docker compose logs backend mosquitto` |
+| the VIP answers from two Pis / sensors flap | VRRP between the Pis is blocked (a firewall or VLAN filtering IP protocol 112), or another VRRP router on the LAN uses id 61 | allow protocol 112 between the three addresses; `docker compose logs keepalived` shows which adverts arrive |
+| sensors log in on one Pi's broker but not after the VIP moved | `mosquitto/config/passwd` differs between the Pis | copy it from the Pi where the sensors were added, `scripts/pi_setup.sh` on the others (RUNME §3.3) |
+
+**A Pi rebuilt with an empty disk.** Its etcd stops with `member ... has already been
+bootstrapped` (the cluster still lists the old member). Replace the member, here `ai` at
+`192.168.1.13`:
+```bash
+# on a healthy Pi
+docker compose exec etcd etcdctl member list                   # the first column of the ai row is its ID
+docker compose exec etcd etcdctl member remove <ID>
+docker compose exec etcd etcdctl member add ai --peer-urls=http://192.168.1.13:2380
+# on the rebuilt Pi, after RUNME §3.2 steps 1, 3 and 4
+CANARY_ETCD_STATE=existing docker compose up -d etcd            # joins the running cluster, once
+docker compose up -d --build                                    # the rest; Postgres copies itself from the primary
+```

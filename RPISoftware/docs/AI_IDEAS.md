@@ -131,12 +131,16 @@ continuous overnight flow can also be caught, which is a classic hidden leak.
 
 ### Incident briefing for responders
 
+> **Status:** implemented (`app/ai/brief.py`, `GET /api/v1/incidents/{id}/brief`, the Dispatch
+> view's "Incident brief" card). A small model on a Raspberry Pi AI HAT+ 2 (hailo-ollama,
+> `CANARY_LLM_URL`) writes it on the hub itself, with no cloud model: the facts never leave the
+> building's network. Without the HAT, or when it is slow or offline, a fixed template answers.
+
 An LLM turns the structured incident timeline into a short Romanian brief for ISU or
 the alarm-receiving centre, for example: "Fire likely started in the kitchen of
 apartment 12 around 03:14. Smoke reached the stairwell at 03:17. Two residents
 unaccounted; last radar presence in the apartment 14 bedroom." It should be generated
-only from database facts and never be in the alarm path. Use a cloud model when online
-and a small local model (llama.cpp on the Pi) as an offline fallback.
+only from database facts and never be in the alarm path.
 
 ### Learning from manager feedback
 

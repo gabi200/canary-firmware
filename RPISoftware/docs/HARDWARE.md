@@ -414,8 +414,34 @@ a broken socket is dropped.
 | `CANARY_ESCALATION_SECRET` | unset | HMAC key signing the webhook; written to `.env` by `scripts/pi_setup.sh`; share it with the partner |
 | `CANARY_CARE_KEY` | unset | Fernet key encrypting care profiles; written to `.env` by `scripts/pi_setup.sh`. Unset → care endpoints 503 |
 | `CANARY_RETENTION_DAYS` | `14` | hourly, in batches of 2000 rows, delete `node_status`, `sensor_readings`, `occupancy_estimates`, `signature_assessments` and `triangulation_snapshots` rows older than this; `0` disables. Incidents, events, check-ins, escalation deliveries and the audit log are never pruned |
+| `CANARY_LLM_URL` | unset | hailo-ollama on a Raspberry Pi AI HAT+ 2 (e.g. `http://host.docker.internal:11434`) for incident briefs; unset → template briefs |
+| `CANARY_LLM_MODEL` | `qwen2.5-instruct:1.5b` | model hailo-ollama runs for the briefs |
+| `CANARY_CLUSTER_MODE` | `single` | `single`: one Pi runs everything. `triple`: three redundant Pis (RUNME.md section 3) |
+| `CANARY_NODE_NAME` | `hub` | triple: this Pi's home role, `processing`, `web` or `ai` (written per Pi by `scripts/pi_setup.sh`) |
+| `CANARY_PROCESSING_IP` / `_WEB_IP` / `_AI_IP` | unset | triple: the three Pis' LAN addresses |
+| `CANARY_VIP` | unset | triple: the floating hub address (sensors' MQTT host, dashboard and app URL) |
+| `CANARY_CLUSTER_SECRET` | unset | triple: key of the node-to-node calls (`X-Canary-Cluster-Key` on `/internal/...`, never proxied by nginx) |
+| `CANARY_VRRP_STATE_FILE` | `/run/canary/vrrp_state` | triple: where keepalived writes whether this Pi holds the hub address |
 
 Under docker compose, `docker-compose.yml` fixes the MQTT connection (enabled, broker
-`mosquitto:1883`, user `hub`; the password comes from `.env`) and uses SQLite at
-`/data/canary.db` unless `.env` sets `CANARY_DATABASE_URL`. Every other setting can be
-added to `.env`.
+`mosquitto:1883` or `CANARY_MQTT_HOST`, user `hub`; the password comes from `.env`) and uses
+SQLite at `/data/canary.db` unless `.env` sets `CANARY_DATABASE_URL`. Every other setting can be
+added to `.env`. In triple mode `scripts/pi_setup.sh --cluster` writes the cluster settings,
+`CANARY_MQTT_HOST=<VIP>` and the shared Postgres URL (`?host=<p>:5432&host=<w>:5432&host=<a>:5432&target_session_attrs=read-write`).
+
+### Three-Pi mode (`CANARY_CLUSTER_MODE=triple`)
+
+| Work | Runs on | When that Pi is down |
+| --- | --- | --- |
+| Hub address (VIP): broker for the sensors, dashboard, API for the app | the `web` Pi (keepalived) | moves to `processing`, then `ai` (a few seconds) |
+| Processing: MQTT subscription, detection, incidents, notifications, retention | holder of the `processing` lease (`cluster_leases`, 15 s, renewed every 2 s) | `web`, then `ai`, after the lease expires; back home 30 s after the Pi returns |
+| AI: triangulation, signature shadow model, incident brief (`POST /internal/ai/{task}`) | the `ai` Pi (AI HAT+ 2 for the brief) | computed by the caller itself (CPU; briefs fall back to the template) |
+| Database | Patroni Postgres primary (synchronous replica on another Pi) | a replica is promoted |
+
+Safety rules (detection, the incident state machine, false-alarm and signature rules) always run
+on the processing Pi and never wait on another one. Every Pi serves the API and forwards its
+WebSocket events to the others (`POST /internal/cluster/broadcast`). Because another Pi's broker
+may hold old retained copies, a retained `status` of a known node and a retained `online` are
+ignored in this mode (the next live document follows within 15 s for air, 60 s for water); a
+retained `offline` (last will) still applies. `GET /api/v1/cluster` (hoa_manager, technician,
+system_admin) shows which Pi runs what.
