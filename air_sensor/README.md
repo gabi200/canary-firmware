@@ -2,8 +2,8 @@
 
 Firmware for an ESP32-S3 that watches carbon monoxide, combustible gas, and
 particulate levels, grades each channel against configurable thresholds, and
-signals hazards on an RGB LED and an active buzzer. It also reports
-temperature, humidity, and radar presence. It provides a local HTTP API,
+signals hazards on an RGB LED and an active buzzer, plus an optional SSD1306
+OLED. It also reports temperature, humidity, and radar presence. It provides a local HTTP API,
 optional MQTT, a WiFiManager provisioning portal, and authenticated
 browser-based OTA firmware updates.
 
@@ -105,6 +105,8 @@ wiring; read the LED-pin warning above first.
 | RGB LED blue | GPIO48 | `LED_BLUE_PIN`, `LED_COMMON_ANODE = false` |
 | Active-buzzer driver | GPIO39 | `BUZZER_ACTIVE_HIGH = true` |
 | Config button | GPIO0 | `CONFIG_BUTTON_ACTIVE_LOW = true`, `INPUT_PULLUP` |
+| SSD1306 OLED SDA (optional) | GPIO8 | `DISPLAY_SDA_PIN`, I2C 400 kHz, address `0x3C` |
+| SSD1306 OLED SCL (optional) | GPIO9 | `DISPLAY_SCL_PIN` |
 
 The sensors, the ESP32-S3, and any driver circuits need a shared ground.
 
@@ -163,6 +165,52 @@ intended for an active buzzer or its driver; use a transistor driver when the
 buzzer voltage or current exceeds the ESP32-S3 GPIO limits, and add flyback
 suppression for an inductive load.
 
+**SSD1306 OLED (I2C, optional).** A 128x64 SSD1306 module: VCC to 3.3 V,
+GND, SDA to GPIO8, SCL to GPIO9. Most modules carry their own pull-ups; add
+4.7 kOhm to 3.3 V on SDA and SCL if yours does not. The address is `0x3C`
+(`DISPLAY_I2C_ADDRESS`; `0x3D` when the module's address jumper is moved).
+At boot the firmware probes the address. With no answer it logs
+`[display] no SSD1306 at 0x3C; display off` and runs exactly as without a
+display; set `DISPLAY_ENABLED = false` to skip the probe entirely. The display
+is drawn by its own low-priority task every 250 ms (`DISPLAY_REFRESH_MS`).
+The safety loop only hands it a snapshot, so a slow, missing or failing
+display never delays the LED or the buzzer. The display is a convenience: it
+is not part of the alarm, and the alarm never depends on it.
+
+### Display
+
+The top row always shows the connection status: `WiFi -61dBm` or `No WiFi` on
+the left, and on the right the MQTT broker (the hub): `Hub OK`, `Hub lost`
+(enabled but not connected), `Hub off` (MQTT disabled) or `Updating` while an
+OTA upload runs. While the setup portal is open it reads `Setup <name>-setup`,
+the access point to join.
+
+Normally the four rows below show the readings, each with the channel's grade
+on the right (`ok`, `warm`, `WARN`, `DANGER`, `FAULT`; a faulted channel shows
+`--` instead of a stale value):
+
+```
+WiFi -61dBm        Hub OK
+CO    3 ppm        ok
+Gas   640          ok
+PM2.5 7 PM10 9     ok
+22.4C 42%    occupied
+192.168.1.40
+```
+
+The last reading row carries temperature and humidity, then the warm-up time
+left (`warm 4:12`) or the radar presence (`occupied`, `empty`). The bottom row
+is the device's IP address, the portal address (`Join, open 192.168.4.1`) or
+`Connecting to Wi-Fi...`.
+
+Any alert takes over the screen below the status row: a warning shows
+`WARNING`, a danger `DANGER`, then the hazard (`Carbon monoxide`,
+`Combustible gas`, `Smoke or dust (PM)`), its value and the alarm state:
+`Alarm sounding` (the alert area blinks inverted twice a second), `Silenced
+4:59` or `Alarm if it rises` for a warning. The installer self-test shows
+`SELF-TEST`. The layout is decided in `DisplayModel.cpp`, which the native
+tests cover; `OledDisplay.cpp` only draws it.
+
 ### LED and buzzer vocabulary
 
 One color per hazard class, so the cause is identifiable across a room
@@ -200,7 +248,8 @@ same grade, CO outranks gas, and gas outranks particulate.
 ## Build and upload
 
 The checked setup was built with Arduino CLI 1.5.1, ESP32 core 3.3.11,
-ArduinoJson 7.4.3, PubSubClient 2.8, and WiFiManager 2.0.17. The repository
+ArduinoJson 7.4.3, PubSubClient 2.8, WiFiManager 2.0.17, and U8g2 2.36.19 (the
+OLED). The repository
 includes `arduino-cli.yaml`; it places board and library data in `.arduino/`.
 
 ### Arduino CLI
@@ -211,7 +260,7 @@ present. On a fresh setup, install the declared versions:
 ```bash
 ./.tools/arduino-cli core update-index --config-file arduino-cli.yaml
 ./.tools/arduino-cli core install esp32:esp32@3.3.11 --config-file arduino-cli.yaml
-./.tools/arduino-cli lib install ArduinoJson@7.4.3 PubSubClient@2.8 WiFiManager@2.0.17 --config-file arduino-cli.yaml
+./.tools/arduino-cli lib install ArduinoJson@7.4.3 PubSubClient@2.8 WiFiManager@2.0.17 U8g2@2.36.19 --config-file arduino-cli.yaml
 ./.tools/arduino-cli compile --config-file arduino-cli.yaml \
   --fqbn esp32:esp32:esp32s3:CDCOnBoot=cdc,PartitionScheme=default \
   --warnings all --output-dir build .
@@ -243,7 +292,7 @@ the port):
    **Preferences → Additional Boards Manager URLs**.
 2. Install **esp32 by Espressif Systems** version 3.3.11 from Boards Manager.
 3. Install these Library Manager versions: ArduinoJson 7.4.3, PubSubClient 2.8,
-   and WiFiManager 2.0.17.
+   WiFiManager 2.0.17, and U8g2 2.36.19.
 4. Open this directory as the `air_sensor` sketch, select an ESP32-S3 board
    matching the hardware, set **USB CDC On Boot** to **Enabled**, select the
    **default** OTA-capable partition scheme, then compile/upload. Review
@@ -653,6 +702,10 @@ the actual board, sensors, LED, and buzzer.
   or `R16V` module GPIO36 and GPIO37 drive nothing.
 - [ ] From power-on until `setup()` completes, confirm the buzzer stays
   silent; add an external pull-down on GPIO39 if it chirps.
+- [ ] If an SSD1306 is fitted: confirm the boot screen, then readings, Wi-Fi
+  and `Hub OK`; run the self-test and a CO/gas test exposure and confirm the
+  alert screen appears with the LED and buzzer. Unplug the display's SDA line
+  while running and confirm the LED and buzzer timing do not change.
 - [ ] With the MQ5 heater at temperature, measure the divider output at the
   sensor's highest expected reading and confirm it stays at or below 2.5 V.
 - [ ] After 24–48 hours of MQ5 burn-in, record `gas.adc` across a full

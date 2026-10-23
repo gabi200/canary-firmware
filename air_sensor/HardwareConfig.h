@@ -82,6 +82,18 @@ constexpr uint8_t CONFIG_BUTTON_PIN = 0;
 constexpr bool CONFIG_BUTTON_ACTIVE_LOW = true;
 constexpr uint32_t CONFIG_BUTTON_HOLD_MS = 3000;
 
+// Optional SSD1306 128x64 OLED on I2C (OledDisplay). GPIO8/9 are the
+// ESP32-S3 Arduino Wire defaults and are not strapping pins. A display that
+// does not answer at boot is simply left off; nothing else depends on it.
+constexpr bool DISPLAY_ENABLED = true;
+constexpr int8_t DISPLAY_SDA_PIN = 8;
+constexpr int8_t DISPLAY_SCL_PIN = 9;
+// 0x3C on most modules; 0x3D when the module's address jumper is moved.
+constexpr uint8_t DISPLAY_I2C_ADDRESS = 0x3C;
+constexpr uint32_t DISPLAY_I2C_HZ = 400000;
+// A full frame is ~1 KB, about 25 ms at 400 kHz, sent by the display task.
+constexpr uint32_t DISPLAY_REFRESH_MS = 250;
+
 // Some ZE03 units are found in question-and-answer mode, where they stay
 // silent until polled. Nudging a quiet sensor back to active upload costs one
 // 9-byte write and turns a permanently dead channel into a working one.

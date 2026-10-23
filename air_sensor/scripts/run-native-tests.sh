@@ -33,6 +33,14 @@ g++ "${common_flags[@]}" -I"$repo_dir/tests/native/stubs" \
   -o "$config_binary"
 "$config_binary"
 
+display_binary="$out_dir/canary-display-model-test"
+g++ "${common_flags[@]}" \
+  "$repo_dir/AirController.cpp" \
+  "$repo_dir/DisplayModel.cpp" \
+  "$repo_dir/tests/native/display_model_test.cpp" \
+  -o "$display_binary"
+"$display_binary"
+
 mesh_binary="$out_dir/canary-mesh-frame-test"
 g++ "${common_flags[@]}" \
   "$repo_dir/tests/native/mesh_frame_test.cpp" \

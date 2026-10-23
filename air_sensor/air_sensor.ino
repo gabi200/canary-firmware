@@ -1,12 +1,14 @@
 #include "AirController.h"
 #include "ConfigStore.h"
 #include "DeviceConfig.h"
+#include "DisplayModel.h"
 #include "HardwareConfig.h"
 #include "HttpApi.h"
 #include "Ld2410Reader.h"
 #include "MeshLink.h"
 #include "MqttService.h"
 #include "NetworkConfig.h"
+#include "OledDisplay.h"
 #include "Pms5003Reader.h"
 #include "SensorReadings.h"
 #include "Ze03Reader.h"
@@ -29,6 +31,9 @@ std::unique_ptr<NetworkConfig> networkConfig;
 std::unique_ptr<HttpApi> httpApi;
 std::unique_ptr<MqttService> mqttService;
 std::unique_ptr<MeshLink> meshLink;
+OledDisplay display;
+bool displayReady = false;
+uint32_t lastDisplayMs = 0;
 DeviceConfig deviceConfig{};
 DeviceConfig pendingDeviceConfig{};
 
@@ -102,6 +107,46 @@ void notifyStateChanged() {
   if (mqttService) {
     mqttService->requestStatusPublish();
   }
+}
+
+// Hands the display task a snapshot of what the sensor knows; the task does
+// the drawing, so this costs the safety loop one small copy per refresh.
+void publishDisplay(uint32_t nowMs) {
+  if (!displayReady || !elapsed(nowMs, lastDisplayMs, Hardware::DISPLAY_REFRESH_MS)) {
+    return;
+  }
+  lastDisplayMs = nowMs;
+  const RuntimeStatus runtime = runtimeStatus();
+  const ParticulateReading& particulate = controller->particulate();
+  DisplayInput input{};
+  input.coState = controller->coState();
+  input.gasState = controller->gasState();
+  input.particulateState = controller->particulateState();
+  input.coPpm = controller->co().ppm;
+  input.gasAdc = controller->gasAdc();
+  input.pm25Ugm3 = particulate.pm2_5;
+  input.pm10Ugm3 = particulate.pm10;
+  input.climateValid = runtime.climate.valid;
+  input.temperatureTenthsC = runtime.climate.value.temperatureTenthsC;
+  input.humidityTenthsPercent = runtime.climate.value.humidityTenthsPercent;
+  input.presenceValid = runtime.presence.valid;
+  input.presenceDetected = runtime.presence.value.detected;
+  input.alarmState = controller->alarmState();
+  input.alarmHazard = controller->alarmHazard();
+  input.selfTest = controller->selfTestActive(nowMs);
+  input.silenceRemainingMs = controller->silenceRemainingMs(nowMs);
+  input.warmupRemainingMs = controller->warmupRemainingMs(nowMs);
+  input.portalActive = networkConfig && networkConfig->portalActive();
+  input.wifiConnected = runtime.wifiConnected;
+  input.wifiRssi = runtime.wifiRssi;
+  input.mqttEnabled = deviceConfig.mqttEnabled;
+  input.mqttConnected = runtime.mqttConnected;
+  input.otaInProgress = runtime.otaInProgress;
+  input.ipAddress = runtime.wifiIp;
+  // NetworkConfig names its setup access point the same way
+  std::snprintf(input.portalName, sizeof(input.portalName), "%s-setup",
+                deviceConfig.deviceName);
+  display.publish(input);
 }
 
 void applyLedOutput(uint32_t nowMs) {
@@ -360,6 +405,7 @@ void setup() {
   controller->begin(millis());
   lastCoRecoveryMs = millis();
   applyOutputs(millis());
+  displayReady = display.begin(Hardware::FIRMWARE_VERSION);
 
   const bool forcePortal = configPortalRequested();
   Serial.printf("[boot] air-sensor firmware %s, stored api_token length=%u%s\n",
@@ -388,6 +434,7 @@ void loop() {
   }
   applyOutputs(nowMs);
   pollConfigButton(nowMs);
+  publishDisplay(nowMs);
 
   networkConfig->process();
   if (!networkServicesStarted && networkConfig->ready()) {
