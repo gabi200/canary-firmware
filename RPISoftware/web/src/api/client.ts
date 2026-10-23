@@ -50,7 +50,8 @@ async function request<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    // FormData sets its own multipart boundary
+    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     // backend-generated text (analysis headlines, advice) follows the dashboard language
     "Accept-Language": getLang(),
     ...(options.headers as Record<string, string> | undefined),
@@ -86,5 +87,8 @@ export const api = {
     request<T>(path, token, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, token: string | null, body: unknown) =>
     request<T>(path, token, { method: "PATCH", body: JSON.stringify(body) }),
+  put: <T>(path: string, token: string | null, body: unknown) =>
+    request<T>(path, token, { method: "PUT", body: JSON.stringify(body) }),
+  upload: <T>(path: string, token: string | null, form: FormData) => request<T>(path, token, { method: "POST", body: form }),
   delete: <T = void>(path: string, token: string | null) => request<T>(path, token, { method: "DELETE" }),
 };

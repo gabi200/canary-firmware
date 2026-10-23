@@ -17,7 +17,12 @@ the contract is docs/HARDWARE.md):
   latch, valve and the 180 s alarm timeout;
 * commands like the firmware: <base>/buzzer/set (air SILENCE|TEST, water
   SILENCE) and <base>/valve/set (water OPEN|CLOSE), answered on
-  <base>/command/result.
+  <base>/command/result;
+* with --ota-port, the firmware's HTTP /api/ota (air on the port, water on the
+  next one): bearer token checked right after the headers (a wrong one is
+  refused before the body is read, like the device), multipart field
+  `firmware` with a .bin name, ota.in_progress while it uploads, then a reboot
+  into the next patch version. The status documents then carry wifi.ip (1.1.0).
 
 --fast runs every firmware timer, heartbeat and scenario step 5x faster
 (uptime_ms included, so it stays consistent).
@@ -27,12 +32,14 @@ Examples:
     python hw_sim.py --scenario co --fast               # CO warning -> danger -> clear
     MQTT_USERNAME=hub MQTT_PASSWORD=... python hw_sim.py --scenario leak
     docker compose --profile sim run --rm hw-sim --scenario all --fast --exit
+    OTA_TOKEN=sim-device-token python hw_sim.py --ota-port 8081   # dashboard firmware pushes
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
+import http.server
 import json
 import os
 import queue
@@ -47,7 +54,7 @@ from typing import Callable, Iterator
 
 import paho.mqtt.client as mqtt
 
-FIRMWARE_VERSION = "1.0.0"      # HardwareConfig.h FIRMWARE_VERSION (both devices)
+FIRMWARE_VERSION = "1.1.0"      # HardwareConfig.h FIRMWARE_VERSION (both devices)
 KEEPALIVE_S = 30                # MqttService.cpp MQTT_KEEPALIVE_SECONDS
 COMMAND_BYTES = 24              # MqttService.cpp COMMAND_BYTES: longer payloads are invalid
 BOOT_TO_MQTT_S = 4.0            # boot -> Wi-Fi joined -> broker connected, roughly
@@ -117,6 +124,10 @@ class Node:
         self.hb_anchor = 0.0
         self.boot_at = 0.0
         self.rssi = -60
+        self.firmware = FIRMWARE_VERSION
+        self.ota_active = False          # HttpApi::otaInProgress()
+        self.ota_reboot_at: float | None = None
+        self.ip: str | None = None       # wifi.ip, once the OTA server listens
 
     # --- device model hooks (subclasses) -------------------------------
     def boot(self, now: float) -> None:
@@ -194,6 +205,67 @@ class Node:
         self.drop()
         self.boot(now)
 
+    def wifi(self) -> dict:
+        wifi: dict = {"connected": True, "rssi": self.rssi + random.randint(-2, 2)}
+        if self.ip:
+            wifi["ip"] = self.ip
+        return wifi
+
+    # --- HttpApi /api/ota -------------------------------------------------
+    def serve_ota(self, bind: str, port: int, ip: str, token: str) -> None:
+        node = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, fmt, *a) -> None:
+                pass
+
+            def reply(self, code: int, doc: dict) -> None:
+                body = json.dumps(doc, separators=(",", ":")).encode()
+                self.close_connection = True
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self) -> None:
+                if self.path != "/api/ota":
+                    return self.reply(404, {"error": "not_found", "message": "Route not found"})
+                if self.headers.get("Authorization") != f"Bearer {token}":
+                    log(node.base, "OTA refused: bad bearer token")
+                    return self.reply(401, {"error": "unauthorized", "message": "Bearer authentication required"})
+                if node.ota_active:
+                    return self.reply(409, {"error": "ota_active", "message": "Firmware update is already in progress"})
+                length = int(self.headers.get("Content-Length") or 0)
+                if length <= 0:
+                    return self.reply(400, {"error": "invalid_request", "message": "Content-Length is required"})
+                node.ota_active = True
+                node.mark("ota")
+                image = ota_image(self.rfile.read(length), self.headers.get("Content-Type", ""))
+                if image is None or image[:1] != b"\xe9":
+                    node.ota_active = False
+                    node.mark("ota")
+                    return self.reply(500, {"error": "ota_failed", "message": "Malformed multipart firmware upload"
+                                            if image is None else "Firmware image is invalid"})
+                self.reply(200, {"ok": True, "rebooting": True})
+                log(node.base, f"OTA: {len(image)} bytes flashed; rebooting")
+                node.ota_reboot_at = node.clock.now() + 0.5  # OTA_REBOOT_DELAY_MS (device time)
+
+        server = http.server.ThreadingHTTPServer((bind, port), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.ip = ip
+        log(self.base, f"OTA: http://{ip}:{port}/api/ota (token from --ota-token / OTA_TOKEN)")
+
+    def finish_ota(self, now: float) -> None:
+        """Reboot into the uploaded image: the next patch version."""
+        self.ota_reboot_at = None
+        major, minor, patch = (self.firmware.split(".") + ["0", "0"])[:3]
+        self.firmware = f"{major}.{minor}.{int(patch) + 1 if patch.isdigit() else 1}"
+        self.ota_active = False
+        self.reboot(now)
+        self.connect()
+
     def _on_connect(self, client, userdata, flags, reason_code, properties) -> None:
         if client is not self.client:
             return
@@ -219,6 +291,8 @@ class Node:
 
     # --- the firmware MqttService loop ------------------------------------
     def service(self, now: float) -> None:
+        if self.ota_reboot_at is not None and now >= self.ota_reboot_at:
+            self.finish_ota(now)
         while not self.commands.empty():
             self._handle_command(*self.commands.get_nowait(), now)
         if self.step(now):
@@ -282,6 +356,21 @@ PRESENCE_EMPTY = {"detected": False, "moving": False, "stationary": False,
                   "moving_distance_cm": 0, "moving_energy": 0,
                   "stationary_distance_cm": 0, "stationary_energy": 0,
                   "detection_distance_cm": 0}
+
+
+def ota_image(body: bytes, content_type: str) -> bytes | None:
+    """The `firmware` part of a multipart upload, as HttpApi accepts it, or None."""
+    boundary = content_type.partition("boundary=")[2].strip('"').encode()
+    if not content_type.startswith("multipart/form-data") or not boundary:
+        return None
+    opening, closing = b"--" + boundary + b"\r\n", b"\r\n--" + boundary + b"--\r\n"
+    if not body.startswith(opening) or not body.endswith(closing):
+        return None
+    headers, sep, image = body[len(opening):-len(closing)].partition(b"\r\n\r\n")
+    text = headers.decode("latin-1").lower()
+    if not sep or 'name="firmware"' not in text or '.bin"' not in text or "application/octet-stream" not in text:
+        return None
+    return image
 
 
 def level_for(value: int, warn: int, danger: int) -> str:
@@ -456,7 +545,7 @@ class AirNode(Node):
         age = lambda limit: random.randint(0, limit)  # noqa: E731 - ms since the last frame
         silence_ms = (self.silenced_until - now) * 1000 if self.silence_active else 0
         return {
-            "device": {"name": self.name, "firmware": FIRMWARE_VERSION},
+            "device": {"name": self.name, "firmware": self.firmware},
             "uptime_ms": self.uptime_ms(now),
             "warmup_remaining_seconds": ceil_seconds(self.warmup_s * 1000 - self.uptime_ms(now)),
             "co": {"ppm": self.co_ppm, "peak_ppm": self.peaks["co"],
@@ -480,9 +569,9 @@ class AirNode(Node):
                       "silence_remaining_seconds": ceil_seconds(silence_ms),
                       "self_test": self.self_test_active(now),
                       "led_color": self.led_color(now), "led_on": self.led_on(now)},
-            "wifi": {"connected": True, "rssi": self.rssi + random.randint(-2, 2)},
+            "wifi": self.wifi(),
             "mqtt": {"enabled": True, "connected": True},
-            "ota": {"in_progress": False},
+            "ota": {"in_progress": self.ota_active},
         }
 
     def summary(self, now: float) -> str:
@@ -589,7 +678,7 @@ class WaterNode(Node):
         state = self.alarm_state(now)
         remaining_ms = (self.ALARM_S - (now - self.alarm_started)) * 1000 if state in ("sounding", "silenced") else 0
         return {
-            "device": {"name": self.name, "firmware": FIRMWARE_VERSION},
+            "device": {"name": self.name, "firmware": self.firmware},
             "uptime_ms": self.uptime_ms(now),
             "sensor": {"adc": self.adc, "initialized": self.sensor_state != "uninitialized",
                        "state": self.sensor_state, "wet_threshold": WET_THRESHOLD,
@@ -599,9 +688,9 @@ class WaterNode(Node):
                       "relay_active": self.valve == "closed"},
             "alarm": {"state": state, "sounding": state == "sounding",
                       "remaining_seconds": ceil_seconds(remaining_ms)},
-            "wifi": {"connected": True, "rssi": self.rssi + random.randint(-2, 2)},
+            "wifi": self.wifi(),
             "mqtt": {"enabled": True, "connected": True},
-            "ota": {"in_progress": False},
+            "ota": {"in_progress": self.ota_active},
         }
 
     def summary(self, now: float) -> str:
@@ -619,6 +708,10 @@ class Sim:
         self.air = AirNode(args.air_base, self.clock, args)
         self.water = WaterNode(args.water_base, self.clock, args)
         self.nodes: list[Node] = [self.air, self.water]
+        if getattr(args, "ota_port", 0):
+            for offset, node in enumerate(self.nodes):
+                node.serve_ota(args.ota_bind, args.ota_port + offset, args.ota_ip or local_ip(args.ota_bind),
+                               args.ota_token)
 
     # -- lifecycle
     def start(self) -> None:
@@ -813,6 +906,16 @@ def script(sim: Sim, name: str) -> Scenario:
 # ============================================================ main
 
 
+def local_ip(bind: str) -> str:
+    """The address the hub reaches the OTA server at: the bind address, else this host's LAN address."""
+    if bind not in ("", "0.0.0.0"):
+        return bind
+    with contextlib.suppress(OSError), socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect(("192.0.2.1", 9))  # no packet is sent: only picks the outgoing interface
+        return s.getsockname()[0]
+    return "127.0.0.1"
+
+
 def valid_base(value: str) -> str:
     if not value or len(value) > 64 or any(c in value for c in "+#") or value.startswith("/"):
         raise argparse.ArgumentTypeError("1-64 characters, no MQTT wildcards (+ #), no leading '/'")
@@ -857,7 +960,17 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                    help="stop after this many real seconds (default 0 = until Ctrl-C)")
     p.add_argument("--exit", action="store_true", help="stop as soon as the scenario has finished")
     p.add_argument("-v", "--verbose", action="store_true", help="also print every status document")
+    p.add_argument("--ota-port", type=int, default=0,
+                   help="serve the firmware's HTTP /api/ota: air on this port, water on the next (default 0 = off)")
+    p.add_argument("--ota-bind", default="127.0.0.1",
+                   help="OTA listen address (default 127.0.0.1; 0.0.0.0 when the hub runs in Docker)")
+    p.add_argument("--ota-ip", default="",
+                   help="address reported as wifi.ip (default: the bind address, or this host's LAN address)")
+    p.add_argument("--ota-token", default=os.environ.get("OTA_TOKEN", "sim-device-token"),
+                   help="the devices' API token (env OTA_TOKEN, default sim-device-token)")
     args = p.parse_args(argv)
+    if args.ota_port and not 0 < args.ota_port < 65535:
+        p.error("--ota-port must be 1-65534")
     if args.air_base == args.water_base:
         p.error("--air-base and --water-base must differ: every device needs a unique base topic")
     if args.warmup < 0:

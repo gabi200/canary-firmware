@@ -122,7 +122,7 @@ constexpr size_t UART_RX_BUFFER_BYTES = 1024;
 constexpr uint32_t CONFIG_SAVE_RETRY_MS = 1000;
 constexpr uint32_t CONFIG_REBOOT_DELAY_MS = 500;
 
-constexpr char FIRMWARE_VERSION[] = "1.0.0";
+constexpr char FIRMWARE_VERSION[] = "1.1.0";
 
 inline uint8_t outputLevel(bool active, bool activeHigh) {
   return activeLevelFor(active, activeHigh) ? HIGH : LOW;

@@ -25,9 +25,12 @@ from app.models import (
     Building,
     Device,
     DeviceCommand,
+    FirmwareUpdate,
     Floor,
     Node,
+    NodeFirmwareSeen,
     NodeInbox,
+    NodeOtaTarget,
     ResidentUnit,
     StaffBuilding,
     Unit,
@@ -407,7 +410,7 @@ async def delete_zone(
 async def delete_node(
     node_id: str, scope: Scope = Depends(staff_scope), session: AsyncSession = Depends(get_session)
 ) -> Response:
-    """Remove an offline node with its logical devices and command history. Raw snapshots and
+    """Remove an offline node with its logical devices, command and firmware history. Raw snapshots and
     readings stay (incident evidence; nothing references them by key; retention prunes them),
     so the same base topic coming back re-registers as usual and sees that earlier history."""
     node = await session.get(Node, node_id)
@@ -417,6 +420,8 @@ async def delete_node(
     await session.execute(delete(Device).where(Device.id.in_(device_ids(node.id, node.kind))))
     await session.execute(delete(DeviceCommand).where(DeviceCommand.node_id == node.id))
     await session.execute(delete(NodeInbox).where(NodeInbox.node_id == node.id))
+    for model in (NodeOtaTarget, NodeFirmwareSeen, FirmwareUpdate):
+        await session.execute(delete(model).where(model.node_id == node.id))
     base = node.mqtt_base
     await session.delete(node)
     session.add(scope.audit("admin_node_deleted", node_id, []))

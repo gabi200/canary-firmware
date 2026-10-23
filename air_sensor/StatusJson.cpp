@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -224,6 +225,16 @@ bool buildStatusJson(const DeviceConfig& config,
   JsonObject wifi = document["wifi"].to<JsonObject>();
   wifi["connected"] = runtime.wifiConnected;
   wifi["rssi"] = runtime.wifiRssi;
+  if (runtime.wifiConnected && runtime.wifiIp != 0) {
+    // the hub suggests this address for firmware pushes (staff confirm it there)
+    char ip[16];
+    std::snprintf(ip, sizeof(ip), "%u.%u.%u.%u",
+                  static_cast<unsigned>(runtime.wifiIp & 0xFF),
+                  static_cast<unsigned>((runtime.wifiIp >> 8) & 0xFF),
+                  static_cast<unsigned>((runtime.wifiIp >> 16) & 0xFF),
+                  static_cast<unsigned>(runtime.wifiIp >> 24));
+    wifi["ip"] = ip;
+  }
 
   JsonObject mqtt = document["mqtt"].to<JsonObject>();
   mqtt["enabled"] = config.mqttEnabled;

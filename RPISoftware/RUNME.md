@@ -197,6 +197,19 @@ the leak latch after `--scenario leak`:
 docker compose exec mosquitto mosquitto_pub -o /tmp/hub.opts -t water-sensor/valve/set -m OPEN
 ```
 
+Firmware pushes from **Administration → Firmware** work against the simulator too:
+`--ota-port 8081` serves the firmware's `/api/ota` (air on 8081, water on 8082) and adds
+`wifi.ip` to the status documents. A push with the right token reboots the node into the
+next patch version (1.1.0 → 1.1.1); a wrong token is refused like on the device:
+
+```bash
+docker compose --profile sim run --rm hw-sim --ota-port 8081 --ota-bind 0.0.0.0
+```
+
+In the dashboard, open **Device access** on each node: the address is the reported IP plus
+the port (e.g. `172.18.0.7:8081`, water `:8082`), the token `sim-device-token` (`--ota-token` /
+`OTA_TOKEN`). Any ESP32-S3 / ESP32-C3 application `.bin` passes the hub's image check.
+
 The legacy `canary.telemetry.v1` simulator (the seeded demo building's sensors) still runs:
 `docker compose --profile sim run --rm simulator --scenario gas_leak`.
 
@@ -645,7 +658,7 @@ this Pi's own address (the VIP no longer exists). The cluster passwords may stay
 | `ana` | resident | mobile app |
 | `mihai` | hoa_manager | dashboard /manager (+ /dispatch, /sensors) |
 | `dispecer` | dispatcher_external | dashboard /dispatch (+ /sensors) |
-| `tehnician` | technician | dashboard /admin/rooms, /admin/devices (+ /sensors): rooms, new sensors, tests |
+| `tehnician` | technician | dashboard /admin/rooms, /admin/devices, /admin/firmware (+ /sensors): rooms, new sensors, tests, firmware updates |
 | `admin` | system_admin | everything |
 
 ## End-to-end demo (all layers, no hardware)

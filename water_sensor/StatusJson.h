@@ -14,6 +14,7 @@ struct RuntimeStatus {
   int32_t wifiRssi;
   bool mqttConnected;
   bool otaInProgress;
+  uint32_t wifiIp;  // IPv4 as IPAddress stores it (first octet in the low byte); 0 = none
 };
 
 using RuntimeStatusProvider = std::function<RuntimeStatus()>;

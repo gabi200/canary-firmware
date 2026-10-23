@@ -17,6 +17,9 @@ import type {
   AdminZoneCreate,
   AdminZonePatch,
   CommandRecord,
+  FirmwareUpdate,
+  NodeFirmware,
+  NodeFirmwareDetail,
   UnitKind,
 } from "./types";
 
@@ -198,5 +201,65 @@ export function useNodeCommandHistory(nodeId: string, enabled: boolean) {
     queryFn: () => api.get<CommandRecord[]>(`/api/v1/nodes/${enc(nodeId)}/commands?limit=20`, token),
     refetchInterval: enabled ? 5_000 : false,
     retry: false,
+  });
+}
+
+/** Every node of the building with its firmware version and push readiness. */
+export function useFirmware() {
+  const { token, buildingId } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "firmware", buildingId],
+    queryFn: () => api.get<NodeFirmware[]>(`/api/v1/admin/buildings/${enc(buildingId)}/firmware`, token),
+    // online / offline changes arrive as node events; this keeps readiness current without them
+    refetchInterval: 15_000,
+    retry: false,
+  });
+}
+
+/** One node's version history and pushes (history panel). */
+export function useNodeFirmware(nodeId: string, enabled: boolean) {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "firmware", "node", nodeId],
+    enabled,
+    queryFn: () => api.get<NodeFirmwareDetail>(`/api/v1/admin/nodes/${enc(nodeId)}/firmware`, token),
+    retry: false,
+  });
+}
+
+/** Pin the device's address and (optionally, when one is stored) its API token. */
+export function useSetOtaTarget() {
+  const { token } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ nodeId, address, deviceToken }: { nodeId: string; address: string; deviceToken?: string }) =>
+      api.put<NodeFirmware>(`/api/v1/admin/nodes/${enc(nodeId)}/ota-target`, token, {
+        address,
+        ...(deviceToken ? { token: deviceToken } : {}),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "firmware"] }),
+  });
+}
+
+export function useClearOtaTarget() {
+  const { token } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (nodeId: string) => api.delete(`/api/v1/admin/nodes/${enc(nodeId)}/ota-target`, token),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "firmware"] }),
+  });
+}
+
+/** Queue a .bin for one node; the hub pushes one node at a time (WebSocket `firmware_update`). */
+export function usePushFirmware() {
+  const { token } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ nodeId, file }: { nodeId: string; file: File }) => {
+      const form = new FormData();
+      form.append("firmware", file);
+      return api.upload<FirmwareUpdate>(`/api/v1/admin/nodes/${enc(nodeId)}/firmware`, token, form);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "firmware"] }),
   });
 }

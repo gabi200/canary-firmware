@@ -387,7 +387,7 @@ static void testBearerAuthentication() {
 }
 
 static RuntimeStatus mqttRuntimeStatus() {
-  return RuntimeStatus{100, 200, true, -42, true, false};
+  return RuntimeStatus{100, 200, true, -42, true, false, 0};
 }
 
 static DeviceConfig mqttConfig() {

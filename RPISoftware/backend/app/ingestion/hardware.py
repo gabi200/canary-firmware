@@ -25,12 +25,13 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analytics.environment import finite_number
+from app import firmware
 from app.analytics.nodes import broadcast_node, device_ids
 from app.config import settings
 from app.db import SessionLocal, engine
 from app.enums import NODE_CHANNELS, EdgeState, NodeKind, SensorType
 from app.ingestion.pipeline import ingest_telemetry
-from app.models import Device, Node, NodeInbox, NodeStatus, Zone
+from app.models import Device, Node, NodeFirmwareSeen, NodeInbox, NodeStatus, Zone
 from app.schemas import Location, ReadingThresholds, Signal, TelemetryPayload
 
 log = logging.getLogger("canary.hardware")
@@ -274,6 +275,7 @@ async def _handle_status(base: str, raw: bytes, retain: bool, now: datetime) -> 
             )
         ).first()
         node, zone = row if row is not None else (None, None)
+        previous_firmware, rebooted = node.firmware if node is not None else "", False
         if node is None:
             node = await _register(session, base, kind, doc, now)
             if node is None:
@@ -289,11 +291,14 @@ async def _handle_status(base: str, raw: bytes, retain: bool, now: datetime) -> 
             return  # duplicate: retained re-delivery of a document already stored
         elif node.last_uptime_ms is not None and uptime < node.last_uptime_ms:
             node.boot_epoch += 1  # rebooted (or the 32-bit uptime wrapped): new epoch
+            rebooted = not retain
             log.info("node %s rebooted; boot_epoch %d", node.id, node.boot_epoch)
 
         node.last_uptime_ms = uptime
         node.last_status = doc
         node.firmware = device_field(doc, "firmware") or node.firmware
+        if node.firmware and node.firmware != previous_firmware:
+            session.add(NodeFirmwareSeen(node_id=node.id, firmware=node.firmware, ts=now))
         if not retain:  # a live document proves the device is up; a retained one may be old
             node.online = True
             node.last_seen_ts = now
@@ -331,6 +336,8 @@ async def _handle_status(base: str, raw: bytes, retain: bool, now: datetime) -> 
                 log.info("incident %s -> %s (%s)", result.incident_id, result.incident_state, payload.device_id)
 
     await broadcast_node(node)
+    if rebooted:
+        await firmware.confirm_reboot(node, now)
 
 
 async def _handle_availability(base: str, raw: bytes, retain: bool, now: datetime) -> None:

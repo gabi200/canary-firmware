@@ -917,3 +917,19 @@ select.input { padding-right: 6px; }
   .admin-tabs::-webkit-scrollbar { display: none; }
   .admin-tabs a { padding: 10px 12px; white-space: nowrap; }
 }
+
+/* firmware (Administration: Firmware tab) */
+.fw-summary, .fw-push { margin-bottom: 14px; }
+.fw-summary .env-chips { list-style: none; padding: 0; margin: 0; }
+.fw-push h3 .icon { vertical-align: -0.2em; margin-right: 4px; }
+.fw-push input[type="file"] { color: var(--text); font-size: 14px; }
+.fw-targets { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; gap: 6px; }
+.fw-targets label { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; background: var(--bg); border: 1px solid var(--border); font-size: 14px; cursor: pointer; }
+.fw-targets li.muted label { cursor: not-allowed; }
+.fw-access, .fw-history { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.fw-history h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.fw-history ul { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+@media (max-width: 560px) {
+  .fw-targets label { grid-template-columns: 20px minmax(0, 1fr); }
+  .fw-targets label > :nth-child(n + 3) { grid-column: 2; }
+}

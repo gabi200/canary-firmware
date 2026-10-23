@@ -488,7 +488,8 @@ RuntimeStatus mqttRuntimeStatus() {
                        true,
                        -50,
                        true,
-                       false};
+                       false,
+                       0};
 }
 
 DeviceConfig mqttConfig() {

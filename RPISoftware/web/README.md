@@ -14,6 +14,14 @@ over WebSocket:
   zones, evacuation progress, and the incident timeline + actions. **Incident brief**:
   a short text summary generated on demand (`GET /incidents/{id}/brief`, never polled):
   the LLM on the AI HAT+ 2 (up to a minute) or a template without one.
+- **Administration → Firmware** (`/admin/firmware`; managers read, technicians and the
+  system admin act) — the firmware version of every sensor in the scope, each one's version
+  history and dashboard pushes, its pinned device address and API token ("Device access";
+  the token is write-only), and "Update firmware": pick the `.bin`, the page checks the chip
+  and image type before upload, lists the matching sensors and queues the push on each
+  selected one. Progress (`firmware_update` WebSocket events): waiting → sending →
+  installed, restarting → done (the version the sensor reports after its reboot) or failed
+  with the device's reason ([`docs/HARDWARE.md`](../docs/HARDWARE.md) §4, Firmware).
 - **Administration → Hub** (`/admin/hub`; managers, technicians, system admin) — the
   hub's Raspberry Pis (`GET /cluster`, every 10 s): one Pi running every role, or three
   redundant Pis (processing / web = the hub address / AI) with who runs which role now,

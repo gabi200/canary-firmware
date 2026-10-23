@@ -32,7 +32,8 @@ function throttle(fn: () => void, ms: number) {
  * `node` events (a hardware status/availability message was processed) refresh only the
  * sensor queries: summary + nodes (bursts coalesced) and the reporting nodes' raw history
  * (at most every 10 s). `command_result` events (a device answered a hardware-test command)
- * settle the live command store (lib/commands.ts).
+ * settle the live command store (lib/commands.ts). `firmware_update` events (a firmware push
+ * moved on) refresh the admin firmware queries.
  */
 export function useIncidentSocket(buildingId: string, token: string | null) {
   const qc = useQueryClient();
@@ -93,6 +94,11 @@ export function useIncidentSocket(buildingId: string, token: string | null) {
               historyDue.add(data.node_id);
               refreshHistory();
             }
+            return;
+          }
+          if (data.type === "firmware_update") {
+            // a firmware push moved on (uploading, flashed, confirmed, failed)
+            qc.invalidateQueries({ queryKey: ["admin", "firmware"] });
             return;
           }
           if (data.type === "command_result") {

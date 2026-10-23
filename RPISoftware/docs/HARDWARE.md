@@ -89,6 +89,11 @@ Vocabularies: channel `state` (`co`, `gas`, `particulate`) = `warmup|ok|warning|
 `gas.adc` is a raw, uncalibrated MQ5 ADC count (0–4095), **not ppm**. No wall
 clock on the devices: the hub timestamps on receipt.
 
+Firmware 1.1.0 (both devices) adds `wifi.ip`, the device's IPv4 address, while
+Wi-Fi is connected (`"wifi":{"connected":true,"rssi":-58,"ip":"192.168.1.40"}`).
+The hub only offers it as a suggestion for firmware pushes (§4, Firmware): staff
+pin the address the hub sends to.
+
 ## 2. Nodes (physical devices) and channels
 
 A **node** is one physical ESP32, keyed by its MQTT base topic and
@@ -230,7 +235,7 @@ and time remaining in `health.detail`.
 | PATCH | `/admin/units/{id}` `{"label"?, "kind"?}` | system_admin, hoa_manager | unit item; 409 making a unit with residents `common` |
 | GET / POST | `/admin/buildings/{id}/zones` (POST `{"label", "kind", "unit_id", "pos_x", "pos_y"}`, floor taken from the unit) | system_admin, hoa_manager | `[{"zone_id", "label", "kind", "unit_id", "unit_label", "floor_id", "floor_label", "pos_x", "pos_y", "nodes": [{"node_id", "name", "kind", "online", "status"}]}]` / 201 one |
 | PATCH / DELETE | `/admin/zones/{id}` (PATCH any of `{"label", "kind", "unit_id", "pos_x", "pos_y"}`) | system_admin, hoa_manager | zone item (devices in it follow a new unit) / 204; 409 while nodes or devices are assigned |
-| DELETE | `/admin/nodes/{node_id}` | system_admin, hoa_manager (their buildings) | 204: removes an **offline** node, its logical devices and its command history (409 `node online`); raw snapshots and readings stay (incident evidence, pruned by retention), so the same base topic re-registers as usual and sees that earlier history. Audited `admin_node_deleted` |
+| DELETE | `/admin/nodes/{node_id}` | system_admin, hoa_manager (their buildings) | 204: removes an **offline** node, its logical devices, its command history and its firmware data (push target, versions, pushes) (409 `node online`); raw snapshots and readings stay (incident evidence, pruned by retention), so the same base topic re-registers as usual and sees that earlier history. Audited `admin_node_deleted` |
 | POST | `/me/care-profiles` body `CareProfileIn` | resident | 201 `CareProfileOut`; 404 unit not one of the caller's residential units, 409 second `is_self`, 422 invalid (see below) |
 | PUT | `/me/care-profiles/{id}` body `CareProfileIn` | resident (owner) | `CareProfileOut`; 404 not the owner's |
 | DELETE | `/me/care-profiles/{id}` | resident (owner) | 204; hard delete with its care check-ins (works without `CANARY_CARE_KEY`) |
@@ -392,6 +397,40 @@ thresholds `co.warn_ppm`, `co.danger_ppm`, `gas.warn_adc`, `gas.danger_adc`, `pa
 `particulate.danger_pm2_5`, `particulate.warn_pm10`, `particulate.danger_pm10` / `sensor.wet_threshold`,
 `sensor.dry_threshold`; any other field → 400.
 
+### Firmware (`app/firmware.py`, `app/api/firmware.py`)
+
+The hub pushes a firmware image to a node through the node's own HTTP update
+endpoint (`POST http://<device>/api/ota`, firmware README "Web OTA"), the same way
+the device's `/update` page does: multipart field `firmware`, a `.bin` file name,
+`Authorization: Bearer <device API token>`. The device keeps its hazard alarm running
+while it flashes, answers `{"ok":true,"rebooting":true}` and reboots; its first live
+status document after the reboot (uptime reset) confirms the push with the version it
+now reports. One push runs at a time per hub process.
+
+The device address and API token are **pinned by staff**, never taken from MQTT unchecked:
+the broker has no ACLs, so a forged status document could otherwise point the hub, and
+the token, anywhere. The token is Fernet-encrypted under `CANARY_CARE_KEY` (unset → 503)
+and never returned. Every status document's `device.firmware` is tracked: the first
+document with a new value adds a version history row.
+
+Roles: reads for system_admin, hoa_manager and technician (their buildings); pinning and
+pushing for system_admin and technician. Out-of-scope ids answer 404.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| GET | `/admin/buildings/{building_id}/firmware` | every node: `{"node_id", "name", "kind", "zone_id", "online", "firmware", "reported_ip", "address", "token_set", "blocked", "last_update"}`. `reported_ip` = `wifi.ip` of the latest document (a suggestion); `address` = the pinned one; `blocked` = why a push would be refused now (`offline`, `no_target`, `busy`, `ota_active`) or null |
+| GET | `/admin/nodes/{node_id}/firmware` | the same plus `history` (`[{"firmware", "ts"}]`, newest first, from the first document that reported each version) and `updates` (last 20 pushes) |
+| PUT | `/admin/nodes/{node_id}/ota-target` body `{"address": "192.168.1.40" or "ip:port", "token": "<12-64 printable chars>"}` | the node's firmware entry. `token` may be left out to keep the stored one (e.g. to follow a new DHCP address); required for a new target (422). Audited `ota_target_set` (field names only) |
+| DELETE | `/admin/nodes/{node_id}/ota-target` | 204; audited `ota_target_cleared` |
+| POST | `/admin/nodes/{node_id}/firmware` multipart field `firmware` (the `<sketch>.ino.bin`) | 202 push `{"update_id", "node_id", "filename", "size", "sha256", "firmware_before", "firmware_after", "status", "detail", "requested_by_name", "created_ts", "finished_ts"}`. 413 over 4 MiB; 422 not an ESP32 application image for the node's chip (air ESP32-S3, water ESP32-C3; merged, bootloader and partition images are refused); 409 with `detail` = the `blocked` reason. Audited `firmware_push` with the image's sha256 |
+
+Push `status`: `queued` → `uploading` → `flashed` (the device took the image and reboots) →
+`confirmed` (it came back; `firmware_after` = the version it reports), or `failed` with
+`detail` = the device's error token (`unauthorized`: wrong token; `ota_active`;
+`ota_failed: <message>`), `no_target`, `hub_error` or a network error. `timeout` is computed
+on read: queued/uploading for 15 min, or flashed with no reboot seen within 5 min (a reboot
+within 30 min still confirms it).
+
 ## 5. WebSocket (`/api/v1/ws/incidents?building_id=&token=`)
 
 Existing `incident` and `checkin` events are unchanged. New event after every
@@ -403,7 +442,14 @@ processed hardware status/availability message (analysis only, no raw values):
 ```
 
 Clients refetch `summary` (and, on the dashboard, `nodes`/`history`) on `node`
-events, throttled; clients must ignore unknown event types. (The `ts` of `incident`
+events, throttled; clients must ignore unknown event types.
+
+A firmware push (§4, Firmware) sends an event on every status change:
+
+```json
+{"type": "firmware_update", "building_id": "bld_007", "node_id": "canary", "update_id": "…",
+ "status": "flashed", "detail": null, "firmware_after": null, "ts": "2026-10-23T12:00:00Z"}
+``` (The `ts` of `incident`
 and `checkin` events is also UTC, written `+00:00` instead of `Z`.)
 
 The hub sends each frame to all of a building's sockets at once, with a 2 s limit per
@@ -422,7 +468,7 @@ a broken socket is dropped.
 | `CANARY_PUBLIC_URL` | `http://localhost` | base of shareable links (household invites: `/join/<code>`) |
 | `CANARY_ESCALATION_URL` | unset | escalation webhook target (http/https); unset → no webhook |
 | `CANARY_ESCALATION_SECRET` | unset | HMAC key signing the webhook; written to `.env` by `scripts/pi_setup.sh`; share it with the partner |
-| `CANARY_CARE_KEY` | unset | Fernet key encrypting care profiles; written to `.env` by `scripts/pi_setup.sh`. Unset → care endpoints 503 |
+| `CANARY_CARE_KEY` | unset | Fernet key encrypting care profiles and the device API tokens of firmware push targets; written to `.env` by `scripts/pi_setup.sh`. Unset → care and firmware-target endpoints 503 |
 | `CANARY_RETENTION_DAYS` | `14` | hourly, in batches of 2000 rows, delete `node_status`, `sensor_readings`, `occupancy_estimates`, `signature_assessments` and `triangulation_snapshots` rows older than this; `0` disables. Incidents, events, check-ins, escalation deliveries and the audit log are never pruned |
 | `CANARY_LLM_URL` | unset | hailo-ollama on a Raspberry Pi AI HAT+ 2 (e.g. `http://host.docker.internal:11434`) for incident briefs; unset → template briefs |
 | `CANARY_LLM_MODEL` | `qwen2.5-instruct:1.5b` | model hailo-ollama runs for the briefs |

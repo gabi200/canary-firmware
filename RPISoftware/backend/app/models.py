@@ -146,6 +146,52 @@ class NodeInbox(Base):
     ts: Mapped[datetime] = _ts_col()
 
 
+class NodeOtaTarget(Base):
+    """Where and how the hub pushes firmware to a node (app.firmware): the device's HTTP address,
+    pinned by staff (never taken from MQTT unchecked), and its API token as a Fernet token under
+    CANARY_CARE_KEY. A new table so `nodes` stays untouched."""
+
+    __tablename__ = "node_ota_targets"
+    node_id: Mapped[str] = mapped_column(ForeignKey("nodes.id"), primary_key=True)
+    address: Mapped[str] = mapped_column(String)  # ip or ip:port
+    token_enc: Mapped[str] = mapped_column(String)
+    updated_ts: Mapped[datetime] = _ts_col()
+
+
+class NodeFirmwareSeen(Base):
+    """A firmware version a node reported, from the first status document that carried it."""
+
+    __tablename__ = "node_firmware_seen"
+    __table_args__ = (Index("ix_node_firmware_seen_node_ts", "node_id", "ts"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    node_id: Mapped[str] = mapped_column(String)
+    firmware: Mapped[str] = mapped_column(String)
+    ts: Mapped[datetime] = _ts_col()
+
+
+class FirmwareUpdate(Base):
+    """One firmware push from the dashboard to a node's `/api/ota`. status: queued | uploading |
+    flashed (the device took the image and reboots) | confirmed (it came back) | failed; a job
+    stuck before that reads as `timeout` (computed on read)."""
+
+    __tablename__ = "firmware_updates"
+    __table_args__ = (Index("ix_firmware_updates_node_created", "node_id", "created_ts"),)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    node_id: Mapped[str] = mapped_column(String)
+    building_id: Mapped[str] = mapped_column(String, index=True)
+    filename: Mapped[str] = mapped_column(String)
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String)
+    firmware_before: Mapped[str] = mapped_column(String, default="")
+    firmware_after: Mapped[str | None] = mapped_column(String, nullable=True)  # reported after the reboot
+    status: Mapped[str] = mapped_column(String, default="queued")
+    detail: Mapped[str | None] = mapped_column(String, nullable=True)  # device error token / network error
+    requested_by_user_id: Mapped[str] = mapped_column(String)
+    created_ts: Mapped[datetime] = _ts_col()
+    flashed_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    finished_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
 # --------------------------------------------------------------------------- #
 # People & access
 # --------------------------------------------------------------------------- #

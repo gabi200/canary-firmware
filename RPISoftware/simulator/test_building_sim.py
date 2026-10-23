@@ -341,6 +341,36 @@ class HubSetup(unittest.TestCase):
                 bs.Hub(url)
 
 
+class HwSimOta(unittest.TestCase):
+    """The simulated /api/ota takes multipart uploads the way the firmware's HttpApi does."""
+
+    def body(self, name="firmware", filename="air.bin", ctype="application/octet-stream", image=b"\xe9abc"):
+        head = (f'--b0\r\nContent-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+                f"Content-Type: {ctype}\r\n\r\n").encode()
+        return head + image + b"\r\n--b0--\r\n"
+
+    def test_image_is_the_firmware_part(self):
+        self.assertEqual(hw_sim.ota_image(self.body(), "multipart/form-data; boundary=b0"), b"\xe9abc")
+
+    def test_malformed_uploads_are_refused(self):
+        for body, ctype in ((self.body(name="file"), "multipart/form-data; boundary=b0"),
+                            (self.body(filename="air.hex"), "multipart/form-data; boundary=b0"),
+                            (self.body(ctype="text/plain"), "multipart/form-data; boundary=b0"),
+                            (self.body(), "multipart/form-data; boundary=other"),
+                            (self.body(), "application/octet-stream")):
+            with self.subTest(ctype=ctype):
+                self.assertIsNone(hw_sim.ota_image(body, ctype))
+
+    def test_reboot_after_ota_bumps_the_patch_version(self):
+        node = hw_sim.AirNode("canary", hw_sim.Clock(1.0), hw_sim.parse_args([]))
+        node.boot(0)
+        node.ota_active, node.ota_reboot_at = True, 0.0
+        with mock.patch.object(node, "connect"):
+            node.finish_ota(1.0)
+        self.assertEqual((node.firmware, node.ota_active, node.ota_reboot_at), ("1.1.1", False, None))
+        self.assertEqual(node.status(1.0)["device"]["firmware"], "1.1.1")
+
+
 class HwSimUnchanged(unittest.TestCase):
     """hw_sim.py's own CLI and single-pair behaviour stay as they were."""
 
@@ -349,7 +379,9 @@ class HwSimUnchanged(unittest.TestCase):
         base = {"scenario": "normal", "host": env.get("MQTT_HOST", "localhost"),
                 "port": int(env.get("MQTT_PORT", "1883")), "username": env.get("MQTT_USERNAME") or None,
                 "password": env.get("MQTT_PASSWORD") or None, "air_base": "canary", "water_base": "water-sensor",
-                "fast": False, "warmup": 20.0, "duration": 0.0, "exit": False, "verbose": False}
+                "fast": False, "warmup": 20.0, "duration": 0.0, "exit": False, "verbose": False,
+                # opt-in firmware OTA endpoint: off unless --ota-port is given
+                "ota_port": 0, "ota_bind": "127.0.0.1", "ota_ip": "", "ota_token": env.get("OTA_TOKEN", "sim-device-token")}
         return {**base, **changes}
 
     def test_defaults(self):
@@ -364,7 +396,7 @@ class HwSimUnchanged(unittest.TestCase):
 
     def test_errors(self):
         for argv in (["--air-base", "x", "--water-base", "x"], ["--warmup", "-1"], ["--scenario", "fire"],
-                     ["--air-base", "a/+"]):
+                     ["--air-base", "a/+"], ["--ota-port", "65535"]):
             with self.subTest(argv=argv), mock.patch("sys.stderr"), self.assertRaises(SystemExit):
                 hw_sim.parse_args(argv)
 

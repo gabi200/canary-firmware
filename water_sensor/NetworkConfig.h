@@ -18,6 +18,7 @@ class NetworkConfig {
   void process();
   bool wifiConnected() const;
   int32_t wifiRssi() const;
+  uint32_t wifiIp() const;
   bool portalActive() const;
   bool servicesReady() const;
   bool takeConfigChanged(DeviceConfig& output);
@@ -62,6 +63,7 @@ class NetworkConfig {
   TaskHandle_t taskHandle_;
   std::atomic<bool> wifiConnected_;
   std::atomic<int32_t> wifiRssi_;
+  std::atomic<uint32_t> wifiIp_;
   std::atomic<bool> portalActive_;
   std::atomic<bool> servicesReady_;
   bool taskStarted_;

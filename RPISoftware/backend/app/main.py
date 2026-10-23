@@ -25,6 +25,7 @@ from app.api.admin import router as admin_router
 from app.api.ai import router as ai_router
 from app.api.cluster import router as cluster_router
 from app.api.device_commands import router as commands_router
+from app.api.firmware import router as firmware_router
 from app.api.household import router as household_router
 from app.api.routes import router
 from app import cluster
@@ -165,6 +166,7 @@ app.include_router(router)
 app.include_router(household_router)
 app.include_router(commands_router)
 app.include_router(admin_router)
+app.include_router(firmware_router)
 app.include_router(ai_router)
 app.include_router(cluster_router)
 

@@ -121,6 +121,7 @@ NetworkConfig::NetworkConfig()
       taskHandle_(nullptr),
       wifiConnected_(false),
       wifiRssi_(0),
+      wifiIp_(0),
       portalActive_(false),
       servicesReady_(false),
       taskStarted_(false),
@@ -189,6 +190,10 @@ bool NetworkConfig::wifiConnected() const {
 
 int32_t NetworkConfig::wifiRssi() const {
   return wifiRssi_.load(std::memory_order_acquire);
+}
+
+uint32_t NetworkConfig::wifiIp() const {
+  return wifiIp_.load(std::memory_order_acquire);
 }
 
 bool NetworkConfig::portalActive() const {
@@ -318,6 +323,8 @@ void NetworkConfig::publishNetworkStatus() {
   const bool wasConnected = wifiConnected_.load(std::memory_order_acquire);
   const bool wasPortalActive = portalActive_.load(std::memory_order_acquire);
   wifiRssi_.store(rssi, std::memory_order_release);
+  wifiIp_.store(connected ? static_cast<uint32_t>(WiFi.localIP()) : 0,
+                std::memory_order_release);
   wifiConnected_.store(connected, std::memory_order_release);
   portalActive_.store(portalActive, std::memory_order_release);
   servicesReady_.store(connected && !portalActive, std::memory_order_release);

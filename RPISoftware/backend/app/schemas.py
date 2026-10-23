@@ -803,6 +803,69 @@ class NodeUpdate(BaseModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)] | None = None
 
 
+# --------------------------------------------------------------------------- #
+# Firmware (app.firmware): versions and pushes to a node's /api/ota
+# --------------------------------------------------------------------------- #
+_ADDRESS = re.compile(r"^(\d{1,3}(\.\d{1,3}){3})(:\d{1,5})?$")
+
+
+class OtaTargetIn(BaseModel):
+    """The device's HTTP address (IPv4, optional :port) and its API token (portal field, 12-64 chars;
+    omitted: keep the stored one, e.g. to follow a new DHCP address)."""
+
+    address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=21)]
+    token: Annotated[str, StringConstraints(min_length=12, max_length=64, pattern=r"^[\x20-\x7e]+$")] | None = None
+
+    @field_validator("address")
+    @classmethod
+    def _ipv4(cls, v: str) -> str:
+        m = _ADDRESS.match(v)
+        if not m or any(int(p) > 255 for p in m.group(1).split(".")) or (m.group(3) and not 0 < int(m.group(3)[1:]) < 65536):
+            raise ValueError("an IPv4 address, optionally with :port")
+        return v
+
+
+class FirmwareUpdateOut(BaseModel):
+    update_id: str
+    node_id: str
+    filename: str
+    size: int
+    sha256: str
+    firmware_before: str
+    firmware_after: str | None
+    status: str  # queued | uploading | flashed | confirmed | failed | timeout
+    detail: str | None
+    requested_by_name: str | None
+    created_ts: datetime
+    finished_ts: datetime | None
+
+
+class FirmwareSeenOut(BaseModel):
+    firmware: str
+    ts: datetime  # first status document that reported it
+
+
+class NodeFirmwareOut(BaseModel):
+    """A node's firmware: version now, where the hub would push to, and why it cannot (if so)."""
+
+    node_id: str
+    name: str
+    kind: str
+    zone_id: str
+    online: bool
+    firmware: str
+    reported_ip: str | None  # `wifi.ip` of the latest status document (firmware >= 1.1.0)
+    address: str | None  # pinned by staff; pushes go here only
+    token_set: bool
+    blocked: str | None  # offline | no_target | busy | ota_active; None = ready
+    last_update: FirmwareUpdateOut | None
+
+
+class NodeFirmwareDetailOut(NodeFirmwareOut):
+    history: list[FirmwareSeenOut]  # newest first
+    updates: list[FirmwareUpdateOut]  # newest first
+
+
 class HistoryPoint(BaseModel):
     ts: datetime
     values: dict[str, int | float | str | None]

@@ -49,6 +49,7 @@ RuntimeStatus runtimeStatus() {
       wifiConnected ? networkConfig->wifiRssi() : 0,
       mqttService && mqttService->connected(),
       httpApi && httpApi->otaInProgress(),
+      wifiConnected ? networkConfig->wifiIp() : 0,
   };
 }
 

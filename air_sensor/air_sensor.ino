@@ -94,6 +94,7 @@ RuntimeStatus runtimeStatus() {
       wifiConnected ? WiFi.RSSI() : 0,
       mqttService && mqttService->connected(),
       httpApi && httpApi->otaInProgress(),
+      wifiConnected ? static_cast<uint32_t>(WiFi.localIP()) : 0,
   };
 }
 

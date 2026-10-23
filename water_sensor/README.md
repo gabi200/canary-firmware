@@ -224,6 +224,7 @@ has every field below:
 | `valve.requested`, `valve.applied`, `valve.relay_active` | Requested/present valve state (`open` or `closed`) and relay active state |
 | `alarm.state`, `alarm.sounding`, `alarm.remaining_seconds` | `inactive`, `sounding`, `silenced`, or `timed_out`; sound state and remaining window |
 | `wifi.connected`, `wifi.rssi` | Wi-Fi state and RSSI (0 when disconnected) |
+| `wifi.ip` | IPv4 address while Wi-Fi is connected (absent otherwise; firmware 1.1.0+). The hub suggests it as the firmware push address |
 | `mqtt.enabled`, `mqtt.connected` | MQTT configuration and current connection state |
 | `ota.in_progress` | Whether an authenticated OTA update is active |
 
@@ -356,7 +357,13 @@ online again after its last will.
 
 Build with the OTA-capable partition command shown above. Open
 `http://$DEVICE_IP/update` in a browser, enter the API token and choose the
-compiled firmware `.bin`. The page does not store the token. Alternatively:
+compiled firmware `.bin`. The page does not store the token. From the hub, use
+the dashboard's **Administration → Firmware** tab: pin the device's IP address
+and API token once, then send `build/water_sensor.ino.bin` to one or many sensors
+(the hub uploads to this same `/api/ota`, one device at a time, and confirms
+the version the device reports after its reboot;
+[`RPISoftware/docs/HARDWARE.md`](../RPISoftware/docs/HARDWARE.md) §4, Firmware).
+Devices on 1.0.0 do not report `wifi.ip`: type the address. Alternatively:
 
 ```bash
 # Expected 401 and no write: missing Authorization header.

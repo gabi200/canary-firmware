@@ -637,3 +637,47 @@ export interface IncidentBrief {
   node: string;
   generated_ts: string;
 }
+
+// Firmware (/api/v1/admin/.../firmware): versions and pushes to a node's /api/ota
+export type FirmwareStatus = "queued" | "uploading" | "flashed" | "confirmed" | "failed" | "timeout";
+/** Why a push would be refused now; null = ready. */
+export type FirmwareBlocked = "offline" | "no_target" | "busy" | "ota_active";
+
+export interface FirmwareUpdate {
+  update_id: string;
+  node_id: string;
+  filename: string;
+  size: number;
+  sha256: string;
+  firmware_before: string;
+  /** the version the node reported after the reboot (confirmed) */
+  firmware_after: string | null;
+  status: FirmwareStatus;
+  /** device error token (unauthorized, ota_active, "ota_failed: <message>") or network error */
+  detail: string | null;
+  requested_by_name: string | null;
+  created_ts: string;
+  finished_ts: string | null;
+}
+
+export interface NodeFirmware {
+  node_id: string;
+  name: string;
+  kind: string;
+  zone_id: string;
+  online: boolean;
+  firmware: string;
+  /** `wifi.ip` of the latest status document (firmware >= 1.1.0): a suggestion only */
+  reported_ip: string | null;
+  /** pinned by staff; pushes go here only */
+  address: string | null;
+  token_set: boolean;
+  blocked: FirmwareBlocked | null;
+  last_update: FirmwareUpdate | null;
+}
+
+export interface NodeFirmwareDetail extends NodeFirmware {
+  /** versions it reported, newest first, from the first status document that carried each */
+  history: { firmware: string; ts: string }[];
+  updates: FirmwareUpdate[];
+}
