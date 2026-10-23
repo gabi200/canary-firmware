@@ -5,6 +5,7 @@
 
 #include <ESPmDNS.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 
 #include <cerrno>
 #include <cstdio>
@@ -29,6 +30,15 @@ constexpr char SECONDS_ATTRIBUTES[] =
     "type=\"number\" min=\"10\" max=\"3600\" step=\"1\"";
 constexpr uint32_t NETWORK_TASK_STACK_BYTES = 8192;
 constexpr UBaseType_t NETWORK_TASK_PRIORITY = tskIDLE_PRIORITY;
+// Wi-Fi outage before the ESP-NOW fallback holds the channel, and how often
+// Wi-Fi is retried while it does.
+constexpr uint32_t MESH_FALLBACK_AFTER_MS = 20000;
+constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 30000;
+constexpr uint32_t WIFI_RETRY_WINDOW_MS = 10000;
+
+bool elapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t intervalMs) {
+  return static_cast<uint32_t>(nowMs - sinceMs) >= intervalMs;
+}
 
 template <size_t Capacity>
 bool copyText(char (&destination)[Capacity], const char* source) {
@@ -125,7 +135,11 @@ NetworkConfig::NetworkConfig()
       recoveryAction_(PortalSubmissionAction::ClearCredentialsAndRestart),
       apName_{},
       hostname_{},
-      discoveryStarted_(false) {}
+      discoveryStarted_(false),
+      meshFallback_(false),
+      meshChannel_(0),
+      lastConnectedMs_(0),
+      wifiRetryMs_(0) {}
 
 void NetworkConfig::begin(DeviceConfig& config, bool forcePortal) {
   if (taskStarted_) {
@@ -227,6 +241,9 @@ void NetworkConfig::networkTask() {
   // Set before the STA interface starts so DHCP registers the name too.
   WiFi.setHostname(hostname_);
   WiFi.mode(WIFI_STA);
+  // Modem sleep turns the receiver off between beacons and would miss
+  // neighbours' ESP-NOW frames.
+  WiFi.setSleep(false);
   captureStoredWiFiCredentials();
   if (forcePortal_) {
     Serial.printf("[network] starting setup portal: %s\n", apName_);
@@ -254,6 +271,7 @@ void NetworkConfig::networkTask() {
       }
     }
     publishNetworkStatus();
+    manageMeshFallback();
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
@@ -318,6 +336,51 @@ void NetworkConfig::startDiscovery() {
   MDNS.addServiceTxt("canary", "tcp", "api", "/api/status");
   Serial.printf("[network] mDNS: http://%s.local (_canary._tcp type=air)\n",
                 hostname_);
+}
+
+// ESP-NOW only reaches neighbours on the radio's current channel, but the
+// core's auto-reconnect rescans every channel back to back while the access
+// point is gone. After a grace period, stop it, hold the access point's last
+// channel (the one the neighbours are on) and retry Wi-Fi on a slower cadence.
+// ponytail: needs one Wi-Fi join since boot to learn the channel; persist it
+// if nodes must mesh after booting into an outage.
+void NetworkConfig::manageMeshFallback() {
+  const uint32_t nowMs = millis();
+  if (WiFi.status() == WL_CONNECTED) {
+    meshChannel_ = static_cast<uint8_t>(WiFi.channel());
+    lastConnectedMs_ = nowMs;
+    if (meshFallback_) {
+      meshFallback_ = false;
+      WiFi.setAutoReconnect(true);
+      Serial.println("[network] Wi-Fi back; mesh fallback off");
+    }
+    return;
+  }
+  if (!meshFallback_) {
+    if (meshChannel_ == 0 || !currentConfig_.mqttEnabled ||
+        savedWifiPassword_.isEmpty() || wifiManager_.getConfigPortalActive() ||
+        !elapsed(nowMs, lastConnectedMs_, MESH_FALLBACK_AFTER_MS)) {
+      return;
+    }
+    meshFallback_ = true;
+    wifiRetryMs_ = nowMs;
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect();
+    esp_wifi_set_channel(meshChannel_, WIFI_SECOND_CHAN_NONE);
+    Serial.printf("[network] Wi-Fi lost; mesh fallback on channel %u\n",
+                  static_cast<unsigned>(meshChannel_));
+    return;
+  }
+  if (elapsed(nowMs, wifiRetryMs_, WIFI_RETRY_INTERVAL_MS)) {
+    wifiRetryMs_ = nowMs;
+    WiFi.begin();  // one scan and join attempt with the saved network
+    return;
+  }
+  // Setting the channel mid-scan would break the attempt, so wait it out.
+  if (elapsed(nowMs, wifiRetryMs_, WIFI_RETRY_WINDOW_MS) &&
+      WiFi.channel() != meshChannel_) {
+    esp_wifi_set_channel(meshChannel_, WIFI_SECOND_CHAN_NONE);
+  }
 }
 
 void NetworkConfig::handleSubmissionRecovery() {

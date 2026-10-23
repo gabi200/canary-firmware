@@ -323,6 +323,35 @@ mosquitto_pub -o "$MQTT_OPTIONS" \
 Replace `water-sensor` in those topic arguments when a different base topic is
 configured. The commands above omit `-r` deliberately.
 
+### ESP-NOW backup link
+
+When a node has MQTT enabled but loses its MQTT session (usually because its
+Wi-Fi dropped), it keeps sending its status document over ESP-NOW instead, on
+every change and every 60 seconds. Every node listens. A node with a live
+MQTT session republishes what it hears on `<origin base>/status` (retained),
+exactly as the origin would have; a node without one rebroadcasts it, up to 3
+times, so a frame can hop across several offline nodes. Water and air nodes
+relay each other. The hub needs no change: a live status marks the origin
+online again after its last will.
+
+- **Status only.** Hub commands and command results do not travel over the
+  mesh. The local safety logic does not need the network.
+- **Needs a node that still has MQTT.** If the access point itself is down for
+  every node, the mesh has nowhere to deliver.
+- **Channel.** ESP-NOW works only on one channel. About 20 seconds into an
+  outage the node stops the core's back-to-back reconnect scans, holds the
+  access point's last channel (where its neighbours are), and tries Wi-Fi
+  again every 30 seconds. It must have joined Wi-Fi once since boot to know
+  that channel; a node that boots into an outage does not use the mesh.
+- **Signed, not encrypted.** Frames carry a 16-byte HMAC-SHA256 tag keyed from
+  the Wi-Fi passphrase (WPA2 PBKDF2, so a captured frame is no easier to
+  brute-force than a captured handshake), plus a boot counter kept in NVS and a
+  sequence number. Relays drop unsigned, altered and replayed frames. Anyone in
+  radio range can read the status, as with plaintext MQTT. Open Wi-Fi
+  networks disable the mesh.
+- **Power.** Wi-Fi modem sleep is turned off so the receiver hears
+  neighbours between beacons.
+
 ## Web OTA
 
 Build with the OTA-capable partition command shown above. Open
@@ -396,6 +425,10 @@ the actual board, sensor, relay, and valve.
   confirm retained `online` and current status. Test broker loss/recovery
   separately: after the broker returns, the device must reconnect and publish
   its current retained availability and status.
+- [ ] With a second node online nearby, take this node off Wi-Fi (block its
+  MAC on the access point) and confirm its status keeps reaching the broker on
+  `<base>/status` within one heartbeat after the 20-second fallback starts.
+  Unblock it and confirm it rejoins Wi-Fi within about 30 seconds.
 
 ### Installation record template
 
@@ -438,5 +471,6 @@ scripts/run-native-tests.sh
 For the embedded warning-clean build, use the Arduino CLI compile command in
 the build section. Native tests exercise the platform-neutral safety state
 machine, configuration validation, authentication, persistence retry behavior,
-and MQTT command/connection behavior; they do not substitute for the installed
-hardware checklist.
+MQTT command/connection behavior, and the ESP-NOW backup link's frame format,
+signing, replay protection and MQTT fallback/relay; they do not substitute for
+the installed hardware checklist.

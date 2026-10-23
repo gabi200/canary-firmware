@@ -32,6 +32,7 @@ class NetworkConfig {
   void networkTask();
   void publishNetworkStatus();
   void startDiscovery();
+  void manageMeshFallback();
   void handleSubmissionRecovery();
   void captureStoredWiFiCredentials();
   void restoreStoredWiFiCredentials();
@@ -78,4 +79,8 @@ class NetworkConfig {
   char apName_[40];
   char hostname_[33];
   bool discoveryStarted_;
+  bool meshFallback_;
+  uint8_t meshChannel_;
+  uint32_t lastConnectedMs_;
+  uint32_t wifiRetryMs_;
 };

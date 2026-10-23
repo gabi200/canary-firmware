@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ConfigStore.h"
+#include "MeshLink.h"
 #include "StatusJson.h"
 
 #include <PubSubClient.h>
@@ -15,7 +16,8 @@
 class MqttService {
  public:
   MqttService(const DeviceConfig& config, LeakController& controller,
-              ConfigStore& store, RuntimeStatusProvider statusProvider);
+              ConfigStore& store, RuntimeStatusProvider statusProvider,
+              MeshLink& mesh);
   void begin();
   // Safety-loop entrypoint: never calls WiFiClient or PubSubClient.
   void process(uint32_t nowMs);
@@ -45,6 +47,8 @@ class MqttService {
   void publishPendingResult();
   void publishPendingStatusError();
   void publishStatus(uint32_t nowMs);
+  void sendStatusOverMesh(uint32_t nowMs);
+  void relayMeshStatus();
   bool publishResult(const char* command, bool accepted, const char* detail);
   static void messageCallback(char* topic, uint8_t* payload, unsigned int length);
   static const char* commandName(QueuedCommand command);
@@ -59,6 +63,7 @@ class MqttService {
   LeakController& controller_;
   ConfigStore& store_;
   RuntimeStatusProvider statusProvider_;
+  MeshLink& mesh_;
   WiFiClient wifiClient_;
   PubSubClient mqttClient_;
   char availabilityTopic_[96];
@@ -72,7 +77,9 @@ class MqttService {
   uint32_t reconnectDelayMs_;
   uint32_t lastStatusRequestMs_;
   uint32_t publishedStatusGeneration_;
+  uint32_t meshStatusGeneration_;
   bool networkConfigured_;
+  MeshMessage meshMessage_;
 
   // Main-loop-owned state.
   uint32_t nextStatusRetryMs_;

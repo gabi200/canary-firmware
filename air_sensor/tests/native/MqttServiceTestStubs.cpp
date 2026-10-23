@@ -1,6 +1,7 @@
 #include "MqttServiceTestSupport.h"
 
 #include "Arduino.h"
+#include "MeshLink.h"
 #include "PubSubClient.h"
 #include "StatusJson.h"
 #include "WiFi.h"
@@ -32,6 +33,10 @@ std::string fakeMqttWillMessage;
 bool fakeMqttWillRetained = false;
 std::vector<std::string> fakeMqttSubscriptions;
 std::vector<FakeMqttPublish> fakeMqttPublishes;
+MeshLink fakeMeshLink;
+std::vector<FakeMeshFrame> fakeMeshSends;
+std::vector<FakeMeshFrame> fakeMeshInbox;
+int fakeMeshForwards = 0;
 static void (*fakeMqttCallback)(char*, uint8_t*, unsigned int) = nullptr;
 static unsigned long fakeMillis = 0;
 static TaskFunction_t fakeTask = nullptr;
@@ -63,6 +68,10 @@ bool buildStatusJson(const DeviceConfig&, const AirController&,
 }
 
 void resetFakeMqtt() {
+  fakeWifiConnected = true;
+  fakeMeshSends.clear();
+  fakeMeshInbox.clear();
+  fakeMeshForwards = 0;
   fakeMqttConnectResult = true;
   fakeMqttConnectCalls = 0;
   fakeMqttLoopCalls = 0;
@@ -176,6 +185,13 @@ bool PubSubClient::publish(const char* topic, const char* payload, bool retained
   fakeMqttPublishes.push_back(FakeMqttPublish{topic, payload, retained});
   return true;
 }
+bool PubSubClient::publish(const char* topic, const uint8_t* payload,
+                           unsigned int length, bool retained) {
+  fakeMqttPublishes.push_back(FakeMqttPublish{
+      topic, std::string(reinterpret_cast<const char*>(payload), length),
+      retained});
+  return true;
+}
 bool PubSubClient::subscribe(const char* topic, uint8_t) {
   fakeMqttSubscriptions.emplace_back(topic);
   return true;
@@ -184,6 +200,28 @@ bool PubSubClient::loop() {
   ++fakeMqttLoopCalls;
   return connected_;
 }
+// MeshLink stand-in: records sends and forwards, hands out queued frames as
+// already authenticated.
+void MeshLink::begin() {}
+bool MeshLink::start() { return true; }
+bool MeshLink::send(const char* baseTopic, const char* payload) {
+  fakeMeshSends.push_back(FakeMeshFrame{baseTopic, payload});
+  return true;
+}
+bool MeshLink::receive(MeshMessage& message) {
+  if (fakeMeshInbox.empty()) {
+    return false;
+  }
+  const FakeMeshFrame next = fakeMeshInbox.front();
+  fakeMeshInbox.erase(fakeMeshInbox.begin());
+  std::strcpy(message.frame.topic, next.topic.c_str());
+  std::memcpy(message.bytes, next.payload.data(), next.payload.size());
+  message.frame.payload = message.bytes;
+  message.frame.payloadLength = next.payload.size();
+  return true;
+}
+void MeshLink::forward(MeshMessage&) { ++fakeMeshForwards; }
+
 void fakeMqttDeliver(const char* topic, const char* payload) {
   if (fakeMqttCallback == nullptr) {
     return;

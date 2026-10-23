@@ -64,11 +64,13 @@ const char* rejectionDetail(CommandResult result) {
 MqttService* MqttService::callbackOwner_ = nullptr;
 
 MqttService::MqttService(const DeviceConfig& config, AirController& controller,
-                         RuntimeStatusProvider statusProvider)
+                         RuntimeStatusProvider statusProvider,
+                         MeshLink& mesh)
     : config_(config),
       networkConfig_(config),
       controller_(controller),
       statusProvider_(statusProvider),
+      mesh_(mesh),
       mqttClient_(wifiClient_),
       availabilityTopic_{},
       statusTopic_{},
@@ -78,7 +80,9 @@ MqttService::MqttService(const DeviceConfig& config, AirController& controller,
       reconnectDelayMs_(1000),
       lastStatusRequestMs_(0),
       publishedStatusGeneration_(0),
+      meshStatusGeneration_(0),
       networkConfigured_(false),
+      meshMessage_{},
       nextStatusRetryMs_(0),
       statusDirty_(true),
       statusFailureReported_(false),
@@ -227,9 +231,14 @@ void MqttService::processNetwork(uint32_t nowMs) {
   if (!networkConfigured_) {
     configureNetworkClient();
   }
-  if (!networkConfig_.mqttEnabled || !topicsValid_ ||
-      WiFi.status() != WL_CONNECTED) {
+  if (!networkConfig_.mqttEnabled || !topicsValid_) {
     connected_.store(false, std::memory_order_release);
+    return;
+  }
+  mesh_.start();
+  if (WiFi.status() != WL_CONNECTED) {
+    connected_.store(false, std::memory_order_release);
+    sendStatusOverMesh(nowMs);
     return;
   }
 
@@ -243,6 +252,7 @@ void MqttService::processNetwork(uint32_t nowMs) {
     publishPendingResult();
     publishPendingStatusError();
     publishStatus(nowMs);
+    relayMeshStatus();
     if (elapsed(nowMs, lastStatusRequestMs_, STATUS_HEARTBEAT_MS)) {
       statusSnapshotRequested_.store(true, std::memory_order_release);
       lastStatusRequestMs_ = nowMs;
@@ -251,6 +261,7 @@ void MqttService::processNetwork(uint32_t nowMs) {
   }
 
   connected_.store(false, std::memory_order_release);
+  sendStatusOverMesh(nowMs);
   if (static_cast<int32_t>(nowMs - nextConnectMs_) < 0) {
     return;
   }
@@ -479,6 +490,46 @@ void MqttService::publishStatus(uint32_t nowMs) {
       publishedStatusGeneration_ = generation;
     }
     xSemaphoreGive(handoffMutex_);
+  }
+}
+
+// No MQTT session: hand our status to neighbours over ESP-NOW instead, keep
+// the heartbeat going, and pass on what other offline nodes hand us.
+void MqttService::sendStatusOverMesh(uint32_t nowMs) {
+  while (mesh_.receive(meshMessage_)) {
+    mesh_.forward(meshMessage_);
+  }
+  if (elapsed(nowMs, lastStatusRequestMs_, STATUS_HEARTBEAT_MS)) {
+    statusSnapshotRequested_.store(true, std::memory_order_release);
+    lastStatusRequestMs_ = nowMs;
+  }
+  if (handoffMutex_ == nullptr ||
+      xSemaphoreTake(handoffMutex_, 0) != pdTRUE) {
+    return;
+  }
+  if (statusGeneration_ == meshStatusGeneration_) {
+    xSemaphoreGive(handoffMutex_);
+    return;
+  }
+  char payload[STATUS_JSON_MAX_BYTES];
+  std::strcpy(payload, statusPayload_);
+  meshStatusGeneration_ = statusGeneration_;
+  xSemaphoreGive(handoffMutex_);
+  mesh_.send(networkConfig_.mqttBaseTopic, payload);
+}
+
+// A neighbour without MQTT reached us over ESP-NOW: publish its status as it
+// would have. The hub drops the copies other relays publish (same uptime_ms).
+void MqttService::relayMeshStatus() {
+  while (mesh_.receive(meshMessage_)) {
+    char topic[mesh::MAX_TOPIC_BYTES + sizeof("/status")];
+    std::snprintf(topic, sizeof(topic), "%s/status", meshMessage_.frame.topic);
+    if (std::strcmp(topic, statusTopic_) == 0) {
+      continue;  // base topics are unique; never overwrite our own status
+    }
+    mqttClient_.publish(topic, meshMessage_.frame.payload,
+                        static_cast<unsigned int>(meshMessage_.frame.payloadLength),
+                        true);
   }
 }
 

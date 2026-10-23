@@ -405,7 +405,7 @@ static void testMqttSafetyProcessNeverConnectsOnMainLoop() {
   LeakController controller(config());
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   mqtt.process(0);
   CHECK(fakeMqttConnectCalls == 0);
@@ -419,7 +419,7 @@ static void testMqttWorkerUsesImmutableNetworkConfigSnapshot() {
   LeakController controller(config());
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   std::strcpy(cfg.mqttHost, "changed-after-begin");
   runFakeMqttTaskAt(0);
@@ -435,7 +435,7 @@ static void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
   LeakController controller(config());
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   mqtt.process(0);
   runFakeMqttTaskAt(0);
@@ -443,7 +443,7 @@ static void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
   runFakeMqttTaskAt(1);
 
   CHECK(mqtt.connected());
-  CHECK(fakeMqttBufferSize == 1024);
+  CHECK(fakeMqttBufferSize == 2048);
   CHECK(fakeMqttKeepAlive == 30);
   CHECK(fakeMqttSocketTimeout == 2);
   CHECK(fakeWifiConnectionTimeoutMs == 2000);
@@ -479,7 +479,7 @@ static void testMqttReconnectBackoffMakesOneAttemptWhenDue() {
   LeakController controller(config());
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   runFakeMqttTaskAt(999);
@@ -499,7 +499,7 @@ static void testMqttValveCommandPersistsImmediatelyAndRejectsWetOpen() {
   establishDry(controller);
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   mqtt.process(0);
@@ -533,7 +533,7 @@ static void testMqttStatusSerializationRetriesWithoutErrorFlooding() {
   LeakController controller(config());
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   mqtt.process(0);
@@ -562,7 +562,7 @@ static void testMqttPersistenceFailureKeepsMainLoopRetryState() {
   establishDry(controller);
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   mqtt.process(0);
@@ -575,6 +575,57 @@ static void testMqttPersistenceFailureKeepsMainLoopRetryState() {
   runFakeMqttTaskAt(3);
   CHECK(fakeMqttPublishes[2].payload ==
         "{\"command\":\"OPEN\",\"accepted\":false,\"error\":\"persistence_failed\"}");
+}
+
+static void testMqttFallsBackToMeshWhileWifiIsDown() {
+  // An outage must not silence the node: its status and heartbeat go to the
+  // mesh, neighbours' frames are passed on, and the socket is left alone.
+  resetFakeMqtt();
+  fakeWifiConnected = false;
+  LeakController controller(config());
+  ConfigStore store;
+  DeviceConfig cfg = mqttConfig();
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  mqtt.process(0);
+  fakeMeshInbox.push_back(FakeMeshFrame{"air-kitchen", "{}"});
+  runFakeMqttTaskAt(0);
+  CHECK(fakeMqttConnectCalls == 0);
+  CHECK(fakeMqttPublishes.empty());
+  CHECK(fakeMeshForwards == 1);
+  CHECK(fakeMeshSends.size() == 1);
+  CHECK(fakeMeshSends[0].topic == "water-sensor");
+  CHECK(fakeMeshSends[0].payload == "{\"safe\":true}");
+  runFakeMqttTaskAt(1);
+  CHECK(fakeMeshSends.size() == 1);
+  runFakeMqttTaskAt(60000);
+  mqtt.process(60000);
+  runFakeMqttTaskAt(60001);
+  CHECK(fakeMeshSends.size() == 2);
+}
+
+static void testMqttRelaysMeshStatusToItsOriginTopic() {
+  // Dropping a neighbour's status, publishing it under the relay's topic, or
+  // letting a frame overwrite the relay's own status breaks the backup path.
+  resetFakeMqtt();
+  LeakController controller(config());
+  ConfigStore store;
+  DeviceConfig cfg = mqttConfig();
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  mqtt.process(0);
+  runFakeMqttTaskAt(0);
+  runFakeMqttTaskAt(1);
+  CHECK(mqtt.connected());
+  const size_t published = fakeMqttPublishes.size();
+  fakeMeshInbox.push_back(FakeMeshFrame{"air-kitchen", "{\"co\":{}}"});
+  fakeMeshInbox.push_back(FakeMeshFrame{"water-sensor", "{\"spoof\":true}"});
+  runFakeMqttTaskAt(2);
+  CHECK(fakeMqttPublishes.size() == published + 1);
+  CHECK(fakeMqttPublishes.back().topic == "air-kitchen/status");
+  CHECK(fakeMqttPublishes.back().payload == "{\"co\":{}}");
+  CHECK(fakeMqttPublishes.back().retained);
+  CHECK(fakeMeshForwards == 0);
 }
 
 static void testHostnameSanitizesDeviceName() {
@@ -630,6 +681,8 @@ int main() {
   testMqttValveCommandPersistsImmediatelyAndRejectsWetOpen();
   testMqttStatusSerializationRetriesWithoutErrorFlooding();
   testMqttPersistenceFailureKeepsMainLoopRetryState();
+  testMqttFallsBackToMeshWhileWifiIsDown();
+  testMqttRelaysMeshStatusToItsOriginTopic();
   testHostnameSanitizesDeviceName();
   if (failures) return EXIT_FAILURE;
   std::cout << "All native tests passed\n";

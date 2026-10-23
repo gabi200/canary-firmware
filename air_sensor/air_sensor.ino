@@ -4,6 +4,7 @@
 #include "HardwareConfig.h"
 #include "HttpApi.h"
 #include "Ld2410Reader.h"
+#include "MeshLink.h"
 #include "MqttService.h"
 #include "NetworkConfig.h"
 #include "Pms5003Reader.h"
@@ -27,6 +28,7 @@ std::unique_ptr<AirController> controller;
 std::unique_ptr<NetworkConfig> networkConfig;
 std::unique_ptr<HttpApi> httpApi;
 std::unique_ptr<MqttService> mqttService;
+std::unique_ptr<MeshLink> meshLink;
 DeviceConfig deviceConfig{};
 DeviceConfig pendingDeviceConfig{};
 
@@ -367,8 +369,10 @@ void setup() {
   networkConfig = std::make_unique<NetworkConfig>();
   httpApi = std::make_unique<HttpApi>(deviceConfig, *controller, runtimeStatus,
                                       notifyStateChanged);
+  meshLink = std::make_unique<MeshLink>();
+  meshLink->begin();
   mqttService = std::make_unique<MqttService>(deviceConfig, *controller,
-                                              runtimeStatus);
+                                              runtimeStatus, *meshLink);
   networkConfig->begin(deviceConfig, forcePortal);
 }
 

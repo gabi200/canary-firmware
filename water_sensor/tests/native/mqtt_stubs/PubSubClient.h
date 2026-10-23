@@ -45,6 +45,8 @@ class PubSubClient {
                bool willRetained, const char* willMessage);
   bool connected() const;
   bool publish(const char* topic, const char* payload, bool retained = false);
+  bool publish(const char* topic, const uint8_t* payload, unsigned int length,
+               bool retained);
   bool subscribe(const char* topic, uint8_t qos = 0);
   bool loop();
 

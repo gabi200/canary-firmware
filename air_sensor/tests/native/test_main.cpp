@@ -505,7 +505,7 @@ void testMqttSafetyProcessNeverConnectsOnMainLoop() {
   resetFakeMqtt();
   AirController controller(config());
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   mqtt.process(0);
   CHECK(fakeMqttConnectCalls == 0);
@@ -518,7 +518,7 @@ void testMqttWorkerUsesImmutableNetworkConfigSnapshot() {
   resetFakeMqtt();
   AirController controller(config());
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   std::strcpy(cfg.mqttHost, "changed-after-begin");
   runFakeMqttTaskAt(0);
@@ -531,7 +531,7 @@ void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
   fakeEfuseMac = 0x123456ULL;
   AirController controller(config());
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   mqtt.process(0);
   runFakeMqttTaskAt(0);
@@ -572,7 +572,7 @@ void testMqttReconnectBackoffMakesOneAttemptWhenDue() {
   fakeMqttConnectResult = false;
   AirController controller(config());
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   runFakeMqttTaskAt(999);
@@ -592,7 +592,7 @@ void testMqttSilenceIsAppliedOnTheSafetyLoop() {
   CHECK(controller.alarmState() == AlarmState::Sounding);
 
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   mqtt.process(nowMs);
@@ -614,7 +614,7 @@ void testMqttReportsRejectedAndUnknownCommands() {
   AirController controller(config());
   const uint32_t nowMs = settleClean(controller);
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   mqtt.process(nowMs);
@@ -646,7 +646,7 @@ void testMqttStatusSerializationRetriesWithoutErrorFlooding() {
   fakeStatusSerializationResult = false;
   AirController controller(config());
   DeviceConfig cfg = mqttConfig();
-  MqttService mqtt(cfg, controller, mqttRuntimeStatus);
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
   mqtt.begin();
   runFakeMqttTaskAt(0);
   mqtt.process(0);
@@ -663,6 +663,55 @@ void testMqttStatusSerializationRetriesWithoutErrorFlooding() {
   runFakeMqttTaskAt(1001);
   CHECK(fakeMqttPublishes.size() == 3);
   CHECK(fakeMqttPublishes[2].topic == "canary/status");
+}
+
+void testMqttFallsBackToMeshWhileWifiIsDown() {
+  // An outage must not silence the node: its status and heartbeat go to the
+  // mesh, neighbours' frames are passed on, and the socket is left alone.
+  resetFakeMqtt();
+  fakeWifiConnected = false;
+  AirController controller(config());
+  DeviceConfig cfg = mqttConfig();
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  mqtt.process(0);
+  fakeMeshInbox.push_back(FakeMeshFrame{"water-sensor", "{}"});
+  runFakeMqttTaskAt(0);
+  CHECK(fakeMqttConnectCalls == 0);
+  CHECK(fakeMqttPublishes.empty());
+  CHECK(fakeMeshForwards == 1);
+  CHECK(fakeMeshSends.size() == 1);
+  CHECK(fakeMeshSends[0].topic == "canary");
+  CHECK(fakeMeshSends[0].payload == "{\"safe\":true}");
+  runFakeMqttTaskAt(1);
+  CHECK(fakeMeshSends.size() == 1);
+  runFakeMqttTaskAt(15000);
+  mqtt.process(15000);
+  runFakeMqttTaskAt(15001);
+  CHECK(fakeMeshSends.size() == 2);
+}
+
+void testMqttRelaysMeshStatusToItsOriginTopic() {
+  // Dropping a neighbour's status, publishing it under the relay's topic, or
+  // letting a frame overwrite the relay's own status breaks the backup path.
+  resetFakeMqtt();
+  AirController controller(config());
+  DeviceConfig cfg = mqttConfig();
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  mqtt.process(0);
+  runFakeMqttTaskAt(0);
+  runFakeMqttTaskAt(1);
+  CHECK(mqtt.connected());
+  const size_t published = fakeMqttPublishes.size();
+  fakeMeshInbox.push_back(FakeMeshFrame{"water-sensor", "{\"valve\":{}}"});
+  fakeMeshInbox.push_back(FakeMeshFrame{"canary", "{\"spoof\":true}"});
+  runFakeMqttTaskAt(2);
+  CHECK(fakeMqttPublishes.size() == published + 1);
+  CHECK(fakeMqttPublishes.back().topic == "water-sensor/status");
+  CHECK(fakeMqttPublishes.back().payload == "{\"valve\":{}}");
+  CHECK(fakeMqttPublishes.back().retained);
+  CHECK(fakeMeshForwards == 0);
 }
 
 }  // namespace
@@ -715,6 +764,8 @@ int main() {
   testMqttSilenceIsAppliedOnTheSafetyLoop();
   testMqttReportsRejectedAndUnknownCommands();
   testMqttStatusSerializationRetriesWithoutErrorFlooding();
+  testMqttFallsBackToMeshWhileWifiIsDown();
+  testMqttRelaysMeshStatusToItsOriginTopic();
   testHostnameSanitizesDeviceName();
   if (failures) return EXIT_FAILURE;
   std::cout << "All native tests passed\n";

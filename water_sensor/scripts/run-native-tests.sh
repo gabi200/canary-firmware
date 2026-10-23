@@ -22,3 +22,17 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -I"$repo_dir" \
   "$repo_dir/tests/native/config_store_fallback_test.cpp" \
   -o "$config_store_binary_path"
 "$config_store_binary_path"
+
+mesh_binary_path="${TMPDIR:-/tmp}/water-sensor-mesh-frame-test"
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic -I"$repo_dir" \
+  "$repo_dir/tests/native/mesh_frame_test.cpp" \
+  -o "$mesh_binary_path"
+"$mesh_binary_path"
+
+# Water and air nodes relay each other's frames: the mesh code must match.
+for file in MeshFrame.h MeshLink.h MeshLink.cpp; do
+  if ! cmp -s "$repo_dir/$file" "$repo_dir/../air_sensor/$file"; then
+    echo "$file differs from ../air_sensor/$file" >&2
+    exit 1
+  fi
+done

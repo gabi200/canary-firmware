@@ -32,3 +32,17 @@ g++ "${common_flags[@]}" -I"$repo_dir/tests/native/stubs" \
   "$repo_dir/tests/native/config_store_fallback_test.cpp" \
   -o "$config_binary"
 "$config_binary"
+
+mesh_binary="$out_dir/canary-mesh-frame-test"
+g++ "${common_flags[@]}" \
+  "$repo_dir/tests/native/mesh_frame_test.cpp" \
+  -o "$mesh_binary"
+"$mesh_binary"
+
+# Water and air nodes relay each other's frames: the mesh code must match.
+for file in MeshFrame.h MeshLink.h MeshLink.cpp; do
+  if ! cmp -s "$repo_dir/$file" "$repo_dir/../water_sensor/$file"; then
+    echo "$file differs from ../water_sensor/$file" >&2
+    exit 1
+  fi
+done

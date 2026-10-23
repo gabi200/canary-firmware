@@ -39,6 +39,16 @@ The device kind is detected from the status document shape:
 - **water**: object has `sensor` and `valve` objects.
 - anything else on `.../status` (e.g. the plain string `online`) is ignored.
 
+**Relayed status (ESP-NOW backup link).** A sensor that loses its MQTT session
+sends its status document over ESP-NOW; any sensor that still has MQTT
+republishes it, verbatim, on the origin's `<base>/status` (retained), using its
+own broker login. Nothing on the hub changes: the broker has no ACLs, and a live
+document sets the node online again after its last will. Several relays can
+publish the same document, and the uptime dedupe drops the copies. Two documents
+sent closer together than a relay hop can arrive out of order, which the hub
+reads as a reboot (`boot_epoch + 1`). Commands are not relayed. Details:
+[`../../water_sensor/README.md`](../../water_sensor/README.md) ("ESP-NOW backup link").
+
 ### Water status document (ESP32-C3, `water_sensor/StatusJson.cpp`)
 
 ```json

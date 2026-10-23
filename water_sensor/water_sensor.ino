@@ -3,6 +3,7 @@
 #include "HardwareConfig.h"
 #include "HttpApi.h"
 #include "LeakController.h"
+#include "MeshLink.h"
 #include "MqttService.h"
 #include "NetworkConfig.h"
 #include "PersistenceRetry.h"
@@ -19,6 +20,7 @@ std::unique_ptr<LeakController> controller;
 std::unique_ptr<NetworkConfig> networkConfig;
 std::unique_ptr<HttpApi> httpApi;
 std::unique_ptr<MqttService> mqttService;
+std::unique_ptr<MeshLink> meshLink;
 DeviceConfig deviceConfig{};
 DeviceConfig pendingDeviceConfig{};
 uint32_t lastSampleMs = 0;
@@ -229,8 +231,11 @@ void setup() {
   networkConfig->begin(deviceConfig, forcePortal);
   httpApi = std::make_unique<HttpApi>(deviceConfig, *controller, *configStore,
                                       runtimeStatus, notifyStateChanged);
+  meshLink = std::make_unique<MeshLink>();
+  meshLink->begin();
   mqttService = std::make_unique<MqttService>(deviceConfig, *controller,
-                                              *configStore, runtimeStatus);
+                                              *configStore, runtimeStatus,
+                                              *meshLink);
   Serial.println("[boot] setup complete; valve starts closed");
 }
 
