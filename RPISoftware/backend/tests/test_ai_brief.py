@@ -198,8 +198,7 @@ async def test_roles_and_unknown_incidents(client):
 async def test_dispatchers_read_the_brief_without_personal_data(client, ollama):
     fake = ollama()
     incident_id = await _incident(client)
-    for lang in ("ro", "en"):
-        assert (await _brief(client, incident_id, "dispecer", lang))["source"] == "llm"
+    assert (await _brief(client, incident_id, "dispecer", "en"))["source"] == "llm"
     sent = json.dumps(fake.chats, ensure_ascii=False)
     assert "Bucătărie (Ap. 12)" in sent  # what the LLM gets: places and counts...
     assert_private(sent)  # ...never people
@@ -208,25 +207,29 @@ async def test_dispatchers_read_the_brief_without_personal_data(client, ollama):
 async def test_the_llm_writes_the_brief(client, ollama):
     fake = ollama()
     incident_id = await _incident(client)
-    out = await _brief(client, incident_id, "dispecer", "ro")
+    out = await _brief(client, incident_id, "dispecer", "en")
     assert (out["text"], out["source"], out["model"], out["node"]) == (ANSWER, "llm", MODEL, "hub")
 
     [chat] = fake.chats
     assert (chat["model"], chat["stream"]) == (MODEL, False)
     system, user = chat["messages"]
     assert (system["role"], user["role"]) == ("system", "user")
-    assert "Romanian" in system["content"] and "Never invent people, places, numbers" in system["content"]
+    assert "English" in system["content"] and "Never invent people, places, numbers" in system["content"]
     facts = json.loads(user["content"])
     assert (facts["hazard"], facts["state"], facts["severity"], facts["zone"]) == (
-        "Scurgere de gaz", "evacuare", "critică", "Bucătărie (Ap. 12)")
+        "Gas leak", "evacuation", "critical", "Bucătărie (Ap. 12)")
     assert facts["source_zone"] == "Bucătărie (Ap. 12)" and 0 < facts["source_confidence"] <= 1
     assert facts["people"] == {"present_estimate": 3, "confirmed_safe": 1, "need_help": 0, "unaccounted": 2}
-    assert facts["timeline"][0]["state"] == "detectare" and facts["timeline"][-1]["state"] == "evacuare"
+    assert facts["timeline"][0]["state"] == "detection" and facts["timeline"][-1]["state"] == "evacuation"
     assert all(set(event) == {"time", "state", "reason"} for event in facts["timeline"])
 
-    await _brief(client, incident_id, "dispecer", "en")
-    assert "English" in fake.chats[-1]["messages"][0]["content"]
-    assert json.loads(fake.chats[-1]["messages"][1]["content"])["hazard"] == "Gas leak"
+
+async def test_romanian_briefs_skip_the_llm(client, ollama):
+    fake = ollama()
+    incident_id = await _incident(client)
+    out = await _brief(client, incident_id, "dispecer", "ro")
+    assert (out["source"], out["model"]) == ("template", None) and out["text"].startswith("Scurgere de gaz ")
+    assert fake.chats == []
 
 
 async def test_a_slow_llm_gives_the_template(client, ollama, monkeypatch):
@@ -250,8 +253,8 @@ async def test_a_slow_llm_gives_the_template(client, ollama, monkeypatch):
 async def test_llm_failures_give_the_template(client, ollama, reply, status):
     fake = ollama(reply=reply, status=status)
     incident_id = await _incident(client)
-    out = await _brief(client, incident_id, lang="ro")
-    assert (out["source"], out["model"]) == ("template", None) and out["text"].startswith("Scurgere de gaz ")
+    out = await _brief(client, incident_id, lang="en")
+    assert (out["source"], out["model"]) == ("template", None) and out["text"].startswith("Gas leak in ")
     assert len(fake.chats) == 1
 
 
@@ -326,15 +329,15 @@ async def test_the_ai_node_writes_the_brief(client, monkeypatch):
 
     async def call_peer(base_url: str, path: str, payload: dict, timeout: float) -> dict:
         sent.append((path, payload, timeout))
-        return {"text": "Scurgere de gaz în Ap. 12.", "source": "llm", "model": MODEL, "node": "ai"}
+        return {"text": "Gas leak in Ap. 12.", "source": "llm", "model": MODEL, "node": "ai"}
 
     monkeypatch.setattr(cluster, "ai_peer", lambda: "http://192.0.2.13:8000")
     monkeypatch.setattr(cluster, "call_peer", call_peer)
-    out = await _brief(client, incident_id, "dispecer", "ro")
+    out = await _brief(client, incident_id, "dispecer", "en")
     assert (out["text"], out["source"], out["model"], out["node"]) == (
-        "Scurgere de gaz în Ap. 12.", "llm", MODEL, "ai")
+        "Gas leak in Ap. 12.", "llm", MODEL, "ai")
     [(path, payload, timeout)] = sent
-    assert (path, payload["lang"], timeout) == ("/internal/ai/brief", "ro", offload.BRIEF_TIMEOUT_S)
+    assert (path, payload["lang"], timeout) == ("/internal/ai/brief", "en", offload.BRIEF_TIMEOUT_S)
     assert payload["facts"]["hazard"] == "combustible_gas"  # tokens on the wire; the writer words them
     assert_private(json.dumps(payload, ensure_ascii=False))
 

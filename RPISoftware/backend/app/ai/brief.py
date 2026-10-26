@@ -20,6 +20,7 @@ from app.i18n import translate
 MAX_CHARS = 800
 
 _LANGUAGE = {"ro": "Romanian", "en": "English"}
+_LLM_LANGUAGES = {"en"}
 # Tokens as English words; each word is a key of the RO catalog (app.i18n).
 _HAZARD = {  # as app.notify.service titles incidents
     "combustible_gas": "Gas leak",
@@ -105,7 +106,8 @@ async def generate(facts: dict, lang: str) -> dict:
     """The brief in `lang` (ro | en, anything else is English) as {"text", "source": "llm" | "template",
     "model", "node"}; `node` is this node, the one that wrote it."""
     lang = lang if lang in _LANGUAGE else "en"
-    text = await llm.chat(*prompt(facts, lang))
+    # The 1.5B model writes garbled Romanian that misstates the facts; RO uses the template.
+    text = await llm.chat(*prompt(facts, lang)) if lang in _LLM_LANGUAGES else None
     if text:
         return {"text": _cap(text), "source": "llm", "model": settings.llm_model, "node": cluster.node_name()}
     return {"text": template(facts, lang), "source": "template", "model": None, "node": cluster.node_name()}
