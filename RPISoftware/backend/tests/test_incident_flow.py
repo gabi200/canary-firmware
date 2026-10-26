@@ -174,6 +174,29 @@ async def test_other_devices_normal_readings_do_not_clear_an_incident(client):
     assert resp.json() == []
 
 
+async def test_one_device_clearing_does_not_close_while_another_still_alarms(client):
+    # The kitchen sensor alarms and then goes silent; a stairwell sensor joins the
+    # incident, then reads normal. Its all-clear must not close the evacuation.
+    await client.post("/api/v1/telemetry", json=telemetry(
+        "dev_gas_kitchen", "combustible_gas", 6000, zone_id="zone_kitchen", unit_id="unit_0312",
+        seq=1, edge_state="alarm"))
+    await client.post("/api/v1/telemetry", json=telemetry(
+        "dev_gas_boiler", "combustible_gas", 6000, zone_id="zone_boiler", unit_id="common",
+        seq=1, edge_state="alarm"))
+    for seq in range(2, 7):
+        await client.post("/api/v1/telemetry", json=telemetry(
+            "dev_gas_boiler", "combustible_gas", 200, zone_id="zone_boiler", unit_id="common", seq=seq))
+    assert (await _active_incident(client))["state"] == "evacuation"
+
+    # Once the kitchen sensor clears too, the hold window closes it.
+    for seq in range(2, 5):
+        await client.post("/api/v1/telemetry", json=telemetry(
+            "dev_gas_kitchen", "combustible_gas", 200, zone_id="zone_kitchen", unit_id="unit_0312", seq=seq))
+    resp = await client.get("/api/v1/buildings/bld_007/incidents", params={"active": True},
+                            headers=await _hdr(client, "mihai"))
+    assert resp.json() == []
+
+
 async def test_timestamps_are_utc_aware_on_sqlite(client):
     # SQLite drops tzinfo; zone-less timestamps would be read as local time by clients.
     await client.post("/api/v1/telemetry", json=telemetry(

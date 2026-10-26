@@ -79,9 +79,14 @@ class IncidentService:
 
         # Clearing path: count consecutive low readings, close after the hold window.
         # Only a device that reported this hazard can clear it: another node's normal
-        # heartbeat must never "all clear" an incident whose source went silent.
+        # heartbeat must never "all clear" an incident whose source went silent. Nor may
+        # one device clear it while another device's last reading still says hazard.
         if is_clearing(sensor_type, value, edge_state, th):
-            if incident is not None and device_id in (incident.distinct_device_ids or []):
+            if (
+                incident is not None
+                and device_id in (incident.distinct_device_ids or [])
+                and not await self._others_still_hazardous(incident, device_id)
+            ):
                 incident.clear_count += 1
                 from app.config import settings
 
@@ -348,6 +353,22 @@ class IncidentService:
             .order_by(Incident.opened_ts.desc())
             .limit(1)
         )
+
+    async def _others_still_hazardous(self, incident: Incident, device_id: str) -> bool:
+        """True while any other device of the incident has no reading or its latest one is not clearing."""
+        for other in incident.distinct_device_ids or []:
+            if other == device_id:
+                continue
+            last = await self.session.scalar(
+                select(SensorReading)
+                .where(SensorReading.device_id == other)
+                .order_by(SensorReading.ts.desc())
+                .limit(1)
+            )
+            # shortcut: judged on default thresholds (calibration is not stored), store it if devices drift.
+            if last is None or not is_clearing(SensorType(last.sensor_type), last.value, EdgeState(last.edge_state)):
+                return True
+        return False
 
     async def _close(self, incident: Incident) -> None:
         target = closing_state(IncidentState(incident.state))
