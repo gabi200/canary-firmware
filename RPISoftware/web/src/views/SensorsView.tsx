@@ -1,4 +1,4 @@
-import { useNodes, useSummary, useZones } from "../api/hooks";
+import { useNodes, useSensorTrust, useSummary, useZones } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { BuildingBanner, ZoneCard } from "../components/Analysis";
@@ -33,9 +33,16 @@ export function SensorsView() {
   const { session } = useAuth();
   const summary = useSummary();
   const nodes = useNodes();
+  const trust = useSensorTrust(session?.role !== "system_admin");
   const zones = useZones();
   const sc = useScope();
   const zoneNames = buildZoneNames(zones.data);
+  const trustByNode = new Map((trust.data ?? []).map((item) => [item.node_id, item]));
+  const trustStatus = session?.role === "system_admin" || trust.isError
+    ? "unavailable"
+    : trust.data
+      ? "ready"
+      : "loading";
   const canEdit = session?.role === "hoa_manager" || session?.role === "system_admin" || session?.role === "technician";
   // dispatchers get no raw presence (radar) data from the backend: don't ask, don't show
   const showPresence = session?.role !== "dispatcher_external";
@@ -106,6 +113,8 @@ export function SensorsView() {
               zoneNames={zoneNames}
               canEdit={canEdit}
               showPresence={showPresence}
+              trust={trustByNode.get(n.id)}
+              trustStatus={trustStatus}
             />
           ))}
         </div>

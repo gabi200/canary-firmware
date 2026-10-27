@@ -62,6 +62,7 @@ from app.schemas import (
     EvacuationOut,
     EscalationOut,
     EvacuationRouteOut,
+    FusionExplanationOut,
     IncidentEventOut,
     IncidentOut,
     IngestResult,
@@ -75,6 +76,7 @@ from app.schemas import (
     ResidentOut,
     RosterEntry,
     RosterOut,
+    SensorTrustOut,
     SignatureOut,
     TelemetryPayload,
     Token,
@@ -483,6 +485,18 @@ async def list_nodes(
     return nodes
 
 
+@router.get("/buildings/{building_id}/sensor-trust", response_model=list[SensorTrustOut], tags=["nodes"])
+async def building_sensor_trust(
+    building_id: str,
+    hours: int = Query(default=24, ge=1, le=168),
+    _: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external, Role.technician)),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    if await session.get(Building, building_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "building not found")
+    return await AnalyticsService(session).sensor_trust(building_id, hours=hours)
+
+
 @router.get("/nodes/{node_id}/history", response_model=NodeHistoryOut, tags=["nodes"])
 async def node_history(
     node_id: str,
@@ -816,6 +830,18 @@ async def incident_roster(
 
 
 TRIANGULATION_HISTORY_MAX = 500
+
+
+@router.get("/incidents/{incident_id}/fusion", response_model=FusionExplanationOut, tags=["incidents"])
+async def incident_fusion_explanation(
+    incident_id: str,
+    _: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    incident = await session.get(Incident, incident_id)
+    if incident is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
+    return await AnalyticsService(session).fusion_explanation(incident)
 
 
 @router.get(

@@ -9,6 +9,7 @@ import {
 } from "../api/hooks";
 import { Card } from "../components/Card";
 import { EscalationLine } from "../components/EscalationLine";
+import { FusionExplanationPanel } from "../components/FusionExplanation";
 import { HazardMap } from "../components/HazardMap";
 import { IncidentActions } from "../components/IncidentActions";
 import { IncidentBriefCard } from "../components/IncidentBrief";
@@ -168,6 +169,8 @@ export function DispatchView() {
               <div className="muted small">{t("dispatch.awaitingSensors")}</div>
             )}
           </Card>
+
+          <FusionExplanationPanel incidentId={incident.id} />
 
           <IncidentBriefCard incidentId={incident.id} />
 

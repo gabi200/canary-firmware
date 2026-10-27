@@ -16,6 +16,7 @@ import type {
   IncidentBrief,
   IncidentEvent,
   Escalation,
+  FusionExplanation,
   NodeHistory,
   NodeOut,
   NodePatch,
@@ -23,6 +24,7 @@ import type {
   Reading,
   Resident,
   Roster,
+  SensorTrust,
   Triangulation,
   TriangulationHistory,
   Zone,
@@ -104,6 +106,18 @@ export function useTriangulation(incidentId: string | null) {
     enabled: !!incidentId,
     queryFn: () => api.get<Triangulation>(`/api/v1/incidents/${incidentId}/triangulation`, token),
     refetchInterval: 6_000,
+  });
+}
+
+/** Advisory fusion explanation, recomputed independently of the stored incident score. */
+export function useFusionExplanation(incidentId: string | null) {
+  const { token } = useCtx();
+  return useQuery({
+    queryKey: ["fusion", incidentId],
+    enabled: !!incidentId,
+    queryFn: () => api.get<FusionExplanation>(`/api/v1/incidents/${incidentId}/fusion`, token),
+    refetchInterval: 6_000,
+    retry: false,
   });
 }
 
@@ -233,6 +247,18 @@ export function useNodes() {
     queryKey: ["nodes", buildingId],
     queryFn: () => api.get<NodeOut[]>(`/api/v1/buildings/${buildingId}/nodes`, token),
     refetchInterval: 15_000,
+  });
+}
+
+/** On-demand sensor drift and coverage assessment over bounded history. */
+export function useSensorTrust(enabled = true) {
+  const { token, buildingId } = useCtx();
+  return useQuery({
+    queryKey: ["sensorTrust", buildingId],
+    enabled,
+    queryFn: () => api.get<SensorTrust[]>(`/api/v1/buildings/${buildingId}/sensor-trust`, token),
+    refetchInterval: 15_000,
+    retry: false,
   });
 }
 

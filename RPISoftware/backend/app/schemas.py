@@ -319,6 +319,42 @@ class SignatureOut(BaseModel):
     ts: datetime
 
 
+class FusionInputOut(BaseModel):
+    name: str
+    age_seconds: float | None
+    status: Literal["fresh", "stale", "missing"]
+
+
+class FusionExplanationOut(BaseModel):
+    incident_id: str
+    score: float
+    score_kind: Literal["benign_likelihood"]
+    classification: str
+    assessed_ts: datetime
+    fresh_witnesses: int
+    supporting_evidence: list[str]
+    contradicting_evidence: list[str]
+    missing_inputs: list[str]
+    active_overrides: list[str]
+    inputs: list[FusionInputOut]
+
+
+class SensorTrustChannelOut(BaseModel):
+    device_id: str
+    sensor_type: str
+    state: Literal["ok", "suspect", "lost"]
+    reason: str
+    sample_count: int
+    input_age_seconds: float | None
+
+
+class SensorTrustOut(BaseModel):
+    node_id: str
+    state: Literal["ok", "suspect", "lost"]
+    reason: str
+    channels: list[SensorTrustChannelOut]
+
+
 class IncidentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

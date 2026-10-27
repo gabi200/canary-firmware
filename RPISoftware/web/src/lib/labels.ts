@@ -50,6 +50,10 @@ export const stateLabel = (state: string, t: TFn) => tokenLabel(t, "state", stat
 /** Analysis level (ok / attention / danger / unknown) -> label. */
 export const levelLabel = (level: string, t: TFn) => tokenLabel(t, "level", level);
 
+/** Advisory sensor trust state and its backend reason token. */
+export const trustStateLabel = (state: string, t: TFn) => tokenLabel(t, "trust.state", state);
+export const trustReasonLabel = (reason: string, t: TFn) => tokenLabel(t, "trust.reason", reason);
+
 /** Node kind (air / water) -> label. */
 export const kindLabel = (kind: string, t: TFn) => tokenLabel(t, "kind", kind);
 

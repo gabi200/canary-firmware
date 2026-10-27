@@ -9,22 +9,30 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from statistics import median
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import offload
+from app.analytics.anomalies import AnomalySample, assess_channel, is_stale
+from app.analytics.false_alarm import ReadingSample, classify
+from app.analytics.nodes import device_ids
 from app.analytics.signature.features import extract_features, parse_snapshot
-from app.analytics.signature.rules import SignatureAssessment, assess
+from app.analytics.signature.rules import FIRE_LABELS, SignatureAssessment, assess
 from app.analytics.triangulation import SensorPoint, TriangulationResult
 from app.detection.thresholds import thresholds_for
 from app.enums import NodeKind, SensorType
-from app.models import Incident, Node, NodeStatus, SensorReading, SignatureAssessmentRow, TriangulationSnapshot, Zone
+from app.models import Device, Incident, Node, NodeStatus, SensorReading, SignatureAssessmentRow, TriangulationSnapshot, Zone
 
 log = logging.getLogger("canary.signature")
 
 # Seconds of an air node's status documents the signature classifier looks at.
 SIGNATURE_WINDOW_S = 600
+TRUST_HISTORY_MAX = 5000
+FUSION_HISTORY_MAX = 2000
+FUSION_WINDOW_S = 1800
+FUSION_FRESH_S = 90
 
 
 def _epoch(dt: datetime) -> float:
@@ -195,3 +203,175 @@ class AnalyticsService:
             select(SignatureAssessmentRow).where(SignatureAssessmentRow.id.in_(newest))
         )).all()
         return {r.incident_id: r for r in rows}
+
+    async def sensor_trust(self, building_id: str, *, hours: int = 24) -> list[dict]:
+        """Assess physical node coverage from bounded history without mutating readings or health rows."""
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(hours=hours)
+        reference_cutoff = now - timedelta(minutes=min(60, hours * 15))
+        rows = list((await self.session.scalars(
+            select(SensorReading)
+            .where(SensorReading.building_id == building_id, SensorReading.ts >= since)
+            .order_by(SensorReading.ts.desc(), SensorReading.id.desc())
+            .limit(TRUST_HISTORY_MAX)
+        )).all())
+        rows.reverse()
+        nodes = list((await self.session.scalars(
+            select(Node).where(Node.building_id == building_id).order_by(Node.name, Node.id)
+        )).all())
+        devices = list((await self.session.scalars(
+            select(Device).where(Device.building_id == building_id)
+        )).all())
+        incidents = list((await self.session.scalars(
+            select(Incident).where(
+                Incident.building_id == building_id,
+                Incident.opened_ts <= now,
+                or_(Incident.resolved_ts.is_(None), Incident.resolved_ts >= since),
+            )
+        )).all())
+        incident_ranges = [(_epoch(item.opened_ts), _epoch(item.resolved_ts or now)) for item in incidents]
+        by_device: dict[str, list[SensorReading]] = {}
+        for row in rows:
+            by_device.setdefault(row.device_id, []).append(row)
+        known = {device.id: device for device in devices}
+        now_s = now.timestamp()
+        cutoff_s = reference_cutoff.timestamp()
+        out = []
+        for node in nodes:
+            channels = []
+            for device_id in device_ids(node.id, node.kind):
+                device = known.get(device_id)
+                if device is None:
+                    continue
+                history = by_device.get(device_id, [])
+                times = [_epoch(row.ts) for row in history]
+                deltas = [b - a for a, b in zip(times, times[1:]) if b > a]
+                interval = median(deltas) if deltas else 15.0
+                samples = [
+                    AnomalySample(
+                        ts=_epoch(row.ts),
+                        value=row.value,
+                        incident=any(start <= _epoch(row.ts) <= end for start, end in incident_ranges),
+                    )
+                    for row in history
+                ]
+                result = assess_channel(
+                    samples,
+                    now_ts=now_s,
+                    interval_s=interval,
+                    reference_cutoff_ts=cutoff_s,
+                    binary=device.sensor_type == SensorType.water_leak.value,
+                )
+                seen = _epoch(device.last_seen_ts) if device.last_seen_ts else None
+                if not node.online or is_stale(last_seen_ts=seen, now_ts=now_s, interval_s=interval):
+                    result = result.__class__("lost", "coverage_lost", result.sample_count, result.input_age_seconds)
+                channels.append({
+                    "device_id": device_id,
+                    "sensor_type": device.sensor_type,
+                    "state": result.state,
+                    "reason": result.reason,
+                    "sample_count": result.sample_count,
+                    "input_age_seconds": result.input_age_seconds,
+                })
+            state = "lost" if any(c["state"] == "lost" for c in channels) else (
+                "suspect" if not channels or any(c["state"] == "suspect" for c in channels) else "ok"
+            )
+            reason = next((c["reason"] for c in channels if c["state"] == state), "insufficient_data" if not channels else "ok")
+            out.append({"node_id": node.id, "state": state, "reason": reason, "channels": channels})
+        return out
+
+    async def fusion_explanation(self, incident: Incident) -> dict:
+        """Recompute an advisory explanation from recent inputs; never changes incident state."""
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(seconds=FUSION_WINDOW_S)
+        q = select(SensorReading).where(
+            SensorReading.building_id == incident.building_id,
+            SensorReading.ts >= since,
+        )
+        if incident.primary_zone_id is not None:
+            q = q.where(SensorReading.zone_id == incident.primary_zone_id)
+        rows = list((await self.session.scalars(
+            q.order_by(SensorReading.ts.desc(), SensorReading.id.desc()).limit(FUSION_HISTORY_MAX)
+        )).all())
+        rows.reverse()
+        fresh_after = now.timestamp() - FUSION_FRESH_S
+        latest: dict[str, SensorReading] = {}
+        for row in rows:
+            latest[row.device_id] = row
+
+        def instrument(row: SensorReading) -> str:
+            if row.sensor_type == SensorType.particulate.value:
+                suffix = row.device_id.rsplit(":", 1)[-1]
+                if suffix in {"pm1_0", "pm2_5", "pm10", "particulate"}:
+                    return row.device_id.rsplit(":", 1)[0]
+            return row.device_id
+
+        elevated: dict[str, SensorReading] = {}
+        for row in latest.values():
+            thresholds = thresholds_for(SensorType(row.sensor_type)) if row.sensor_type in SensorType._value2member_map_ else None
+            if _epoch(row.ts) >= fresh_after and thresholds is not None and (
+                row.value >= thresholds.detection or row.edge_state == "alarm"
+            ):
+                elevated[instrument(row)] = row
+
+        try:
+            hazard = SensorType(incident.hazard_type)
+        except ValueError:
+            hazard = None
+        thresholds = thresholds_for(hazard) if hazard is not None else None
+        hazard_rows = [row for row in rows if row.sensor_type == incident.hazard_type]
+        assessment = classify(
+            [ReadingSample(_epoch(row.ts), row.value) for row in hazard_rows],
+            detection=thresholds.detection if thresholds else float("inf"),
+            critical=thresholds.critical if thresholds else float("inf"),
+            clear=thresholds.clear if thresholds else 0.0,
+            multi_sensor=len(elevated) >= 2,
+            edge_alarm=any(row.edge_state == "alarm" for row in hazard_rows),
+        )
+        signature = (await self.latest_signatures([incident.id])).get(incident.id)
+        supporting = [assessment.reason]
+        supporting.extend(f"fresh_{row.sensor_type}:{key}" for key, row in sorted(elevated.items()))
+        contradicting: list[str] = []
+        missing: list[str] = []
+        inputs = []
+        for sensor_type in (SensorType.particulate.value, SensorType.co.value, SensorType.combustible_gas.value):
+            row = max((item for item in latest.values() if item.sensor_type == sensor_type), key=lambda item: item.ts, default=None)
+            if row is None:
+                missing.append(sensor_type)
+                inputs.append({"name": sensor_type, "age_seconds": None, "status": "missing"})
+                continue
+            age = max(0.0, now.timestamp() - _epoch(row.ts))
+            status = "fresh" if age <= FUSION_FRESH_S else "stale"
+            if status == "stale":
+                missing.append(sensor_type)
+            else:
+                th = thresholds_for(SensorType(sensor_type))
+                if th is not None and row.value < th.detection:
+                    contradicting.append(f"{sensor_type}_below_threshold")
+            inputs.append({"name": sensor_type, "age_seconds": age, "status": status})
+        overrides = []
+        if assessment.reason == "critical_or_edge_alarm":
+            overrides.append("critical_or_edge_alarm")
+        if signature is not None:
+            age = max(0.0, now.timestamp() - _epoch(signature.ts))
+            inputs.append({"name": "signature", "age_seconds": age, "status": "fresh" if age <= FUSION_WINDOW_S else "stale"})
+            if signature.label in FIRE_LABELS:
+                overrides.append("fire_signature")
+                supporting.extend(signature.evidence)
+            elif signature.label in {"steam", "cooking", "aerosol"}:
+                contradicting.extend(signature.evidence)
+        if incident.state in {"alarm", "escalation", "evacuation"}:
+            overrides.append("incident_already_alarmed")
+        return {
+            "incident_id": incident.id,
+            "score": assessment.benign_score,
+            "score_kind": "benign_likelihood",
+            "classification": assessment.classification,
+            "assessed_ts": now,
+            "fresh_witnesses": len(elevated),
+            "supporting_evidence": supporting,
+            "contradicting_evidence": contradicting,
+            "missing_inputs": missing,
+            "active_overrides": overrides,
+            "inputs": inputs,
+        }

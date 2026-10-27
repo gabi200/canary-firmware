@@ -8,13 +8,13 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { useNodes } from "../api/hooks";
-import type { CommandRecord, NodeOut } from "../api/types";
+import { useNodes, useSensorTrust } from "../api/hooks";
+import type { CommandRecord, NodeOut, SensorTrust } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { pluralCategory, useT, type Lang, type TFn } from "../i18n";
 import { commandName, lastCommandOutcome, useLiveCommands, type CommandOutcome } from "../lib/commands";
 import { fmtNumber } from "../lib/format";
-import { deviceToken } from "../lib/labels";
+import { deviceToken, trustReasonLabel, trustStateLabel } from "../lib/labels";
 import { channelTrust } from "../lib/metrics";
 import { pick, pickNum } from "../lib/nodes";
 import { setScope, useScope, type Scope } from "../lib/scope";
@@ -143,6 +143,7 @@ export function DeviceHealthCard() {
   // same roles as the Administration entry of the top bar
   const admin = session?.role === "hoa_manager" || session?.role === "system_admin" || session?.role === "technician";
   const nodes = useNodes();
+  const trust = useSensorTrust();
   const live = useLiveCommands();
   const sc = useScope();
 
@@ -157,11 +158,33 @@ export function DeviceHealthCard() {
   const items: Item[] = nodes.data.map((n) => ({ zoneId: n.zone_id, name: n.name || n.id, node: n }));
   const groups = groupByUnit(sc.units, sc.rooms, items, t("health.unplaced"));
   const last = (n: NodeOut) => lastCommandOutcome(n, live.get(n.id));
-  const problems = new Map(nodes.data.map((n) => [n.id, problemsOf(n, last(n), t, lang)]));
+  const trustByNode = new Map((trust.data ?? []).map((item) => [item.node_id, item]));
+  const trustProblem = (n: NodeOut): Problem[] => {
+    const item: SensorTrust | undefined = trustByNode.get(n.id);
+    if (!item) {
+      return [{
+        tone: "unknown",
+        text: trust.isError || trust.data ? t("trust.unavailable") : t("trust.loading"),
+      }];
+    }
+    if (item.state === "ok") return [];
+    return [{
+      tone: item.state === "lost" ? "danger" : "attention",
+      text: t("trust.issue", {
+        state: trustStateLabel(item.state, t),
+        reason: trustReasonLabel(item.reason, t),
+      }),
+    }];
+  };
+  const problems = new Map(nodes.data.map((n) => [n.id, [...problemsOf(n, last(n), t, lang), ...trustProblem(n)]]));
   const num = (v: number) => fmtNumber(v, lang, 0);
   const all = nodes.data.length;
   const online = nodes.data.filter((n) => n.online).length;
   const untested = nodes.data.filter((n) => last(n).outcome === "none").length;
+  const trustCounts = (trust.data ?? []).reduce(
+    (counts, item) => ({ ...counts, [item.state]: counts[item.state] + 1 }),
+    { ok: 0, suspect: 0, lost: 0 },
+  );
 
   const unitLevel = (ns: NodeOut[]) => {
     if (!ns.length) return "unknown";
@@ -195,6 +218,12 @@ export function DeviceHealthCard() {
           <span className={untested ? "t-attention" : "muted"}>
             {t(`devs.untested.${pluralCategory(lang, untested)}`, { n: num(untested) })}
           </span>
+        </div>
+        <div className={`small ${trust.isError || !trust.data ? "t-attention" : "muted"}`}>
+          <b>{t("trust.title")}:</b>{" "}
+          {trust.data?.length || all === 0
+            ? t("trust.summary", trustCounts)
+            : t(trust.isError || trust.data ? "trust.unavailable" : "trust.loading")}
         </div>
         <span className="spacer" />
         {admin && (

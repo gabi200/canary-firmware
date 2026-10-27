@@ -1,7 +1,7 @@
 import { useUpdateNode } from "../api/hooks";
-import type { NodeOut, Zone } from "../api/types";
+import type { NodeOut, SensorTrust, Zone } from "../api/types";
 import { useT } from "../i18n";
-import { kindLabel, zoneLabel } from "../lib/labels";
+import { kindLabel, trustReasonLabel, trustStateLabel, zoneLabel } from "../lib/labels";
 import { connectivity, pick, pickNum } from "../lib/nodes";
 import { fmtAgo, fmtDateTime, fmtDuration } from "../lib/time";
 import { NodeAnalysisView } from "./Analysis";
@@ -18,11 +18,13 @@ interface Props {
   canEdit: boolean;
   /** dispatchers do not see presence (radar) data */
   showPresence?: boolean;
+  trust?: SensorTrust;
+  trustStatus: "loading" | "ready" | "unavailable";
 }
 
 /** One physical device: identity + connectivity, then its raw status next to the hub's
  *  analysis of it, then raw history charts. */
-export function NodeCard({ node, zones, zoneNames, canEdit, showPresence = true }: Props) {
+export function NodeCard({ node, zones, zoneNames, canEdit, showPresence = true, trust, trustStatus }: Props) {
   const { t, lang } = useT();
   const update = useUpdateNode();
   const conn = connectivity(node);
@@ -33,6 +35,10 @@ export function NodeCard({ node, zones, zoneNames, canEdit, showPresence = true 
   // show the requested zone while the PATCH is in flight
   const zoneId = (update.isPending ? update.variables?.patch.zone_id : undefined) ?? node.zone_id;
   const knownZone = zones.some((z) => z.id === zoneId);
+  const trustState = trust?.state ?? "unknown";
+  const trustReason = trust
+    ? trustReasonLabel(trust.reason, t)
+    : t(trustStatus === "loading" ? "trust.loading" : "trust.unavailable");
 
   return (
     <div className="card node-card">
@@ -82,6 +88,13 @@ export function NodeCard({ node, zones, zoneNames, canEdit, showPresence = true 
         </span>
         <span>
           {t("node.boot")} <b>#{node.boot_epoch}</b>
+        </span>
+      </div>
+      <div className="trust-line small">
+        <b>{t("trust.title")}</b>
+        <StatusPill state={trustState} label={trustStateLabel(trustState, t)} />
+        <span className={trustState === "lost" ? "t-danger" : trustState === "suspect" ? "t-attention" : "muted"}>
+          {trustReason}
         </span>
       </div>
       {update.isError && (

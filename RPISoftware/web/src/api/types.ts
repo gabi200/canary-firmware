@@ -81,6 +81,27 @@ export interface Incident {
   signature: Signature | null;
 }
 
+export interface FusionInput {
+  name: string;
+  age_seconds: number | null;
+  status: "fresh" | "stale" | "missing";
+}
+
+/** GET /incidents/{id}/fusion: advisory evidence recomputed from bounded recent input. */
+export interface FusionExplanation {
+  incident_id: string;
+  score: number;
+  score_kind: "benign_likelihood";
+  classification: string;
+  assessed_ts: string;
+  fresh_witnesses: number;
+  supporting_evidence: string[];
+  contradicting_evidence: string[];
+  missing_inputs: string[];
+  active_overrides: string[];
+  inputs: FusionInput[];
+}
+
 export interface TriangulationContributor {
   device_id: string;
   zone_id: string;
@@ -438,6 +459,25 @@ export interface NodeOut {
   last_command?: CommandRecord | null;
   /** Registered itself and not placed in a room yet (technician's "new sensors"). */
   is_new?: boolean;
+}
+
+export type SensorTrustState = "ok" | "suspect" | "lost";
+
+export interface SensorTrustChannel {
+  device_id: string;
+  sensor_type: string;
+  state: SensorTrustState;
+  reason: string;
+  sample_count: number;
+  input_age_seconds: number | null;
+}
+
+/** GET /buildings/{id}/sensor-trust: advisory health, separate from device self-test. */
+export interface SensorTrust {
+  node_id: string;
+  state: SensorTrustState;
+  reason: string;
+  channels: SensorTrustChannel[];
 }
 
 /** PATCH /nodes/{id} body. */
