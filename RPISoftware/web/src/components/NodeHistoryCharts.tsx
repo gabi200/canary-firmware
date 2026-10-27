@@ -295,6 +295,9 @@ function Timeline({ spec, win }: { spec: TimelineSpec; win: Window }) {
                     <YAxis hide domain={[0, 1]} />
                     <Tooltip
                       {...chartStyle.tooltip}
+                      // rows are 24px tall: let the tooltip leave the row and sit above the next one
+                      allowEscapeViewBox={{ y: true }}
+                      wrapperStyle={{ zIndex: 10 }}
                       labelFormatter={(ms) => fmtTooltipTime(Number(ms), lang, minutes)}
                       formatter={(v) => (typeof v !== "number" ? "—" : v ? t("common.yes") : t("common.no"))}
                     />
