@@ -750,3 +750,26 @@ export interface BuildingMotion {
   zones: ZoneMotion[];
   unmapped: MotionSensor[];
 }
+
+/** A room's latest reading against its own frozen normal (GET /buildings/{id}/zone-normal).
+ *  `score` is a robust deviation in MAD units: a heuristic, not a probability. */
+export type NormalStatus = "usual" | "unusual_high" | "unusual_low" | "learning" | "no_recent_data";
+
+export interface MetricNormal {
+  sensor_type: string;
+  status: NormalStatus;
+  score: number | null;
+  value: number | null;
+  median: number | null;
+  mad: number | null;
+  n: number;
+  hour: number | null;
+  source: "live" | "seed" | null;
+  ref_start: string | null;
+  ref_end: string | null;
+}
+
+export interface BuildingNormal {
+  building_id: string;
+  zones: { zone_id: string; label: string; metrics: MetricNormal[] }[];
+}

@@ -944,3 +944,34 @@ class BuildingMotionOut(BaseModel):
     building_id: str
     zones: list[ZoneMotionOut]
     unmapped: list[MotionSensorOut]  # boards seen on the broker with no zone in CANARY_ESPECTRE_ZONES
+
+
+class MetricNormalOut(BaseModel):
+    """A room's latest reading against its own frozen normal (app.analytics.baseline). `score` is a
+    robust deviation (MAD units), a heuristic and not a probability. Evidence only: the absolute
+    thresholds still decide every alarm. source `seed`: labelled synthetic demo data."""
+
+    model_config = ConfigDict(from_attributes=True)
+    sensor_type: str
+    status: str  # usual | unusual_high | unusual_low | learning | no_recent_data
+    score: float | None
+    value: float | None
+    median: float | None
+    mad: float | None
+    n: int
+    hour: int | None  # -1: all hours; 0-23: the building-local hour bucket compared with
+    source: str | None
+    ref_start: datetime | None
+    ref_end: datetime | None
+
+
+class ZoneNormalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    zone_id: str
+    label: str
+    metrics: list[MetricNormalOut]
+
+
+class BuildingNormalOut(BaseModel):
+    building_id: str
+    zones: list[ZoneNormalOut]

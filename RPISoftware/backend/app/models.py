@@ -624,6 +624,28 @@ class MotionObservation(Base):
     ts: Mapped[datetime] = _ts_col(index=True)
 
 
+class ZoneBaseline(Base):
+    """A room's frozen "normal" for one metric (app.analytics.baseline): median / MAD over a past
+    reference window without incidents. hour -1: all hours, else a building-local hour bucket.
+    median None: still learning (n samples so far). source: live (from readings) | seed (labelled
+    synthetic demo data, tools/baseline_seed.py)."""
+
+    __tablename__ = "zone_baselines"
+    __table_args__ = (UniqueConstraint("zone_id", "sensor_type", "hour", name="uq_zone_baseline"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    building_id: Mapped[str] = mapped_column(String, index=True)
+    zone_id: Mapped[str] = mapped_column(String)
+    sensor_type: Mapped[str] = mapped_column(String)
+    hour: Mapped[int] = mapped_column(Integer, default=-1)
+    median: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mad: Mapped[float | None] = mapped_column(Float, nullable=True)
+    n: Mapped[int] = mapped_column(Integer, default=0)
+    ref_start: Mapped[datetime] = mapped_column(UTCDateTime)
+    ref_end: Mapped[datetime] = mapped_column(UTCDateTime)
+    source: Mapped[str] = mapped_column(String, default="live")
+    computed_ts: Mapped[datetime] = _ts_col()
+
+
 # --------------------------------------------------------------------------- #
 # Three-Pi cluster (app.cluster); unused in single mode
 # --------------------------------------------------------------------------- #

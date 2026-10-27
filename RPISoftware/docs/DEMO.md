@@ -51,3 +51,33 @@ Log in to the dashboard as `mihai` (manager).
    kitchen: the incident still goes straight to evacuation.
 
 Not shown to dispatchers or residents (the endpoint answers 403; the card and chips are hidden).
+
+## F4: Learned normal per room
+
+Each room's gas, CO and particulate readings are compared with that room's own frozen reference:
+median and MAD over the 14 days that ended yesterday, without incident windows or readings the
+node flagged. Hour-of-day buckets are used once there are 7 days of history. Readings are kept
+for `CANARY_RETENTION_DAYS` (14), so a reference covers about 13 days. The comparison is evidence
+only: the score is a heuristic in MAD units, not a probability, and alarm thresholds are unchanged.
+
+Setup (a hub without two weeks of history): seed labelled demo references, then restart the
+backend or wait for the next page refresh.
+
+```
+cd backend && python -m tools.baseline_seed --building bld_007
+```
+
+1. **Seeded rooms.** Log in as `mihai`. The card "Usual for this room?" lists each room and metric
+   with a *simulated seed data* tag. With live sensors reporting normally, each shows *Usual* and
+   "x vs usual y (z spreads)".
+2. **Hour buckets.** In a kitchen between 18:00 and 21:00, the particulate line says "at 19:00":
+   the seed's dinner-time bump is that hour's normal, so cooking smoke reads as less unusual than
+   at 03:00.
+3. **Unusual reading.** Breathe on the CO sensor or light a match near the air node, below the
+   alarm threshold. Within 15 s the room shows *Higher than usual* (amber) with a score above 3.
+   No incident opens until the absolute threshold is crossed.
+4. **No data.** Unplug the air node. After 10 minutes its rooms show *No recent data*, never
+   *Usual*.
+5. **Learning.** On a fresh hub without the seed, rooms show *Still learning* with the sample
+   count. The hourly job on the processing node replaces seed or learning rows once a room has
+   200 samples over at least 24 h.
