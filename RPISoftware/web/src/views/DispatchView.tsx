@@ -13,6 +13,7 @@ import { FusionExplanationPanel } from "../components/FusionExplanation";
 import { HazardMap } from "../components/HazardMap";
 import { IncidentActions } from "../components/IncidentActions";
 import { IncidentBriefCard } from "../components/IncidentBrief";
+import { WaterImpactCard } from "../components/WaterImpactCard";
 import { IncidentTimeline } from "../components/IncidentTimeline";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentRoster } from "../components/ResidentRoster";
@@ -173,6 +174,7 @@ export function DispatchView() {
           <FusionExplanationPanel incidentId={incident.id} />
 
           <IncidentBriefCard incidentId={incident.id} />
+          {incident.hazard_type === "water_leak" && <WaterImpactCard incidentId={incident.id} />}
 
           <Card title={t("dispatch.progress")}>
             <div className="progress">

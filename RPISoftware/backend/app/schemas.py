@@ -975,3 +975,23 @@ class ZoneNormalOut(BaseModel):
 class BuildingNormalOut(BaseModel):
     building_id: str
     zones: list[ZoneNormalOut]
+
+
+class WaterImpactUnitOut(BaseModel):
+    unit_id: str
+    label: str
+    reason: str  # below | riser
+    hops: int | None  # floors under the leak (below); None for riser
+    via_unit_id: str
+    riser: str | None = None
+
+
+class WaterImpactOut(BaseModel):
+    """Units a water leak may reach, from the configured plumbing topology. Potentially affected
+    only: no volume estimate and no valve action. topology: configured | not_configured | invalid."""
+
+    incident_id: str
+    applicable: bool  # false: not a water-leak incident
+    topology: str
+    leaking_units: list[WaterImpactUnitOut]  # reason "leak", hops 0
+    affected: list[WaterImpactUnitOut]
