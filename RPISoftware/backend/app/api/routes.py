@@ -10,6 +10,7 @@ from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.evidence import evidence_timeline
 from app.analytics.nodes import NodeService, broadcast_node, parse_fields
 from app import commands
 from app.analytics.service import AnalyticsService
@@ -47,6 +48,7 @@ from app.notify.service import NotificationService
 from app.occupancy.service import OccupancyService
 from app.realtime.ws import manager
 from app.schemas import (
+    EvidenceTimelineOut,
     AccountingOut,
     AssemblyPointOut,
     BuildingOut,
@@ -842,6 +844,21 @@ async def incident_fusion_explanation(
     if incident is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
     return await AnalyticsService(session).fusion_explanation(incident)
+
+
+@router.get(
+    "/incidents/{incident_id}/evidence-timeline", response_model=EvidenceTimelineOut, tags=["incidents"]
+)
+async def incident_evidence_timeline(
+    incident_id: str,
+    _: Principal = Depends(require_roles(Role.hoa_manager, Role.dispatcher_external)),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Read-only replay of stored readings, estimates and motion; never recomputes triangulation."""
+    incident = await session.get(Incident, incident_id)
+    if incident is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "incident not found")
+    return await evidence_timeline(session, incident)
 
 
 @router.get(

@@ -115,3 +115,31 @@ separate from the building's `EvacuationRoute` data and from any incident, and e
    simulated people with no exit".
 5. **Isolation.** The resident app's Evacuate screen and `GET /buildings/bld_007/evacuation` are
    unchanged.
+
+## F3b: Fusion evidence and observed sequence
+
+Both are read-only. The room evidence is labels only: it never changes the benign score or the
+classification, and motion is always weak context, so it can never make a hazard look benign.
+
+1. Log in as `mihai`, open **Dispatch** and start an incident in the kitchen (for example a gas
+   reading over the detection threshold on `dev_gas_kitchen`).
+2. **Room evidence.** Under **Fusion explanation**, the **Room evidence** block groups items by
+   role: *Supports a hazard*, *Points away from a hazard*, *Context*, *Missing or unreliable*.
+   - Kitchen gas higher than its own frozen normal (F4) supports a hazard.
+   - Kitchen gas close to its normal points away from a hazard and is marked **weak**.
+   - An ESPectre board in the room (F2) shows as *Motion detected* or *No recent motion*, always
+     weak context. No board shows as *No presence sensor* under missing.
+   - Each kitchen sensor's trust (F1) shows as context; a *lost* sensor shows under missing.
+3. **Alarm regression.** Seed a kitchen gas normal of 6000 ppm and send a critical 6000 ppm
+   reading with a local alarm. The incident goes to evacuation, the room-normal item says *Usual*
+   (weak, points away), and the score stays 0 with the classification *genuine*.
+4. **Observed sequence.** Below the replay bar on the hazard map, **Observed sequence** ranks each
+   sensor by when it first crossed its threshold, from stored readings. It flags data gaps (a
+   silence over 3x the sensor's usual interval, at least 60 s) and readings received out of order.
+   Duplicate deliveries are dropped at ingest and do not add an arrival. While replaying, sensors
+   that had not crossed yet at the replay time are dimmed.
+5. Stored source estimates and motion events are counted on their own line, not merged into the
+   sequence. Opening the panel never recomputes triangulation (no new snapshot is written).
+
+API: `GET /api/v1/incidents/{id}/fusion` (`evidence_items`) and
+`GET /api/v1/incidents/{id}/evidence-timeline`, staff only.

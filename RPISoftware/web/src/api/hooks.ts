@@ -18,6 +18,7 @@ import type {
   IncidentBrief,
   IncidentEvent,
   Escalation,
+  EvidenceTimeline,
   FusionExplanation,
   NodeHistory,
   NodeOut,
@@ -121,6 +122,18 @@ export function useFusionExplanation(incidentId: string | null) {
     enabled: !!incidentId,
     queryFn: () => api.get<FusionExplanation>(`/api/v1/incidents/${incidentId}/fusion`, token),
     refetchInterval: 6_000,
+    retry: false,
+  });
+}
+
+/** Observed sequence of an incident from stored rows (404 on older backends -> nothing shown). */
+export function useEvidenceTimeline(incidentId: string | null) {
+  const { token } = useCtx();
+  return useQuery({
+    queryKey: ["evidenceTimeline", incidentId],
+    enabled: !!incidentId,
+    queryFn: () => api.get<EvidenceTimeline>(`/api/v1/incidents/${incidentId}/evidence-timeline`, token),
+    refetchInterval: 15_000,
     retry: false,
   });
 }

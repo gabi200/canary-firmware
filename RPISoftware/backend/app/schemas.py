@@ -325,6 +325,16 @@ class FusionInputOut(BaseModel):
     status: Literal["fresh", "stale", "missing"]
 
 
+class EvidenceItemOut(BaseModel):
+    source: Literal["sensor_trust", "motion", "zone_normal"]
+    zone_id: str | None
+    subject: str  # device id, zone id or metric
+    status: str
+    role: Literal["supporting", "contradicting", "context", "missing"]
+    strength: Literal["weak", "normal"]
+    reason: str
+
+
 class FusionExplanationOut(BaseModel):
     incident_id: str
     score: float
@@ -337,6 +347,7 @@ class FusionExplanationOut(BaseModel):
     missing_inputs: list[str]
     active_overrides: list[str]
     inputs: list[FusionInputOut]
+    evidence_items: list[EvidenceItemOut] = []  # labels only: never part of score or classification
 
 
 class SensorTrustChannelOut(BaseModel):
@@ -687,6 +698,55 @@ class TriangulationSnapshotOut(BaseModel):
 class TriangulationHistoryOut(BaseModel):
     incident_id: str
     snapshots: list[TriangulationSnapshotOut]  # oldest first, <= 500
+
+
+class TimelineGapOut(BaseModel):
+    start: datetime
+    end: datetime
+    seconds: float
+
+
+class TimelineDeviceOut(BaseModel):
+    device_id: str
+    zone_id: str
+    sensor_type: str
+    order: int | None  # rank of first over-threshold arrival; None: never crossed in the window
+    first_seen_ts: datetime
+    first_over_ts: datetime | None
+    first_over_value: float | None
+    peak: float
+    sample_count: int
+    out_of_order: int  # readings received after a later seq of the same boot
+    gaps: list[TimelineGapOut]
+
+
+class TimelineEstimateOut(BaseModel):
+    ts: datetime
+    source_zone_id: str | None
+    confidence: float
+    method: str
+    n_contributors: int
+
+
+class TimelineMotionOut(BaseModel):
+    ts: datetime
+    zone_id: str
+    device_id: str
+    state: str
+    score: float
+
+
+class EvidenceTimelineOut(BaseModel):
+    """Stored rows only (GET /incidents/{id}/evidence-timeline); estimates are listed apart from
+    the observed readings, never merged into them."""
+
+    incident_id: str
+    window_start: datetime
+    window_end: datetime
+    truncated: bool
+    devices: list[TimelineDeviceOut]
+    estimates: list[TimelineEstimateOut]
+    motion: list[TimelineMotionOut]
 
 
 class EscalationOut(BaseModel):
