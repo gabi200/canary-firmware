@@ -29,6 +29,7 @@ import type {
   SensorTrust,
   Triangulation,
   TriangulationHistory,
+  WaterImpact,
   Zone,
 } from "./types";
 
@@ -162,6 +163,18 @@ export function useIncidentBrief(incidentId: string | null) {
     retry: false,
     // costly to make: keep it while the incident is being handled
     gcTime: 30 * 60_000,
+  });
+}
+
+/** Units a water-leak incident may reach (managers and dispatchers). */
+export function useWaterImpact(incidentId: string | null) {
+  const { token } = useCtx();
+  return useQuery({
+    queryKey: ["water-impact", incidentId],
+    queryFn: () => api.get<WaterImpact>(`/api/v1/incidents/${incidentId}/water-impact`, token),
+    enabled: !!incidentId,
+    refetchInterval: 30_000,
+    retry: false,
   });
 }
 

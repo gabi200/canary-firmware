@@ -1,0 +1,14 @@
+{
+  "buildings": {
+    "bld_007": {
+      "below": {
+        "unit_0312": ["unit_0212"],
+        "unit_0313": ["unit_0213"],
+        "unit_0212": ["unit_0112"]
+      },
+      "risers": {
+        "riser_kitchen_A": ["unit_0112", "unit_0212", "unit_0312", "unit_0412"]
+      }
+    }
+  }
+}

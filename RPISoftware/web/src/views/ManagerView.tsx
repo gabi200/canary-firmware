@@ -16,6 +16,7 @@ import { HubBanner } from "../components/HubStatus";
 import { IncidentActions } from "../components/IncidentActions";
 import { MotionCard } from "../components/MotionCard";
 import { ZoneNormalCard } from "../components/ZoneNormalCard";
+import { WaterImpactCard } from "../components/WaterImpactCard";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentList, ResidentRoster } from "../components/ResidentRoster";
 import { SafetySign, hazardSign } from "../components/SafetySigns";
@@ -121,6 +122,7 @@ export function ManagerView() {
               {inc.id === primary?.id && <PriorityAlert count={prioAwaiting} />}
               <EscalationLine incidentId={inc.id} />
               <IncidentActions incident={inc} />
+              {inc.hazard_type === "water_leak" && <WaterImpactCard incidentId={inc.id} inline />}
             </div>
           ))}
         </Card>

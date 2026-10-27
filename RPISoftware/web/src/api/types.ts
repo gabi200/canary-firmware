@@ -773,3 +773,21 @@ export interface BuildingNormal {
   building_id: string;
   zones: { zone_id: string; label: string; metrics: MetricNormal[] }[];
 }
+
+/** Units a water leak may reach, from the configured plumbing topology (potentially affected only). */
+export interface WaterImpactUnit {
+  unit_id: string;
+  label: string;
+  reason: "leak" | "below" | "riser";
+  hops: number | null;
+  via_unit_id: string;
+  riser: string | null;
+}
+
+export interface WaterImpact {
+  incident_id: string;
+  applicable: boolean;
+  topology: "configured" | "not_configured" | "invalid";
+  leaking_units: WaterImpactUnit[];
+  affected: WaterImpactUnit[];
+}

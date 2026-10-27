@@ -81,3 +81,19 @@ cd backend && python -m tools.baseline_seed --building bld_007
 5. **Learning.** On a fresh hub without the seed, rooms show *Still learning* with the sample
    count. The hourly job on the processing node replaces seed or learning rows once a room has
    200 samples over at least 24 h.
+
+## F5: Water-leak impact map
+
+Setup: `CANARY_WATER_TOPOLOGY_FILE=docs/water_topology.example.json` (the path is relative to where
+the backend runs; in Docker, mount it and use the in-container path). Restart the backend.
+
+1. **Leak.** Wet the water node's probe (or post a `water_leak` reading of 1 with `edge_state: alarm`
+   for `dev_leak_kitchen`). A water-leak incident opens for Ap. 12.
+2. **Manager view.** Under the incident, "Potentially affected units" says "Leak in: Ap. 12" and
+   then lists: `unit_0212` *directly below* (amber), `unit_0112` *2 floors below*, and `unit_0412`
+   *shares riser riser_kitchen_A*. Units missing from the demo seed show their ids.
+3. **Dispatch view** (`dispecer`): the same list, as a card next to the incident brief.
+4. **Plan missing.** Clear `CANARY_WATER_TOPOLOGY_FILE` and restart. The card says the impact is
+   *Unknown: the plumbing plan is not configured*, not "no units".
+5. **Nothing automatic.** The incident's state, its timeline and the valve are unchanged by the
+   map. Closing the valve stays a manual command.

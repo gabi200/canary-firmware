@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     espectre_zones: dict[str, str] = {}
     espectre_store_interval_s: float = 5.0  # an unchanged motion state is stored at most this often
 
+    # --- water-leak impact map: which units sit below / share a riser (docs/WATER_TOPOLOGY.md) ---
+    water_topology_file: str = ""  # JSON file; empty: the impact map says "topology not configured"
+
     # --- bootstrap ---
     auto_create_schema: bool = True
     auto_seed: bool = True
