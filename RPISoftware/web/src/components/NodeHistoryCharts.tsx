@@ -260,6 +260,9 @@ function HistoryChart({
             )}
             <Tooltip
               {...chartStyle.tooltip}
+              // short presence chart: let the tooltip leave the plot instead of being clipped
+              allowEscapeViewBox={{ y: true }}
+              wrapperStyle={{ zIndex: 10 }}
               labelFormatter={(t) => fmtClock(Number(t))}
               formatter={(v, _name, item) => {
                 if (typeof v !== "number") return "—";
