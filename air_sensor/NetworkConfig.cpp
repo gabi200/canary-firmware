@@ -98,9 +98,9 @@ NetworkConfig::NetworkConfig()
       coDangerParam_(
           "co_danger_ppm", "CO danger ppm", "100", 4, PPM_ATTRIBUTES),
       gasWarnParam_(
-          "gas_warn_adc", "MQ5 warning ADC", "1500", 4, ADC_ATTRIBUTES),
+          "gas_warn_adc", "MQ5 warning ADC", "1200", 4, ADC_ATTRIBUTES),
       gasDangerParam_(
-          "gas_danger_adc", "MQ5 danger ADC", "2200", 4, ADC_ATTRIBUTES),
+          "gas_danger_adc", "MQ5 danger ADC", "1760", 4, ADC_ATTRIBUTES),
       warmupParam_(
           "warmup_seconds", "Sensor warm-up seconds", "300", 4,
           SECONDS_ATTRIBUTES),

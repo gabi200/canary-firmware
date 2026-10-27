@@ -119,7 +119,10 @@ back. Because UART0 is taken, the debug console lives on the native USB port.
 
 **MQ5 (GPIO10).** Supply the heater at 5 V from a source that can carry it;
 the heater draws far more than a logic pin can. Feed the AO through a divider
-sized for 2.5 V or less at full scale, then into GPIO10. GPIO10 is ADC1_CH9,
+sized for 2.5 V or less at full scale, then into GPIO10. The reference build
+uses 15 kOhm from AO to GPIO10 and 10 kOhm from GPIO10 to GND, which passes
+0.4 of AO (2.0 V at a 5 V swing); the default gas thresholds assume that
+ratio. Fitting the resistors the other way round gives 3.0 V and clips. GPIO10 is ADC1_CH9,
 and ADC1 keeps working while Wi-Fi is active, which ADC2 does not. The
 firmware samples every 50 ms and averages 16 samples, so the controller sees a
 new gas value roughly every 800 ms.
@@ -320,8 +323,8 @@ The portal is non-blocking and times out after 300 seconds.
 | `api_token` | API token (12-64 chars; blank keeps existing) | none |
 | `co_warn_ppm` | CO warning ppm | `50` |
 | `co_danger_ppm` | CO danger ppm | `100` |
-| `gas_warn_adc` | MQ5 warning ADC | `1500` |
-| `gas_danger_adc` | MQ5 danger ADC | `2200` |
+| `gas_warn_adc` | MQ5 warning ADC | `1200` |
+| `gas_danger_adc` | MQ5 danger ADC | `1760` |
 | `warmup_seconds` | Sensor warm-up seconds | `300` |
 | `pm25_warn` | PM2.5 warning ug/m3 | `35` |
 | `pm25_danger` | PM2.5 danger ug/m3 | `150` |
@@ -378,9 +381,10 @@ curl -sS http://$DEVICE_IP/api/status | jq '{gas, co, particulate, climate}'
    Note the ceiling of that quiet-air band.
 4. Set `gas_warn_adc` above the observed ceiling with margin for drift, and
    `gas_danger_adc` above that with separation for noise. For example, a
-   quiet-air band topping out at 900 counts might be configured as warn 1500
-   and danger 2200, which are the shipped defaults. Those are an example, not
-   universal values.
+   quiet-air band topping out at 720 counts might be configured as warn 1200
+   and danger 1760, which are the shipped defaults. Those are an example, not
+   universal values, and they assume the 15k/10k divider: a different divider
+   ratio scales every reading, so scale the thresholds with it.
 5. Optionally bump-test with a known source at a safe distance and confirm the
    reading rises well past the danger threshold before choosing final values.
 

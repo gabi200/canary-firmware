@@ -28,8 +28,9 @@ DeviceConfig defaultDeviceConfig() {
   std::strcpy(config.mqttBaseTopic, "canary");
   config.coWarnPpm = 50;
   config.coDangerPpm = 100;
-  config.gasWarnAdc = 1500;
-  config.gasDangerAdc = 2200;
+  // Sized for the 15k/10k MQ5 divider (0.4 x AO, 2.0 V at full scale).
+  config.gasWarnAdc = 1200;
+  config.gasDangerAdc = 1760;
   config.sensorWarmupSeconds = 300;
   config.pm25WarnUgm3 = 35;
   config.pm25DangerUgm3 = 150;
