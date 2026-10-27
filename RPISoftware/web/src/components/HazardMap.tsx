@@ -5,6 +5,7 @@ import {
   useAccounting,
   useDevices,
   useEvacuation,
+  useMotion,
   useNodeHistories,
   useNodes,
   useOccupancy,
@@ -180,6 +181,7 @@ export function HazardMap({ incident }: { incident: Incident | null }) {
   const roster = useRoster(incident?.id ?? null);
   const accounting = useAccounting(incident?.id ?? null);
   const occupancy = useOccupancy();
+  const motion = useMotion();
   const residents = useResidents();
   const evacuation = useEvacuation();
   const [params, setParams] = useSearchParams();
@@ -267,12 +269,14 @@ export function HazardMap({ incident }: { incident: Incident | null }) {
     occupancyByZone[z.zone_id] = z.persons_est;
   }
   const source = incident && snapshot !== null ? sourceView(shownTri, incident, layout) : null;
+  // Wi-Fi motion is live only: a replay shows no motion chips rather than today's on the past
+  const motionByZone = new Map((motion.data?.zones ?? []).map((z) => [z.zone_id, z.state]));
   const views = zoneViews(layout, sensors, {
     incident,
     sourceZoneId: source?.zoneId ?? null,
     occupancyByZone,
     priorityByUnit: incident ? priorityByUnit(roster.data?.priority) : {},
-  });
+  }).map((v) => (replayT == null ? { ...v, motion: motionByZone.get(v.placed.zone.id) } : v));
   const contributors = incident ? contributorViews(shownTri, layout, nodeList, latest) : [];
 
   // the command view always shows the live state (the map may be replaying the past)

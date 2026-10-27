@@ -13,7 +13,7 @@
  * FOOTER row with the room's sensor chips. Overlays are clamped into the body band and drawn
  * under the text layer, so they never cover text.
  */
-import type { Device, Incident, NodeHistory, NodeOut, Reading, Triangulation, Zone } from "../api/types";
+import type { Device, Incident, MotionState, NodeHistory, NodeOut, Reading, Triangulation, Zone } from "../api/types";
 import type { TFn } from "../i18n";
 import { natural } from "./format";
 import { levelLabel, prettyId } from "./labels";
@@ -467,6 +467,8 @@ export interface ZoneView {
   isAffected: boolean;
   occupancy: number;
   priority: number;
+  /** ESPectre Wi-Fi motion, live only (staff); undefined: none shown */
+  motion?: MotionState;
 }
 
 /** The zone's own status, honest during an open incident: a source / affected zone whose

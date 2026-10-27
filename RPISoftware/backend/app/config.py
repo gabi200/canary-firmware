@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     llm_url: str = ""  # e.g. http://host.docker.internal:11434; empty: incident briefs use a template
     llm_model: str = "qwen2.5-instruct:1.5b"
 
+    # --- ESPectre Wi-Fi motion boards (stock firmware, deployed separately; docs/ESPECTRE.md) ---
+    espectre_topic_prefix: str = "espectre/v1/devices"  # ESPectre's default MQTT base
+    # device_id (16 hex chars) -> Zone id, e.g. {"3cf79180d3a0aca4": "zone_kitchen"}; unmapped
+    # boards are listed as such and their motion is not stored
+    espectre_zones: dict[str, str] = {}
+    espectre_store_interval_s: float = 5.0  # an unchanged motion state is stored at most this often
+
     # --- bootstrap ---
     auto_create_schema: bool = True
     auto_seed: bool = True

@@ -14,6 +14,7 @@ import { EscalationLine } from "../components/EscalationLine";
 import { HazardMap } from "../components/HazardMap";
 import { HubBanner } from "../components/HubStatus";
 import { IncidentActions } from "../components/IncidentActions";
+import { MotionCard } from "../components/MotionCard";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentList, ResidentRoster } from "../components/ResidentRoster";
 import { SafetySign, hazardSign } from "../components/SafetySigns";
@@ -132,6 +133,10 @@ export function ManagerView() {
       <div className="grid cols-even" style={{ marginTop: 16 }}>
         <EnvironmentCard />
         <DeviceHealthCard />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <MotionCard />
       </div>
 
       <div className="grid cols-even" style={{ marginTop: 16 }}>

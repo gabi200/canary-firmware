@@ -2,6 +2,8 @@
 
 - `<base>/status`, `<base>/availability`: the real ESP32 firmware (app.ingestion.hardware).
 - `<base>/command/result`: device command results (app.commands).
+- `espectre/v1/devices/<id>/...`: ESPectre Wi-Fi motion boards (app.ingestion.espectre), first,
+  so no other route ever sees them.
 - `<mqtt_topic_prefix>/.../telemetry|event`: legacy canary.telemetry.v1 (simulator).
 - anything else is ignored. The connected client is shared (app.ingestion.broker) so the API
   can publish device commands to the same local broker.
@@ -26,7 +28,7 @@ from app import commands
 from app.config import settings
 from app.db import SessionLocal
 from app.enums import EdgeState
-from app.ingestion import broker
+from app.ingestion import broker, espectre
 from app.ingestion.hardware import handle_hardware_message
 from app.ingestion.pipeline import ingest_telemetry
 from app.schemas import TelemetryPayload
@@ -58,7 +60,9 @@ async def dispatch(topic: str, raw: bytes, retain: bool = False, received_ts: fl
     """Route one message by topic; errors are logged, never raised into the loop. `received_ts`
     (epoch s) is when the MQTT client received it (default: now)."""
     try:
-        if topic.endswith("/status") or topic.endswith("/availability"):
+        if espectre.handles(topic):
+            await espectre.handle_espectre_message(topic, raw, retain=retain, received_ts=received_ts)
+        elif topic.endswith("/status") or topic.endswith("/availability"):
             await handle_hardware_message(topic, raw, retain=retain, received_ts=received_ts)
         elif topic.endswith("/command/result"):
             if not retain:  # results are never retained by the firmware; a retained one is stale
@@ -92,6 +96,8 @@ async def run_mqtt_consumer(stop: asyncio.Event, subscribe: bool = True) -> None
             ) as client:
                 if subscribe:
                     await client.subscribe(topic, qos=1)
+                    for extra in espectre.subscriptions():
+                        await client.subscribe(extra, qos=1)
                     log.info("MQTT consumer subscribed to %s", topic)
                 else:
                     log.info("MQTT publish-only connection to %s", settings.mqtt_host)
