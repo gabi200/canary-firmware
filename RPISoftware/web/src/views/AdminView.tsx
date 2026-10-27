@@ -2,7 +2,7 @@
  * Administration (system_admin, hoa_manager; technician without accounts): accounts, rooms
  * (floor plan editor), devices (new sensors, hardware test), firmware (versions, updates) and the
  * hub's Pis. Tabs are routes: /admin/accounts, /admin/rooms, /admin/devices, /admin/firmware,
- * /admin/hub. The scope bar on top (apartment /
+ * /admin/hub, and an evacuation what-if on a simulated graph (/admin/whatif). The scope bar on top (apartment /
  * room) applies to every tab but Hub.
  */
 import { NavLink, Navigate, useParams } from "react-router-dom";
@@ -15,6 +15,7 @@ import { DevicesTab } from "./admin/DevicesTab";
 import { FirmwareTab } from "./admin/FirmwareTab";
 import { HubTab } from "./admin/HubTab";
 import { RoomsTab } from "./admin/RoomsTab";
+import { WhatIfTab } from "./admin/WhatIfTab";
 
 const TABS: { id: string; label: MsgKey }[] = [
   { id: "accounts", label: "admin.tabAccounts" },
@@ -22,6 +23,7 @@ const TABS: { id: string; label: MsgKey }[] = [
   { id: "devices", label: "admin.tabDevices" },
   { id: "firmware", label: "admin.tabFirmware" },
   { id: "hub", label: "admin.tabHub" },
+  { id: "whatif", label: "admin.tabWhatIf" },
 ];
 
 export function AdminView() {
@@ -34,7 +36,7 @@ export function AdminView() {
   return (
     <>
       {/* accounts belong to apartments, not rooms: no room row there; the hub's Pis to no apartment */}
-      {tab !== "hub" && <ScopeBar rooms={tab !== "accounts"} />}
+      {tab !== "hub" && tab !== "whatif" && <ScopeBar rooms={tab !== "accounts"} />}
       <div className="page-head">
         <h2>{t("admin.title")}</h2>
         <span className="muted">{t("admin.subtitle", { id: buildingId })}</span>
@@ -51,6 +53,7 @@ export function AdminView() {
       {tab === "devices" && <DevicesTab />}
       {tab === "firmware" && <FirmwareTab />}
       {tab === "hub" && <HubTab />}
+      {tab === "whatif" && <WhatIfTab />}
     </>
   );
 }

@@ -995,3 +995,59 @@ class WaterImpactOut(BaseModel):
     topology: str
     leaking_units: list[WaterImpactUnitOut]  # reason "leak", hops 0
     affected: list[WaterImpactUnitOut]
+
+
+class ScenarioIn(BaseModel):
+    unavailable: list[Annotated[str, StringConstraints(max_length=64)]] = Field(default_factory=list, max_length=64)
+
+
+class ScenarioNodeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    label: str
+    kind: str
+    people: int
+
+
+class ScenarioEdgeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    a: str
+    b: str
+    length_m: float
+    capacity_ppm: float
+
+
+class ScenarioRoomOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    room_id: str
+    people: int
+    exit_id: str | None
+    path: list[str]
+    edges: list[str]
+    length_m: float | None
+
+
+class ScenarioLoadOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    edge_id: str
+    people: int
+    capacity_ppm: float
+    minutes_to_clear: float
+
+
+class ScenarioOut(BaseModel):
+    """An evacuation what-if on a simulated graph (app.scenario.evacuation). Not linked to the
+    building's evacuation routes or any incident: `label` says "scenario — not a safety prediction"."""
+
+    graph_id: str
+    graph_label: str
+    label: str
+    simulated: bool = True
+    nodes: list[ScenarioNodeOut]
+    edges: list[ScenarioEdgeOut]
+    unavailable: list[str]
+    unknown_ids: list[str]
+    rooms: list[ScenarioRoomOut]
+    loads: list[ScenarioLoadOut]
+    stranded_people: int
