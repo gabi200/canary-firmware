@@ -97,3 +97,21 @@ the backend runs; in Docker, mount it and use the in-container path). Restart th
    *Unknown: the plumbing plan is not configured*, not "no units".
 5. **Nothing automatic.** The incident's state, its timeline and the valve are unchanged by the
    map. Closing the valve stays a manual command.
+
+## F6: Evacuation what-if
+
+A staff-only tool on a **simulated** floor graph (`backend/app/scenario/demo_graph.json`: three
+apartments, a corridor, two stairs, a lobby and two exits, with made-up head counts). It is
+separate from the building's `EvacuationRoute` data and from any incident, and every screen says
+"scenario — not a safety prediction". There is no smoke spread and no walking speed.
+
+1. Log in as `mihai` and open **Administration → What-if**. The dashed amber banner labels
+   it a scenario.
+2. **Nothing blocked.** Every apartment goes Floor 3 corridor → Stair A → Lobby → Main entrance (Ap.
+   12: 35 m). The busiest passage is Stair A ↔ Lobby: 9 people at 30/min, 0.3 min to clear.
+3. **Block Stair A.** The paths switch to Stair B → Back door, and the busiest passage becomes
+   Stair B ↔ Back door (9 people at 20/min, 0.45 min).
+4. **Block the Floor 3 corridor.** Every apartment shows *No exit reachable* in red, with "9
+   simulated people with no exit".
+5. **Isolation.** The resident app's Evacuate screen and `GET /buildings/bld_007/evacuation` are
+   unchanged.

@@ -27,6 +27,7 @@ import type {
   Resident,
   Roster,
   SensorTrust,
+  Scenario,
   Triangulation,
   TriangulationHistory,
   WaterImpact,
@@ -174,6 +175,18 @@ export function useWaterImpact(incidentId: string | null) {
     queryFn: () => api.get<WaterImpact>(`/api/v1/incidents/${incidentId}/water-impact`, token),
     enabled: !!incidentId,
     refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
+/** Evacuation what-if for a set of unavailable corridors / stairs (staff; simulated graph). */
+export function useEvacuationScenario(unavailable: string[]) {
+  const { token } = useCtx();
+  const key = [...unavailable].sort();
+  return useQuery({
+    queryKey: ["scenario-evacuation", key],
+    queryFn: () => api.post<Scenario>(`/api/v1/scenarios/evacuation`, token, { unavailable: key }),
+    placeholderData: keepPreviousData,
     retry: false,
   });
 }

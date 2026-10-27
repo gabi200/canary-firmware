@@ -1,0 +1,26 @@
+{
+  "id": "demo_floor3",
+  "label": "Demo: floor 3 and ground floor (simulated)",
+  "nodes": [
+    {"id": "ap12", "label": "Ap. 12", "kind": "room", "people": 3},
+    {"id": "ap13", "label": "Ap. 13", "kind": "room", "people": 2},
+    {"id": "ap14", "label": "Ap. 14", "kind": "room", "people": 4},
+    {"id": "corridor_3", "label": "Floor 3 corridor", "kind": "corridor", "people": 0},
+    {"id": "stair_a", "label": "Stair A", "kind": "stair", "people": 0},
+    {"id": "stair_b", "label": "Stair B", "kind": "stair", "people": 0},
+    {"id": "lobby", "label": "Ground-floor lobby", "kind": "corridor", "people": 0},
+    {"id": "exit_main", "label": "Main entrance", "kind": "exit", "people": 0},
+    {"id": "exit_back", "label": "Back door", "kind": "exit", "people": 0}
+  ],
+  "edges": [
+    {"id": "ap12_corr", "a": "ap12", "b": "corridor_3", "length_m": 6, "capacity_ppm": 40},
+    {"id": "ap13_corr", "a": "ap13", "b": "corridor_3", "length_m": 5, "capacity_ppm": 40},
+    {"id": "ap14_corr", "a": "ap14", "b": "corridor_3", "length_m": 8, "capacity_ppm": 40},
+    {"id": "corr_stair_a", "a": "corridor_3", "b": "stair_a", "length_m": 4, "capacity_ppm": 60},
+    {"id": "corr_stair_b", "a": "corridor_3", "b": "stair_b", "length_m": 14, "capacity_ppm": 40},
+    {"id": "stair_a_lobby", "a": "stair_a", "b": "lobby", "length_m": 20, "capacity_ppm": 30},
+    {"id": "stair_b_back", "a": "stair_b", "b": "exit_back", "length_m": 22, "capacity_ppm": 20},
+    {"id": "lobby_main", "a": "lobby", "b": "exit_main", "length_m": 5, "capacity_ppm": 60},
+    {"id": "lobby_back", "a": "lobby", "b": "exit_back", "length_m": 15, "capacity_ppm": 40}
+  ]
+}

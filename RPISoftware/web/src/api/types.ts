@@ -791,3 +791,19 @@ export interface WaterImpact {
   leaking_units: WaterImpactUnit[];
   affected: WaterImpactUnit[];
 }
+
+/** Evacuation what-if on a simulated graph (POST /scenarios/evacuation): never the building's
+ *  real routes. `label` is "scenario — not a safety prediction". */
+export interface Scenario {
+  graph_id: string;
+  graph_label: string;
+  label: string;
+  simulated: boolean;
+  nodes: { id: string; label: string; kind: "room" | "corridor" | "stair" | "exit"; people: number }[];
+  edges: { id: string; a: string; b: string; length_m: number; capacity_ppm: number }[];
+  unavailable: string[];
+  unknown_ids: string[];
+  rooms: { room_id: string; people: number; exit_id: string | null; path: string[]; edges: string[]; length_m: number | null }[];
+  loads: { edge_id: string; people: number; capacity_ppm: number; minutes_to_clear: number }[];
+  stranded_people: number;
+}
