@@ -15,6 +15,7 @@ import { HazardMap } from "../components/HazardMap";
 import { HubBanner } from "../components/HubStatus";
 import { IncidentActions } from "../components/IncidentActions";
 import { MotionCard } from "../components/MotionCard";
+import { ZoneNormalCard } from "../components/ZoneNormalCard";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentList, ResidentRoster } from "../components/ResidentRoster";
 import { SafetySign, hazardSign } from "../components/SafetySigns";
@@ -135,8 +136,9 @@ export function ManagerView() {
         <DeviceHealthCard />
       </div>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="grid cols-even" style={{ marginTop: 16 }}>
         <MotionCard />
+        <ZoneNormalCard />
       </div>
 
       <div className="grid cols-even" style={{ marginTop: 16 }}>

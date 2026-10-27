@@ -41,6 +41,10 @@ upgrade path.
 
 ### A per-room learned "normal"
 
+> **Status:** implemented as frozen median / MAD references per room and metric, with hour-of-day
+> buckets once there are 7 days of history (`app/analytics/baseline.py`, `zone_normal.py`,
+> `GET /api/v1/buildings/{id}/zone-normal`). Evidence only. There is no Isolation Forest.
+
 A kitchen at 19:00 and a bedroom at 03:00 behave very differently. A seasonal baseline
 or Isolation Forest per zone gives early "this is unusual for this room" warnings well
 before fixed thresholds trip.

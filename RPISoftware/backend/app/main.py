@@ -28,6 +28,7 @@ from app.api.device_commands import router as commands_router
 from app.api.firmware import router as firmware_router
 from app.api.household import router as household_router
 from app.api.motion import router as motion_router
+from app.api.zone_normal import router as zone_normal_router
 from app.api.routes import router
 from app import cluster
 from app.care.service import CareUnavailable
@@ -92,6 +93,7 @@ class _Workloads:
             log.warning("MQTT consumer not started: %s", exc)
 
     async def start_processing(self) -> None:
+        from app.analytics.zone_normal import run_baselines
         from app.ingestion import espectre, hardware
         from app.notify import escalation
 
@@ -99,11 +101,13 @@ class _Workloads:
         espectre.reset_state()  # in-memory state from an earlier turn as processing node is stale
         await escalation.resume_pending()  # escalation retries survive a restart or a failover
         self.spawn("retention", run_retention(self.stop))
+        self.spawn("baselines", run_baselines(self.stop))  # per-room normal (app.analytics.zone_normal)
         await self.mqtt(subscribe=True)
 
     async def stop_processing(self) -> None:
         await self.mqtt(subscribe=False)  # the consumer first: it is what must not run twice
         await self.cancel("retention")
+        await self.cancel("baselines")
 
 
 @contextlib.asynccontextmanager
@@ -172,6 +176,7 @@ app.include_router(firmware_router)
 app.include_router(ai_router)
 app.include_router(cluster_router)
 app.include_router(motion_router)
+app.include_router(zone_normal_router)
 
 
 @app.exception_handler(CareUnavailable)

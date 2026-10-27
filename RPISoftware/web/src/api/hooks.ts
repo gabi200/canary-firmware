@@ -8,6 +8,7 @@ import type {
   Accounting,
   Building,
   BuildingMotion,
+  BuildingNormal,
   BuildingSummary,
   ClusterStatus,
   Device,
@@ -194,6 +195,18 @@ export function useMotion() {
     queryFn: () => api.get<BuildingMotion>(`/api/v1/buildings/${buildingId}/motion`, token),
     enabled: canSeeCluster(session?.role),
     refetchInterval: 5_000,
+    retry: false,
+  });
+}
+
+/** Each room against its own learned normal (managers, dispatchers, technicians). */
+export function useZoneNormal() {
+  const { token, buildingId, session } = useAuth();
+  return useQuery({
+    queryKey: ["zone-normal", buildingId],
+    queryFn: () => api.get<BuildingNormal>(`/api/v1/buildings/${buildingId}/zone-normal`, token),
+    enabled: !!session && session.role !== "resident",
+    refetchInterval: 15_000,
     retry: false,
   });
 }
