@@ -589,6 +589,41 @@ class SignatureAssessmentRow(Base):
     ts: Mapped[datetime] = _ts_col(index=True)
 
 
+class MotionSensor(Base):
+    """An ESPectre Wi-Fi motion board (app.ingestion.espectre) and its retained health / sensing
+    state. Motion is evidence of movement only: never a person count or an empty room."""
+
+    __tablename__ = "motion_sensors"
+    device_id: Mapped[str] = mapped_column(String, primary_key=True)
+    zone_id: Mapped[str | None] = mapped_column(String, nullable=True)  # None: not in CANARY_ESPECTRE_ZONES
+    building_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    online: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # None: no health message yet
+    ready: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # None: no sensing message yet
+    calibrating: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    firmware: Mapped[str] = mapped_column(String, default="")
+    last_seen_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # any message
+    last_motion_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # last `motion` state
+
+
+class MotionObservation(Base):
+    """One stored ESPectre motion event: every state change, and an unchanged state at most every
+    CANARY_ESPECTRE_STORE_INTERVAL_S. `source_ms` is the board's monotonic clock (ms since boot),
+    `ts` the hub's receive time. `ready` is the board's readiness when it was received."""
+
+    __tablename__ = "motion_observations"
+    __table_args__ = (Index("ix_motion_observations_device_ts", "device_id", "ts"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    device_id: Mapped[str] = mapped_column(String)
+    zone_id: Mapped[str] = mapped_column(String, index=True)
+    building_id: Mapped[str] = mapped_column(String)
+    score: Mapped[float] = mapped_column(Float)
+    state: Mapped[str] = mapped_column(String)  # idle | motion
+    source_ms: Mapped[int] = mapped_column(BigInteger)
+    ready: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ts: Mapped[datetime] = _ts_col(index=True)
+
+
 # --------------------------------------------------------------------------- #
 # Three-Pi cluster (app.cluster); unused in single mode
 # --------------------------------------------------------------------------- #

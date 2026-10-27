@@ -721,3 +721,32 @@ export interface NodeFirmwareDetail extends NodeFirmware {
   history: { firmware: string; ts: string }[];
   updates: FirmwareUpdate[];
 }
+
+/** ESPectre Wi-Fi motion (GET /buildings/{id}/motion, staff only). Movement only: never a person
+ *  count, and `no_recent_motion` is not an empty room. */
+export type MotionState = "motion" | "no_recent_motion" | "calibrating" | "unavailable" | "no_presence_sensor";
+
+export interface MotionSensor {
+  device_id: string;
+  zone_id: string | null;
+  state: Exclude<MotionState, "no_presence_sensor">;
+  reason: string;
+  firmware: string;
+  last_seen_ts: string | null;
+  last_motion_ts: string | null;
+}
+
+export interface ZoneMotion {
+  zone_id: string;
+  label: string;
+  state: MotionState;
+  last_motion_ts: string | null;
+  last_motion_age_s: number | null;
+  sensors: MotionSensor[];
+}
+
+export interface BuildingMotion {
+  building_id: string;
+  zones: ZoneMotion[];
+  unmapped: MotionSensor[];
+}

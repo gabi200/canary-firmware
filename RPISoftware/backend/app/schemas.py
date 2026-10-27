@@ -912,3 +912,35 @@ class NodeHistoryOut(BaseModel):
     minutes: int
     fields: list[str]
     points: list[HistoryPoint]
+
+
+class MotionSensorOut(BaseModel):
+    """An ESPectre Wi-Fi motion board. `state`: motion | no_recent_motion | calibrating | unavailable."""
+
+    model_config = ConfigDict(from_attributes=True)
+    device_id: str
+    zone_id: str | None
+    state: str
+    reason: str
+    firmware: str
+    last_seen_ts: datetime | None
+    last_motion_ts: datetime | None
+
+
+class ZoneMotionOut(BaseModel):
+    """Motion evidence for one zone. Movement only: never a person count, and `no_recent_motion`
+    is not an empty room. `no_presence_sensor`: no board is configured for the zone."""
+
+    model_config = ConfigDict(from_attributes=True)
+    zone_id: str
+    label: str
+    state: str
+    last_motion_ts: datetime | None
+    last_motion_age_s: float | None
+    sensors: list[MotionSensorOut]
+
+
+class BuildingMotionOut(BaseModel):
+    building_id: str
+    zones: list[ZoneMotionOut]
+    unmapped: list[MotionSensorOut]  # boards seen on the broker with no zone in CANARY_ESPECTRE_ZONES

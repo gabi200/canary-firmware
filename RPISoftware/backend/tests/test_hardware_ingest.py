@@ -686,7 +686,7 @@ async def test_retention_prunes_only_old_time_series(client):
 
     deleted = await prune_old_rows()
     assert deleted == {"node_status": 1, "sensor_readings": 1, "occupancy_estimates": 1, "signature_assessments": 0,
-                       "triangulation_snapshots": 0}
+                       "triangulation_snapshots": 0, "motion_observations": 0}
     assert await _count(NodeStatus) == 1
     assert await _count(SensorReading, SensorReading.device_id == "canary:co") == 1
 

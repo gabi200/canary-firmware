@@ -7,6 +7,7 @@ import { api } from "./client";
 import type {
   Accounting,
   Building,
+  BuildingMotion,
   BuildingSummary,
   ClusterStatus,
   Device,
@@ -182,6 +183,18 @@ export function useOccupancy() {
     queryKey: ["occupancy", buildingId],
     queryFn: () => api.get<Occupancy>(`/api/v1/buildings/${buildingId}/occupancy`, token),
     refetchInterval: 8_000,
+  });
+}
+
+/** ESPectre Wi-Fi motion per zone: staff only (dispatchers and residents get 403, don't ask). */
+export function useMotion() {
+  const { token, buildingId, session } = useAuth();
+  return useQuery({
+    queryKey: ["motion", buildingId],
+    queryFn: () => api.get<BuildingMotion>(`/api/v1/buildings/${buildingId}/motion`, token),
+    enabled: canSeeCluster(session?.role),
+    refetchInterval: 5_000,
+    retry: false,
   });
 }
 

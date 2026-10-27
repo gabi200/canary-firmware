@@ -28,3 +28,26 @@ The panel polls the existing `/api/v1/incidents/{id}/fusion` endpoint. It recomp
    - Expected screen: the node returns to **OK** only when the endpoint reports `ok`; while the assessment is loading or unavailable, the UI shows an unknown/unavailable state.
 
 A flat binary water probe is expected to remain **OK**. Temperature or humidity changes may move readings without proving a device fault.
+
+## F2: ESPectre motion evidence
+
+Setup: the two ESPectre boards are flashed (docs/ESPECTRE.md), connected to the hub broker, and
+mapped in `CANARY_ESPECTRE_ZONES` (for example the C3 in the kitchen, the S3 in the bedroom).
+Log in to the dashboard as `mihai` (manager).
+
+1. **Board starting up.** Power a board on. In the Motion card under the floor plan, its room
+   shows *Calibrating* (amber), and its floor-plan tile has a *Calibrare* / *Calibrating* chip.
+2. **Empty room, board ready.** Wait for calibration to end. The room shows *No recent motion*
+   (grey) with "last motion …" or "no motion seen yet". The card's caption says this is not proof
+   the room is empty.
+3. **Walk in.** Walk into the room. Within about 5 s the tile gets a blue *Motion* chip and the
+   card shows *Motion detected*, "last motion just now".
+4. **Leave.** Walk out. About 30 s after the last motion the room goes back to *No recent motion*,
+   and the age keeps counting up.
+5. **Unplug a board.** Pull its power. The broker publishes its Last Will, or the board falls silent
+   for 60 s. The room shows *Unavailable* (dashed grey chip), never green.
+6. **Rooms with no board** show *No presence sensor* in the card and no chip on the plan.
+7. **Alarm unaffected.** Press "Simulate gas leak" with a board showing *No recent motion* in the
+   kitchen: the incident still goes straight to evacuation.
+
+Not shown to dispatchers or residents (the endpoint answers 403; the card and chips are hidden).

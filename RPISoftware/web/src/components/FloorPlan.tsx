@@ -36,6 +36,8 @@ interface Props {
 }
 
 const PRIORITY_COLOR = "#8957e5";
+/** Wi-Fi motion chip: blue for movement (never green: motion is not "safe"), muted otherwise. */
+const MOTION_COLOR = { motion: "#79c0ff", no_recent_motion: "#a5b3c2", calibrating: "#e3b341", unavailable: "#8b98a8" } as const;
 const SOURCE_COLOR = "#f85149";
 const SELECT_COLOR = "#58a6ff";
 const TEXT = "#e6edf3";
@@ -347,6 +349,24 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           <WarningIcon x={right + 6} y={y + 11} width={15} height={15} style={{ color: "#ffffff" }} />
           <text x={right + 23} y={y + 23.5} fill="#ffffff" fontSize={12} fontWeight={800}>
             {n}
+          </text>
+        </g>,
+      );
+      right -= 6;
+    }
+    if (z.motion && z.motion !== "no_presence_sensor") {
+      const label = t(`motion.chip.${z.motion}`);
+      const cw = 20 + textWidth(label, 12, 700);
+      const color = MOTION_COLOR[z.motion];
+      right -= cw;
+      chips.push(
+        <g key="motion">
+          <title>{t(`motion.state.${z.motion}`)}</title>
+          <rect x={right} y={y + 8} width={cw} height={22} rx={11} fill="#0f1419" stroke={color}
+            strokeDasharray={z.motion === "unavailable" ? "3 3" : undefined} />
+          <circle cx={right + 10} cy={y + 19} r={4} fill={z.motion === "motion" ? color : "none"} stroke={color} strokeWidth={1.5} />
+          <text x={right + 18} y={y + 23.5} fill={color} fontSize={12} fontWeight={700}>
+            {label}
           </text>
         </g>,
       );
