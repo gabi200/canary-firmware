@@ -1,7 +1,8 @@
 import { useFusionExplanation } from "../api/hooks";
+import type { EvidenceItem } from "../api/types";
 import { useT, type TFn } from "../i18n";
 import { fmtNumber } from "../lib/format";
-import { sensorLabel, tokenLabel } from "../lib/labels";
+import { prettyId, sensorLabel, tokenLabel } from "../lib/labels";
 import { fmtAgo, fmtDuration } from "../lib/time";
 import { Card } from "./Card";
 import { StatusPill } from "./StatusPill";
@@ -23,6 +24,57 @@ function EvidenceList({ title, items, label = evidenceLabel }: {
       <h4>{title}</h4>
       {items.length ? (
         <ul>{items.map((item, index) => <li key={`${item}-${index}`}>{label(item, t)}</li>)}</ul>
+      ) : (
+        <div className="muted small">{t("fusion.none")}</div>
+      )}
+    </section>
+  );
+}
+
+const ROLES = ["supporting", "contradicting", "context", "missing"] as const;
+
+function itemLabel(item: EvidenceItem, t: TFn): string {
+  const room = item.zone_id ? prettyId(item.zone_id) : "";
+  if (item.source === "sensor_trust")
+    return t("fusion.item.trust", {
+      device: item.subject,
+      state: tokenLabel(t, "trust.state", item.status),
+      reason: tokenLabel(t, "trust.reason", item.reason),
+    });
+  if (item.source === "motion") return t("fusion.item.motion", { room, state: tokenLabel(t, "motion.state", item.status) });
+  return t("fusion.item.normal", {
+    room,
+    sensor: sensorLabel(item.subject, t),
+    status: tokenLabel(t, "normal.status", item.status),
+  });
+}
+
+/** Room evidence from sensor trust, motion and room normals. Labels only: none of it moves the score. */
+function EvidenceItems({ items }: { items: EvidenceItem[] }) {
+  const { t } = useT();
+  return (
+    <section className="fusion-items">
+      <h4>{t("fusion.items")}</h4>
+      <div className="muted small">{t("fusion.itemsNote")}</div>
+      {items.length ? (
+        <div className="fusion-grid">
+          {ROLES.map((role) => {
+            const mine = items.filter((item) => item.role === role);
+            return mine.length ? (
+              <section className="fusion-evidence" key={role}>
+                <h4>{t(`fusion.role.${role}`)}</h4>
+                <ul>
+                  {mine.map((item, index) => (
+                    <li key={`${item.source}-${item.zone_id}-${item.subject}-${index}`}>
+                      {itemLabel(item, t)}
+                      {item.strength === "weak" && <span className="muted small"> · {t("fusion.weak")}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null;
+          })}
+        </div>
       ) : (
         <div className="muted small">{t("fusion.none")}</div>
       )}
@@ -73,6 +125,8 @@ export function FusionExplanationPanel({ incidentId }: { incidentId: string }) {
               label={(item, translate) => tokenLabel(translate, "fusion.override", item)}
             />
           </div>
+
+          {data.evidence_items && <EvidenceItems items={data.evidence_items} />}
 
           <section className="fusion-inputs">
             <h4>{t("fusion.inputs")}</h4>

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import offload
 from app.analytics.anomalies import AnomalySample, assess_channel, is_stale
+from app.analytics.evidence import evidence_items
 from app.analytics.false_alarm import ReadingSample, classify
 from app.analytics.nodes import device_ids
 from app.analytics.signature.features import extract_features, parse_snapshot
@@ -362,6 +363,7 @@ class AnalyticsService:
                 contradicting.extend(signature.evidence)
         if incident.state in {"alarm", "escalation", "evacuation"}:
             overrides.append("incident_already_alarmed")
+        items = await evidence_items(self.session, incident, await self.sensor_trust(incident.building_id), now)
         return {
             "incident_id": incident.id,
             "score": assessment.benign_score,
@@ -374,4 +376,5 @@ class AnalyticsService:
             "missing_inputs": missing,
             "active_overrides": overrides,
             "inputs": inputs,
+            "evidence_items": items,
         }

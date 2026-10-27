@@ -38,6 +38,7 @@ import { latestByDevice } from "../lib/latest";
 import { unitsFromZones, useScope } from "../lib/scope";
 import { fmtClock, parseTs } from "../lib/time";
 import { FloorPlan } from "./FloorPlan";
+import { ObservedSequence } from "./ObservedSequence";
 import { RoomIndex } from "./RoomIndex";
 import { PauseIcon, PlayIcon } from "./Icons";
 import { priorityByUnit } from "./PriorityPanel";
@@ -370,6 +371,7 @@ export function HazardMap({ incident }: { incident: Incident | null }) {
           estimate={snapshots ? (snapshot ? snapshot.ts : null) : undefined}
         />
       )}
+      {incident && <ObservedSequence incidentId={incident.id} replayT={replayT} zoneNames={zoneNames} />}
       <RoomIndex
         zones={liveViews}
         unitLabel={(id) => unitInfo.get(id)?.label ?? prettyId(id)}

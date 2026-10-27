@@ -932,6 +932,16 @@ select.input { padding-right: 6px; }
 .fusion-evidence ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
 .fusion-evidence li { overflow-wrap: anywhere; }
 .fusion-inputs { margin-top: 16px; }
+.fusion-items { margin-top: 16px; }
+.fusion-items > h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.fusion-items .fusion-grid { margin-top: 10px; }
+.observed { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.observed-list { list-style: none; margin: 8px 0; padding: 0; }
+.observed-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.observed-list li:first-child { border-top: 0; }
+.observed-list li.pending { opacity: 0.45; }
+.observed-rank { flex: none; width: 1.6em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.observed-warn { color: var(--amber); }
 .fusion-inputs .row { gap: 8px; padding: 7px 0; }
 @media (max-width: 560px) {
   .fusion-grid { grid-template-columns: minmax(0, 1fr); }

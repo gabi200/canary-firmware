@@ -100,6 +100,43 @@ export interface FusionExplanation {
   missing_inputs: string[];
   active_overrides: string[];
   inputs: FusionInput[];
+  /** labels only: never part of the score or classification (absent on older backends) */
+  evidence_items?: EvidenceItem[];
+}
+
+export interface EvidenceItem {
+  source: "sensor_trust" | "motion" | "zone_normal";
+  zone_id: string | null;
+  subject: string;
+  status: string;
+  role: "supporting" | "contradicting" | "context" | "missing";
+  strength: "weak" | "normal";
+  reason: string;
+}
+
+export interface TimelineDevice {
+  device_id: string;
+  zone_id: string;
+  sensor_type: string;
+  order: number | null;
+  first_seen_ts: string;
+  first_over_ts: string | null;
+  first_over_value: number | null;
+  peak: number;
+  sample_count: number;
+  out_of_order: number;
+  gaps: { start: string; end: string; seconds: number }[];
+}
+
+/** GET /incidents/{id}/evidence-timeline: stored rows only; estimates kept apart from readings. */
+export interface EvidenceTimeline {
+  incident_id: string;
+  window_start: string;
+  window_end: string;
+  truncated: boolean;
+  devices: TimelineDevice[];
+  estimates: { ts: string; source_zone_id: string | null; confidence: number; method: string; n_contributors: number }[];
+  motion: { ts: string; zone_id: string; device_id: string; state: string; score: number }[];
 }
 
 export interface TriangulationContributor {
