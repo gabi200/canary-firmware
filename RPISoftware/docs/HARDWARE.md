@@ -76,6 +76,7 @@ Vocabularies: `sensor.state` = `uninitialized|dry|wet`; `valve.*` = `open|closed
  "climate":{"temperature_c":22.4,"humidity_percent":41.5,"valid":true,"age_ms":900},
  "presence":{"detected":true,"moving":false,"stationary":true,"moving_distance_cm":0,"moving_energy":0,
              "stationary_distance_cm":142,"stationary_energy":61,"detection_distance_cm":142,"valid":true,"age_ms":120},
+ "gas_detector":{"alarm":false},
  "alarm":{"state":"inactive","hazard":"none","sounding":false,"silence_remaining_seconds":0,
           "self_test":false,"led_color":"green","led_on":true},
  "wifi":{"connected":true,"rssi":-61},
@@ -86,7 +87,11 @@ Vocabularies: `sensor.state` = `uninitialized|dry|wet`; `valve.*` = `open|closed
 Vocabularies: channel `state` (`co`, `gas`, `particulate`) = `warmup|ok|warning|danger|fault`;
 `alarm.state` = `inactive|warning|sounding|silenced`; `alarm.hazard` = `none|co|gas|particulate`;
 `alarm.led_color` = `off|green|blue|cyan|magenta|orange|red|white`.
-`gas.adc` is a raw, uncalibrated MQ5 ADC count (0–4095), **not ppm**. No wall
+`gas.adc` is a raw, uncalibrated MQ5 ADC count (0–4095), **not ppm**.
+`gas_detector.alarm` is the external household gas detector's relay contact:
+`true` when it is alarming **or its wiring is open** (fail-safe, the two are
+not distinguished). It is independent of `alarm.*`, which covers the device's
+own sensors only. No wall
 clock on the devices: the hub timestamps on receipt.
 
 Firmware 1.1.0 (both devices) adds `wifi.ip`, the device's IPv4 address, while

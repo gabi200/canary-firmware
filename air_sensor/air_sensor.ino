@@ -2,6 +2,7 @@
 #include "ConfigStore.h"
 #include "DeviceConfig.h"
 #include "DisplayModel.h"
+#include "GasDetectorInput.h"
 #include "HardwareConfig.h"
 #include "HttpApi.h"
 #include "Ld2410Reader.h"
@@ -50,6 +51,8 @@ uint32_t gasSampleSum = 0;
 uint8_t gasSampleCount = 0;
 uint16_t latestGasAdc = 0;
 uint32_t lastCoRecoveryMs = 0;
+
+GasDetectorInput gasDetector(Hardware::GAS_DETECTOR_DEBOUNCE_MS);
 
 ClimateReading latestClimate{0, 0};
 uint32_t climateUpdatedMs = 0;
@@ -100,6 +103,7 @@ RuntimeStatus runtimeStatus() {
       mqttService && mqttService->connected(),
       httpApi && httpApi->otaInProgress(),
       wifiConnected ? static_cast<uint32_t>(WiFi.localIP()) : 0,
+      gasDetector.alarmActive(),
   };
 }
 
@@ -259,6 +263,27 @@ void sampleGasSensor(uint32_t nowMs) {
   gasSampleCount = 0;
 }
 
+bool gasDetectorContactOpen() {
+  return digitalRead(Hardware::GAS_DETECTOR_PIN) == HIGH;
+}
+
+// Polled every pass through loop(), like the config button. The status
+// document carries the state; a change is logged and pushed over MQTT at once.
+void pollGasDetector(uint32_t nowMs) {
+  switch (gasDetector.update(gasDetectorContactOpen(), nowMs)) {
+    case GasDetectorEvent::AlarmRaised:
+      Serial.println("[gas-detector] alarm raised (contact open: gas alarm or wiring cut)");
+      notifyStateChanged();
+      break;
+    case GasDetectorEvent::AlarmCleared:
+      Serial.println("[gas-detector] alarm cleared (contact closed)");
+      notifyStateChanged();
+      break;
+    case GasDetectorEvent::None:
+      break;
+  }
+}
+
 void queueConfigurationSave(const DeviceConfig& config) {
   pendingDeviceConfig = config;
   configSavePending = true;
@@ -362,6 +387,7 @@ void setup() {
   configureLedPin(Hardware::LED_GREEN_PIN);
   configureLedPin(Hardware::LED_BLUE_PIN);
   pinMode(Hardware::CONFIG_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(Hardware::GAS_DETECTOR_PIN, INPUT_PULLUP);
 
   Serial.begin(115200);
   // Every begin() passes explicit pins. Serial2 defaults to GPIO19/20 on this
@@ -407,6 +433,15 @@ void setup() {
   applyOutputs(millis());
   displayReady = display.begin(Hardware::FIRMWARE_VERSION);
 
+  // Normally long settled by now; the delay only guards a very fast boot.
+  delay(Hardware::GAS_DETECTOR_SETTLE_MS);
+  gasDetector.begin(gasDetectorContactOpen(), millis());
+  Serial.printf("[gas-detector] GPIO%u at boot: %s\n",
+                static_cast<unsigned>(Hardware::GAS_DETECTOR_PIN),
+                gasDetector.alarmActive()
+                    ? "ALARM (contact open: gas alarm or wiring cut)"
+                    : "normal (contact closed)");
+
   const bool forcePortal = configPortalRequested();
   Serial.printf("[boot] air-sensor firmware %s, stored api_token length=%u%s\n",
                 Hardware::FIRMWARE_VERSION,
@@ -429,6 +464,7 @@ void loop() {
   pumpParticulateSensor(nowMs);
   pumpPresenceSensor(nowMs);
   sampleGasSensor(nowMs);
+  pollGasDetector(nowMs);
   if (controller->tick(nowMs)) {
     notifyStateChanged();
   }

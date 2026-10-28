@@ -17,6 +17,7 @@ struct RuntimeStatus {
   bool mqttConnected;
   bool otaInProgress;
   uint32_t wifiIp;  // IPv4 as IPAddress stores it (first octet in the low byte); 0 = none
+  bool gasDetectorAlarm;  // external detector's contact open (alarm or wiring cut)
 };
 
 using RuntimeStatusProvider = std::function<RuntimeStatus()>;
