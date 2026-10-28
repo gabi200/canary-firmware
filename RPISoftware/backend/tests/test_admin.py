@@ -235,4 +235,4 @@ async def test_delete_an_offline_node_and_let_it_register_again(client):
     await handle_hardware_message("canary/status", json.dumps(air_doc(uptime_ms=700000)).encode())  # it comes back
     [node] = (await client.get("/api/v1/buildings/bld_007/nodes", headers=mihai)).json()
     assert (node["id"], node["online"], node["zone_id"]) == ("canary", True, "zone_hallway")
-    assert await count(Device, Device.id.like("canary:%")) == 4
+    assert await count(Device, Device.id.like("canary:%")) == 5

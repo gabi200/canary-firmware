@@ -93,6 +93,7 @@ async def test_first_status_registers_node_devices_and_readings(client, ws_event
             "canary:co": "co",
             "canary:gas": "combustible_gas",
             "canary:particulate": "particulate",
+            "canary:gas_detector": "combustible_gas",
             "canary:presence": "radar_presence",
         }
         assert all((d.zone_id, d.unit_id, d.floor_id, d.status, d.fw_version) ==
@@ -143,6 +144,35 @@ async def test_gas_is_graded_with_the_device_adc_thresholds(client):
     # the device's own danger grading drives the alarm even though 2300 < the 5000 ppm default
     await publish("canary", air_doc(uptime_ms=615000, gas={"adc": 2300, "peak_adc": 2300, "state": "danger"}))
     assert [(i["hazard_type"], i["state"]) for i in await _active(client)] == [("combustible_gas", "evacuation")]
+
+
+async def test_gas_detector_contact_evacuates_then_clears(client):
+    await publish("canary", air_doc(uptime_ms=1000))
+    # the device's own channels are quiet: only the external detector's relay has opened
+    await publish("canary", air_doc(uptime_ms=2000, gas_detector={"alarm": True}))
+    incidents = await _active(client)
+    assert [(i["hazard_type"], i["state"], i["severity"]) for i in incidents] == [
+        ("combustible_gas", "evacuation", "critical")]
+    incident_id = incidents[0]["id"]
+
+    for uptime in (3000, 4000, 5000):
+        await publish("canary", air_doc(uptime_ms=uptime))
+    assert await _active(client) == []
+    inc = (await client.get(f"/api/v1/incidents/{incident_id}", headers=await _hdr(client, "mihai"))).json()
+    assert inc["state"] == "resolution"
+
+
+async def test_node_registered_before_gas_detector_gets_its_device_row(client):
+    await publish("canary", air_doc(uptime_ms=1000, gas_detector=None))
+    async with SessionLocal() as s:
+        await s.delete(await s.get(Device, "canary:gas_detector"))  # as registered by an older hub
+        await s.commit()
+    hardware.reset_state()  # hub restart
+
+    await publish("canary", air_doc(uptime_ms=2000))
+    async with SessionLocal() as s:
+        device = await s.get(Device, "canary:gas_detector")
+        assert (device.sensor_type, device.zone_id, device.status) == ("combustible_gas", "zone_hallway", "ok")
 
 
 async def test_particulate_danger_alarms_without_evacuating(client):
@@ -655,7 +685,8 @@ async def test_hostile_messages_are_dropped_without_raising(client):
 
     # odd field types register the node but never raise; bad channels are just skipped
     await publish("canary", air_doc(co={"state": ["ok"]}, gas={"adc": "640"}, particulate={"pm2_5": None},
-                                    climate={"temperature_c": "hot"}, wifi=None, device={"name": 7}))
+                                    climate={"temperature_c": "hot"}, gas_detector={"alarm": "on"}, wifi=None,
+                                    device={"name": 7}))
     node = await _node("canary")
     assert node is not None and node.name == "canary"
     assert await _count(SensorReading, SensorReading.device_id.like("canary:%")) == 1  # presence only
