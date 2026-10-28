@@ -117,6 +117,7 @@ auto-registered on its first status document.
 | air | `co` | `co` | `co.ppm` | `ppm` |
 | air | `gas` | `combustible_gas` | `gas.adc` | `adc` |
 | air | `particulate` | `particulate` (new) | `particulate.pm2_5` | `ug/m3` |
+| air | `gas_detector` | `combustible_gas` | 1 if `gas_detector.alarm` else 0 | `bool` |
 | air | `presence` | `radar_presence` (new, occupancy) | 1 if `presence.detected` else 0 | `persons_est` |
 | water | `leak` | `water_leak` | 1 if `sensor.state == "wet"` else 0 | `bool` |
 
@@ -144,6 +145,13 @@ label **"Smoke / particulates"**, not auto-evacuating) and
 - Water: reading only when `sensor.initialized`; `edge_state = alarm` when wet,
   else `normal`. A latched-but-dry sensor clears the incident; the latch and the
   closed valve are reported by the analysis layer instead.
+- Gas detector (firmware 1.1.0+, the external detector's relay contact): `edge_state =
+  alarm` when `gas_detector.alarm` is true, else `normal`, with thresholds detection 0.5 /
+  critical 1 / clear 0.5. An open contact is therefore critical combustible gas and goes
+  to `evacuation` like an MQ5 `danger`, even though it also reads open when the wiring
+  is cut. Older firmware sends no `gas_detector` object and produces no reading.
+  Nodes registered before this channel existed get its Device row on their next status
+  document after a hub start.
 - Presence readings only when the value changed or ≥ 5 min since the last one.
 - Location (floor/unit/zone) comes from the node's zone.
 

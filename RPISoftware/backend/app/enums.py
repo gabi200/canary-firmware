@@ -65,6 +65,8 @@ NODE_CHANNELS: dict[NodeKind, tuple[tuple[str, SensorType], ...]] = {
         ("co", SensorType.co),
         ("gas", SensorType.combustible_gas),
         ("particulate", SensorType.particulate),
+        # external household gas detector's relay contact (1 = alarm or wiring open)
+        ("gas_detector", SensorType.combustible_gas),
         ("presence", SensorType.radar_presence),
     ),
     NodeKind.water: (("leak", SensorType.water_leak),),

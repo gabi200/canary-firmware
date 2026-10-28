@@ -95,7 +95,7 @@ async def test_one_failing_channel_does_not_lose_the_document_or_the_others(clie
         stored = set((await s.scalars(select(SensorReading.device_id))).all())
         assert await s.scalar(select(func.count()).select_from(NodeStatus)) == 1
         assert (await s.get(Node, "canary")).online is True
-    assert stored == {"canary:gas", "canary:particulate", "canary:presence"}  # co rolled back alone
+    assert stored == {"canary:gas", "canary:particulate", "canary:gas_detector", "canary:presence"}  # co rolled back alone
 
 
 async def test_a_normal_status_document_stays_within_its_query_budget(client):
@@ -116,5 +116,5 @@ async def test_a_normal_status_document_stays_within_its_query_budget(client):
         event.remove(engine.sync_engine, "before_cursor_execute", on_execute)
         event.remove(engine.sync_engine.pool, "checkout", on_checkout)
     # node+zone, node update, status row, device liveness, then per hazard channel: reading + open incident
-    assert len(statements) <= 11, statements
+    assert len(statements) <= 13, statements
     assert len(checkouts) == 1  # one session for the whole document

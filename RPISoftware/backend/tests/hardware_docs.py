@@ -35,6 +35,7 @@ AIR_SAMPLE = {
         "stationary_distance_cm": 142, "stationary_energy": 61, "detection_distance_cm": 142,
         "valid": True, "age_ms": 120,
     },
+    "gas_detector": {"alarm": False},
     "alarm": {
         "state": "inactive", "hazard": "none", "sounding": False, "silence_remaining_seconds": 0,
         "self_test": False, "led_color": "green", "led_on": True,

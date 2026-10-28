@@ -50,6 +50,9 @@ _AIR_HAZARDS = {
     "gas": ("adc", "adc", "warn_adc", "danger_adc"),  # raw MQ5 ADC counts, not ppm
     "particulate": ("pm2_5", "ug/m3", "warn_pm2_5", "danger_pm2_5"),
 }
+# A contact reads 1 (alarm or open wiring) or 0, so anything open is critical. Explicit so the
+# combustible_gas ppm defaults never apply to a boolean.
+_GAS_DETECTOR_THRESHOLDS = ReadingThresholds(detection=0.5, critical=1.0, clear=0.5)
 # device channel grading -> edge state; warmup / fault produce no reading
 _EDGE_BY_STATE = {"ok": EdgeState.normal, "warning": EdgeState.warn, "danger": EdgeState.alarm}
 
@@ -57,18 +60,21 @@ _EDGE_BY_STATE = {"ok": EdgeState.normal, "warning": EdgeState.warn, "danger": E
 # registered (base -> online), and the last presence reading per node.
 _pending_availability: dict[str, bool] = {}
 _last_presence: dict[str, tuple[float, float]] = {}  # node_id -> (value, monotonic ts)
+_channels_checked: set[str] = set()  # node_ids whose channel Device rows are known to exist
 
 
 def reset_state() -> None:
     """Forget the in-memory state (tests)."""
     _pending_availability.clear()
     _last_presence.clear()
+    _channels_checked.clear()
 
 
 def forget_node(node_id: str, base: str) -> None:
     """Drop a deleted node's in-memory state, so its base topic registers afresh."""
     _pending_availability.pop(base, None)
     _last_presence.pop(node_id, None)
+    _channels_checked.discard(node_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -162,6 +168,16 @@ def _presence(obj: object) -> float | None:
     return 1.0 if detected else 0.0
 
 
+def _gas_detector(obj: object) -> float | None:
+    """Firmware 1.1.0+: the external detector's contact. Older firmware sends no object."""
+    if not isinstance(obj, dict):
+        return None
+    alarm = obj.get("alarm")
+    if not isinstance(alarm, bool):
+        return None
+    return 1.0 if alarm else 0.0
+
+
 def _leak(sensor: object) -> float | None:
     if not isinstance(sensor, dict) or sensor.get("initialized") is not True:
         return None
@@ -214,6 +230,13 @@ def status_to_payloads(
                 present = _presence(doc.get("presence"))
                 if present is not None:
                     out.append(make(channel, sensor_type, present, "persons_est", EdgeState.normal))
+                continue
+            if channel == "gas_detector":
+                open_contact = _gas_detector(doc.get("gas_detector"))
+                if open_contact is not None:
+                    edge_state = EdgeState.alarm if open_contact else EdgeState.normal
+                    out.append(make(channel, sensor_type, open_contact, "bool", edge_state,
+                                    _GAS_DETECTOR_THRESHOLDS))
                 continue
             reading = _air_hazard(channel, doc.get(channel))
             if reading is not None:
@@ -303,6 +326,9 @@ async def _handle_status(base: str, raw: bytes, retain: bool, now: datetime) -> 
             node.online = True
             node.last_seen_ts = now
         session.add(NodeStatus(node_id=node.id, ts=now, uptime_ms=uptime, payload=doc))
+        if zone is not None and node.id not in _channels_checked:
+            await _add_missing_devices(session, node, kind, zone, now)
+            _channels_checked.add(node.id)
         await session.execute(_device_liveness(node))  # mirror liveness onto the node's Device rows
         await session.commit()
         session.expunge(node)  # keep the loaded node usable after the channel transactions
@@ -393,21 +419,33 @@ async def _register(session: AsyncSession, base: str, kind: NodeKind, doc: dict,
     session.add(node)
     session.add(NodeInbox(node_id=node_id, ts=now))  # waits for a technician to place it
     for channel, sensor_type in NODE_CHANNELS[kind]:
-        await session.merge(
-            Device(
-                id=f"{node_id}:{channel}",
-                building_id=zone.building_id,
-                floor_id=zone.floor_id,
-                unit_id=zone.unit_id,
-                zone_id=zone.id,
-                sensor_type=sensor_type.value,
-                fw_version=firmware,
-                status="ok" if node.online else "offline",
-                last_seen_ts=now,
-            )
-        )
+        await session.merge(_channel_device(node, channel, sensor_type, zone, now))
     log.info("registered %s node %s (base %r) in %s/%s", kind.value, node_id, base, zone.building_id, zone.id)
     return node
+
+
+def _channel_device(node: Node, channel: str, sensor_type: SensorType, zone: Zone, now: datetime) -> Device:
+    return Device(
+        id=f"{node.id}:{channel}",
+        building_id=zone.building_id,
+        floor_id=zone.floor_id,
+        unit_id=zone.unit_id,
+        zone_id=zone.id,
+        sensor_type=sensor_type.value,
+        fw_version=node.firmware,
+        status="ok" if node.online else "offline",
+        last_seen_ts=now,
+    )
+
+
+async def _add_missing_devices(session: AsyncSession, node: Node, kind: NodeKind, zone: Zone, now: datetime) -> None:
+    """Device rows for channels added after the node registered (e.g. gas_detector); checked
+    once per node per process, so a status document normally costs no extra query."""
+    ids = device_ids(node.id, kind.value)
+    existing = set((await session.scalars(select(Device.id).where(Device.id.in_(ids)))).all())
+    for channel, sensor_type in NODE_CHANNELS[kind]:
+        if f"{node.id}:{channel}" not in existing:
+            session.add(_channel_device(node, channel, sensor_type, zone, now))
 
 
 async def _landing_zone(session: AsyncSession) -> Zone | None:

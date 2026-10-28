@@ -22,9 +22,9 @@ def _th(payload) -> tuple:
 
 def test_air_sample_translates_per_contract():
     ps = _payloads(NodeKind.air, AIR_SAMPLE)
-    assert list(ps) == ["canary:co", "canary:gas", "canary:particulate", "canary:presence"]
+    assert list(ps) == ["canary:co", "canary:gas", "canary:particulate", "canary:gas_detector", "canary:presence"]
 
-    co, gas, pm, presence = ps.values()
+    co, gas, pm, detector, presence = ps.values()
     assert (co.sensor_type, co.value, co.units, co.edge_state) == (SensorType.co, 3, "ppm", EdgeState.normal)
     assert _th(co) == (50, 100, 50)  # detection = clear = warn_ppm, critical = danger_ppm
     # MQ5 value is a raw ADC count and carries the device's ADC thresholds (never ppm defaults)
@@ -32,6 +32,9 @@ def test_air_sample_translates_per_contract():
     assert _th(gas) == (1500, 2200, 1500)
     assert (pm.sensor_type, pm.value, pm.units) == (SensorType.particulate, 7, "ug/m3")
     assert _th(pm) == (35, 150, 35)
+    assert (detector.sensor_type, detector.value, detector.units, detector.edge_state) == (
+        SensorType.combustible_gas, 0, "bool", EdgeState.normal)
+    assert _th(detector) == (0.5, 1.0, 0.5)
     assert (presence.sensor_type, presence.value, presence.units) == (SensorType.radar_presence, 1, "persons_est")
     assert presence.thresholds is None and presence.edge_state == EdgeState.normal
 
@@ -50,9 +53,17 @@ def test_device_grading_maps_to_edge_state():
     assert ps["canary:presence"].value == 0
 
 
+def test_gas_detector_contact_is_a_boolean_gas_reading():
+    alarm = _payloads(NodeKind.air, air_doc(gas_detector={"alarm": True}))["canary:gas_detector"]
+    assert (alarm.sensor_type, alarm.value, alarm.edge_state) == (SensorType.combustible_gas, 1, EdgeState.alarm)
+    # firmware before 1.1.0 sends no gas_detector object; a malformed one is skipped
+    for doc in (air_doc(gas_detector=None), air_doc(gas_detector={"alarm": 1}), air_doc(gas_detector=[])):
+        assert "canary:gas_detector" not in _payloads(NodeKind.air, doc)
+
+
 def test_warmup_fault_and_invalid_channels_produce_no_reading():
     doc = air_doc(co={"state": "warmup"}, gas={"state": "fault"}, particulate={"valid": False},
-                  presence={"valid": False})
+                  presence={"valid": False}, gas_detector=None)
     assert _payloads(NodeKind.air, doc) == {}
     # co graded but flagged invalid (no fresh frame) is skipped too
     assert "canary:co" not in _payloads(NodeKind.air, air_doc(co={"valid": False}))
@@ -105,7 +116,7 @@ def test_hostile_input_is_rejected_without_raising():
 
     # wrong-typed fields never raise; the affected channel is simply skipped
     doc = air_doc(co={"ppm": "3"}, gas={"state": ["ok"]}, particulate={"warn_pm2_5": None},
-                  presence={"detected": "yes"})
+                  presence={"detected": "yes"}, gas_detector={"alarm": "yes"})
     assert _payloads(NodeKind.air, doc) == {}
     assert "canary:co" not in _payloads(NodeKind.air, air_doc(co={"ppm": 1e400}))  # inf
     assert "canary:co" not in _payloads(NodeKind.air, air_doc(co={"ppm": 10**400}))  # overflows float
