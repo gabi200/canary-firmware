@@ -100,6 +100,7 @@ wiring; read the LED-pin warning above first.
 | PMS5003T UART2 receive (sensor TX) | GPIO13 | `PARTICULATE_RX_PIN`, 9600 8N1 |
 | PMS5003T UART2 transmit (sensor RX) | GPIO14 | `PARTICULATE_TX_PIN` |
 | MQ5 analog output | GPIO10 | `GAS_ADC_PIN`, ADC1_CH9, 12-bit, 11 dB |
+| External gas detector relay (NC) | GPIO11 | `GAS_DETECTOR_PIN`, `INPUT_PULLUP`, 200 ms debounce |
 | RGB LED red | GPIO21 | `LED_RED_PIN`, PWM 5 kHz, 8-bit |
 | RGB LED green | GPIO47 | `LED_GREEN_PIN` |
 | RGB LED blue | GPIO48 | `LED_BLUE_PIN`, `LED_COMMON_ANODE = false` |
@@ -126,6 +127,19 @@ ratio. Fitting the resistors the other way round gives 3.0 V and clips. GPIO10 i
 and ADC1 keeps working while Wi-Fi is active, which ADC2 does not. The
 firmware samples every 50 ms and averages 16 samples, so the controller sees a
 new gas value roughly every 800 ms.
+
+**External gas detector (GPIO11).** A mains-powered household gas detector's
+isolated dry relay contact, read as an extra input: COM to GND, NC through a
+1 kOhm series resistor to GPIO11, and 33 nF from GPIO11 to GND. The internal
+pull-up is enabled; an external 10 kOhm to 3.3 V may be added. LOW means
+normal (NC closed). HIGH means the detector is alarming **or the wiring is cut
+or unplugged**; the two are indistinguishable by design, so an open circuit
+always reads as an alarm. A level change is accepted once it has held for
+200 ms (`GAS_DETECTOR_DEBOUNCE_MS`); the boot state is reported as read. The
+state appears as `gas_detector.alarm` in the status document, transitions are
+logged as `[gas-detector] …` and pushed over MQTT straight away. It is
+monitoring only: it does not sound this device's buzzer or change its LED, and
+nothing in the firmware drives the detector or its gas valve.
 
 **LD2410 (UART1).** Sensor TX to GPIO15, sensor RX to GPIO16, 256000 baud.
 LD2410, LD2410B, and LD2410C share this framing exactly, and all three leave

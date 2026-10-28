@@ -42,6 +42,18 @@ constexpr uint32_t PARTICULATE_BAUD = 9600;
 // scale. Size the divider so the MQ5's full 5 V swing lands at or below 2.5 V.
 constexpr uint8_t GAS_ADC_PIN = 10;
 
+// NC dry contact of an external household gas detector (GasDetectorInput):
+// COM -> GND, NC -> 1 kOhm -> GPIO11, 33 nF from GPIO11 to GND. The internal
+// pull-up is enabled; an external 10 kOhm to 3.3 V may be added. LOW = normal,
+// HIGH = detector alarm or open wiring. GPIO11 is free, not a strapping pin,
+// and sits next to the MQ5 pin on the DevKitC-1 header. (The ESP32-S3 has no
+// GPIO25.) Read only: this firmware never drives the detector or its valve.
+constexpr uint8_t GAS_DETECTOR_PIN = 11;
+constexpr uint32_t GAS_DETECTOR_DEBOUNCE_MS = 200;
+// Internal pull-up (~45 kOhm) x 33 nF is ~1.5 ms; wait well past that before
+// the boot reading.
+constexpr uint32_t GAS_DETECTOR_SETTLE_MS = 10;
+
 // WARNING - check the module part number before using the alternative pins.
 // GPIO33-GPIO37 carry the extra data lines of an in-package Octal SPI PSRAM.
 // On any module whose suffix is R8 or R16V (N8R8, N16R8, N16R16VA, every

@@ -212,6 +212,9 @@ bool buildStatusJson(const DeviceConfig& config,
   presence["valid"] = runtime.presence.valid;
   presence["age_ms"] = runtime.presence.ageMs;
 
+  JsonObject gasDetector = document["gas_detector"].to<JsonObject>();
+  gasDetector["alarm"] = runtime.gasDetectorAlarm;
+
   JsonObject alarm = document["alarm"].to<JsonObject>();
   alarm["state"] = alarmStateName(alarmState);
   alarm["hazard"] = hazardName(controller.alarmHazard());

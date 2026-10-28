@@ -41,6 +41,13 @@ g++ "${common_flags[@]}" \
   -o "$display_binary"
 "$display_binary"
 
+detector_binary="$out_dir/canary-gas-detector-input-test"
+g++ "${common_flags[@]}" \
+  "$repo_dir/GasDetectorInput.cpp" \
+  "$repo_dir/tests/native/gas_detector_input_test.cpp" \
+  -o "$detector_binary"
+"$detector_binary"
+
 mesh_binary="$out_dir/canary-mesh-frame-test"
 g++ "${common_flags[@]}" \
   "$repo_dir/tests/native/mesh_frame_test.cpp" \
