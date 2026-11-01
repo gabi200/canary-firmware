@@ -47,6 +47,9 @@ class AirController {
   explicit AirController(const AirConfig& config);
 
   void begin(uint32_t nowMs);
+  // Caps the warm-up window, still measured from begin(). Never lengthens it,
+  // and ends warm-up at the next tick() when the cap has already passed.
+  void shortenWarmup(uint32_t warmupMs);
 
   void updateCo(const CoReading& reading, uint32_t nowMs);
   void updateGas(uint16_t adc, uint32_t nowMs);

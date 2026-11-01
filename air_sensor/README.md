@@ -419,6 +419,21 @@ if that is a nuisance rather than a signal.
 at least 5 minutes, which is what the 300-second default provides; no channel
 can raise a hazard and no peak is recorded until the window elapses.
 
+**Warm-up after a short power cut.** Once Wi-Fi is up, the device sets its
+clock over SNTP, asking the MQTT host (the hub) first and `pool.ntp.org`
+second. While the clock is set, it saves the current time to NVS every 10 s.
+After the next boot it compares the two once the clock is set again: if the
+power was off for under 30 s, the warm-up window shrinks to 60 s from boot
+instead of the configured length. Without a synced clock, or with no stamp
+from a run that had one, the full window applies. Warm-up is shortened rather
+than skipped because the MQ5 heater and the ZE03 cell both read high for a
+while after power returns, and the PMS5003 fan needs about 30 s to settle.
+The stamp is up to 10 s old when the power drops, which overstates the gap,
+so only cuts of up to about 20 s are certain to qualify. For the hub to
+answer, run an NTP server on the Pi host (for example `chrony` with an
+`allow` line for the sensor LAN); otherwise the device needs internet
+access to reach the fallback server.
+
 ## HTTP API
 
 The following names are metavariables used throughout this guide:

@@ -12,11 +12,16 @@
 #include "OledDisplay.h"
 #include "Pms5003Reader.h"
 #include "SensorReadings.h"
+#include "WarmupResume.h"
 #include "Ze03Reader.h"
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <WiFi.h>
+#include <esp_sntp.h>
+#include <time.h>
 
+#include <atomic>
 #include <memory>
 
 // Status serialization and the JSON parser both build their documents on the
@@ -75,6 +80,18 @@ uint32_t configButtonPressedAtMs = 0;
 // ask the next boot to open the setup portal.
 constexpr uint32_t PORTAL_REQUEST_MARKER = 0x504F5254;  // "PORT"
 RTC_NOINIT_ATTR uint32_t portalRequestMarker;
+
+// Wall clock, used only to tell a short power cut from a cold start. Set by
+// SNTP from the hub (the MQTT host); the hub still timestamps every reading.
+constexpr char CLOCK_NAMESPACE[] = "clock";
+constexpr char ALIVE_KEY[] = "alive";
+Preferences clockStore;
+bool clockStoreReady = false;
+uint32_t previousAliveEpoch = 0;
+std::atomic<bool> clockSynced{false};
+bool warmupResumeChecked = false;
+bool aliveStamped = false;
+uint32_t lastAliveStampMs = 0;
 
 bool elapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t intervalMs) {
   return static_cast<uint32_t>(nowMs - sinceMs) >= intervalMs;
@@ -371,6 +388,46 @@ void pollConfigButton(uint32_t nowMs) {
   ESP.restart();
 }
 
+void onClockSynced(struct timeval*) { clockSynced = true; }
+
+void startClockSync() {
+  sntp_set_time_sync_notification_cb(onClockSynced);
+  // lwIP keeps the server pointers; deviceConfig lives until the next reboot.
+  if (deviceConfig.mqttHost[0] != '\0') {
+    configTime(0, 0, deviceConfig.mqttHost, Hardware::FALLBACK_NTP_SERVER);
+  } else {
+    configTime(0, 0, Hardware::FALLBACK_NTP_SERVER);
+  }
+}
+
+// Once the clock is set: decide warm-up resume one time, then keep stamping
+// the time this run was last alive for the next boot to compare against.
+void serviceClock(uint32_t nowMs) {
+  if (!clockSynced || !clockStoreReady) {
+    return;
+  }
+  const uint32_t epoch = static_cast<uint32_t>(time(nullptr));
+  if (!warmupResumeChecked) {
+    warmupResumeChecked = true;
+    const uint32_t bootEpoch = epoch - nowMs / 1000;
+    if (quickRestart(previousAliveEpoch, bootEpoch,
+                     Hardware::QUICK_RESTART_MAX_OFF_SECONDS)) {
+      controller->shortenWarmup(Hardware::QUICK_RESTART_WARMUP_MS);
+      Serial.printf("[clock] off for %lus; warm-up shortened to %lus\n",
+                    static_cast<unsigned long>(bootEpoch - previousAliveEpoch),
+                    static_cast<unsigned long>(Hardware::QUICK_RESTART_WARMUP_MS / 1000));
+    } else {
+      Serial.println("[clock] synced; full warm-up (cold start or no prior stamp)");
+    }
+  }
+  if (aliveStamped && !elapsed(nowMs, lastAliveStampMs, Hardware::ALIVE_STAMP_INTERVAL_MS)) {
+    return;
+  }
+  clockStore.putUInt(ALIVE_KEY, epoch);
+  aliveStamped = true;
+  lastAliveStampMs = nowMs;
+}
+
 void configureLedPin(uint8_t pin) {
   pinMode(pin, OUTPUT);
   analogWriteResolution(pin, Hardware::LED_PWM_RESOLUTION_BITS);
@@ -410,6 +467,10 @@ void setup() {
   configStore = std::make_unique<ConfigStore>();
   configStore->begin();
   deviceConfig = configStore->loadConfig();
+  clockStoreReady = clockStore.begin(CLOCK_NAMESPACE, false);
+  if (clockStoreReady) {
+    previousAliveEpoch = clockStore.getUInt(ALIVE_KEY, 0);
+  }
 
   const AirConfig airConfig{
       deviceConfig.coWarnPpm,
@@ -476,6 +537,7 @@ void loop() {
   if (!networkServicesStarted && networkConfig->ready()) {
     httpApi->begin();
     mqttService->begin();
+    startClockSync();
     networkServicesStarted = true;
   }
   if (networkServicesStarted) {
@@ -495,6 +557,7 @@ void loop() {
   // silence or a self-test without waiting for the next pass through loop().
   applyOutputs(serviceNowMs);
   processConfigurationSave(serviceNowMs);
+  serviceClock(serviceNowMs);
   restartWhenSafe(millis());
 
   if (networkServicesStarted && httpApi->rebootDue(millis())) {

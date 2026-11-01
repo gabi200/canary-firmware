@@ -143,6 +143,18 @@ constexpr size_t UART_BYTES_PER_LOOP = 192;
 // so the driver buffer is widened to survive a slow pass through loop().
 constexpr size_t UART_RX_BUFFER_BYTES = 1024;
 
+// Warm-up resume after a short power cut (WarmupResume.h). Only applies once
+// SNTP has set the clock this boot. The MQ5 heater and the ZE03 cell both read
+// high for a while after power returns, and the PMS5003 fan needs ~30 s, so a
+// short residual warm-up stays instead of skipping it outright. The alive
+// stamp is written to NVS on this interval while the clock is set; a stale
+// stamp only overstates the gap, so it can cost a resume, never fake one.
+constexpr uint32_t QUICK_RESTART_MAX_OFF_SECONDS = 30;
+constexpr uint32_t QUICK_RESTART_WARMUP_MS = 60000;
+constexpr uint32_t ALIVE_STAMP_INTERVAL_MS = 10000;
+// Used when no MQTT host (the hub) is configured to answer NTP.
+constexpr char FALLBACK_NTP_SERVER[] = "pool.ntp.org";
+
 constexpr uint32_t CONFIG_SAVE_RETRY_MS = 1000;
 constexpr uint32_t CONFIG_REBOOT_DELAY_MS = 500;
 

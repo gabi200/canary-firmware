@@ -7,6 +7,7 @@
 #include "OutputLogic.h"
 #include "PortalSubmissionPolicy.h"
 #include "PubSubClient.h"
+#include "WarmupResume.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -93,6 +94,39 @@ void testWarmupSuppressesAlarmsAndPeaks() {
   CHECK(controller.pm25PeakUgm3() == 0);
   CHECK(controller.warmupRemainingMs(WARMUP_MS / 2) > 0);
   CHECK(controller.warmupRemainingMs(WARMUP_MS) == 0);
+}
+
+void testShortenedWarmupEndsEarlyButNeverLengthens() {
+  AirController controller(config());
+  controller.begin(1000);
+  controller.shortenWarmup(WARMUP_MS / 4);
+  CHECK(controller.warmupRemainingMs(1000) == WARMUP_MS / 4);
+  hold(controller, 0, 100, 5, 8, 1000, WARMUP_MS / 4);
+  CHECK(controller.gasState() == ChannelState::Ok);
+  CHECK(controller.warmupRemainingMs(1000 + WARMUP_MS / 4) == 0);
+
+  AirController late(config());
+  late.begin(0);
+  hold(late, 0, 100, 5, 8, 0, WARMUP_MS / 2);
+  CHECK(late.gasState() == ChannelState::Warmup);
+  late.shortenWarmup(WARMUP_MS / 4);  // cap already passed: warm-up ends now
+  late.updateGas(100, WARMUP_MS / 2 + 1);
+  late.tick(WARMUP_MS / 2 + 1);
+  CHECK(late.gasState() == ChannelState::Ok);
+
+  AirController longer(config());
+  longer.begin(0);
+  longer.shortenWarmup(WARMUP_MS * 2);
+  CHECK(longer.warmupRemainingMs(0) == WARMUP_MS);
+}
+
+void testQuickRestartNeedsAShortGapAndAPriorStamp() {
+  CHECK(quickRestart(1000, 1000, 30));
+  CHECK(quickRestart(1000, 1029, 30));
+  CHECK(!quickRestart(1000, 1030, 30));
+  CHECK(!quickRestart(1000, 5000, 30));
+  CHECK(!quickRestart(0, 10, 30));     // no stamp from a synced run
+  CHECK(!quickRestart(1000, 999, 30));  // clock went backwards
 }
 
 void testDangerNeedsTriggerHoldThenSounds() {
@@ -738,6 +772,8 @@ static void testHostnameSanitizesDeviceName() {
 int main() {
   testStartupIsWarmupAndSilent();
   testWarmupSuppressesAlarmsAndPeaks();
+  testShortenedWarmupEndsEarlyButNeverLengthens();
+  testQuickRestartNeedsAShortGapAndAPriorStamp();
   testDangerNeedsTriggerHoldThenSounds();
   testClearNeedsClearHold();
   testHazardPriorityIsCoThenGasThenParticulate();

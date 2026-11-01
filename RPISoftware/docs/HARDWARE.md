@@ -91,8 +91,9 @@ Vocabularies: channel `state` (`co`, `gas`, `particulate`) = `warmup|ok|warning|
 `gas_detector.alarm` is the external household gas detector's relay contact:
 `true` when it is alarming **or its wiring is open** (fail-safe, the two are
 not distinguished). It is independent of `alarm.*`, which covers the device's
-own sensors only. No wall
-clock on the devices: the hub timestamps on receipt.
+own sensors only. Documents carry no wall-clock time: the hub timestamps on
+receipt. The air node syncs SNTP (from the MQTT host first) only to shorten
+warm-up after a power cut under 30 s; see `air_sensor/README.md`.
 
 Firmware 1.1.0 (both devices) adds `wifi.ip`, the device's IPv4 address, while
 Wi-Fi is connected (`"wifi":{"connected":true,"rssi":-58,"ip":"192.168.1.40"}`).

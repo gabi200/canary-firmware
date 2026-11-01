@@ -44,6 +44,12 @@ void AirController::begin(uint32_t nowMs) {
   particulateChannel_ = idleChannel();
 }
 
+void AirController::shortenWarmup(uint32_t warmupMs) {
+  if (warmupMs < config_.warmupMs) {
+    config_.warmupMs = warmupMs;
+  }
+}
+
 void AirController::updateCo(const CoReading& reading, uint32_t nowMs) {
   co_ = reading;
   coChannel_.lastSampleMs = nowMs;
