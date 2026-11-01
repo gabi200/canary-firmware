@@ -1,0 +1,9 @@
+{"ts": 1793563247.9098482, "time": "2026-11-01T22:00:47.909+02:00", "kind": "phase", "phase": "baseline", "text": "baseline"}
+{"ts": 1793563342.9355934, "time": "2026-11-01T22:02:22.935+02:00", "kind": "poll_error", "phase": "baseline", "text": "timed out"}
+{"ts": 1793563347.9237802, "time": "2026-11-01T22:02:27.923+02:00", "kind": "poll_error", "phase": "baseline", "text": "timed out"}
+{"ts": 1793563409.9239502, "time": "2026-11-01T22:03:29.923+02:00", "kind": "poll_error", "phase": "baseline", "text": "timed out"}
+{"ts": 1793563431.9103587, "time": "2026-11-01T22:03:51.910+02:00", "kind": "phase", "phase": "event", "text": "event"}
+{"ts": 1793563452.9132671, "time": "2026-11-01T22:04:12.913+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793563454.9159775, "time": "2026-11-01T22:04:14.915+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793563589.9102254, "time": "2026-11-01T22:06:29.910+02:00", "kind": "phase", "phase": "recovery", "text": "recovery"}
+{"ts": 1793563676.9103355, "time": "2026-11-01T22:07:56.910+02:00", "kind": "stop", "phase": "recovery", "text": ""}

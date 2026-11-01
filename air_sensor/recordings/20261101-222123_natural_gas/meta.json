@@ -1,0 +1,17 @@
+{
+  "label": "natural_gas",
+  "note": "",
+  "host": "10.247.177.251",
+  "device": {
+    "name": "canary",
+    "firmware": "1.1.0"
+  },
+  "interval_s": 1.0,
+  "started": "2026-11-01T22:21:23.252+02:00",
+  "started_ts": 1793564483.2529807,
+  "ended": "2026-11-01T22:29:55.254+02:00",
+  "ended_ts": 1793564995.254752,
+  "duration_s": 512.0,
+  "samples": 507,
+  "poll_failures": 5
+}

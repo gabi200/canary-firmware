@@ -1,0 +1,17 @@
+{
+  "label": "cooking",
+  "note": "",
+  "host": "10.247.177.251",
+  "device": {
+    "name": "canary",
+    "firmware": "1.1.0"
+  },
+  "interval_s": 1.0,
+  "started": "2026-10-28T18:36:40.377+02:00",
+  "started_ts": 1793205400.377594,
+  "ended": "2026-10-28T18:49:04.379+02:00",
+  "ended_ts": 1793206144.3792517,
+  "duration_s": 744.0,
+  "samples": 737,
+  "poll_failures": 7
+}

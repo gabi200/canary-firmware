@@ -1,0 +1,12 @@
+{"ts": 1793205400.3784778, "time": "2026-10-28T18:36:40.378+02:00", "kind": "phase", "phase": "baseline", "text": "baseline"}
+{"ts": 1793205604.3787062, "time": "2026-10-28T18:40:04.378+02:00", "kind": "phase", "phase": "event", "text": "event"}
+{"ts": 1793205679.393274, "time": "2026-10-28T18:41:19.393+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793205702.3901663, "time": "2026-10-28T18:41:42.390+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793205756.3953702, "time": "2026-10-28T18:42:36.395+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793205794.3786452, "time": "2026-10-28T18:43:14.378+02:00", "kind": "note", "phase": "event", "text": "no"}
+{"ts": 1793205799.3914192, "time": "2026-10-28T18:43:19.391+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793205802.389221, "time": "2026-10-28T18:43:22.389+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793205844.3905628, "time": "2026-10-28T18:44:04.390+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793206038.3787427, "time": "2026-10-28T18:47:18.378+02:00", "kind": "phase", "phase": "recovery", "text": "recovery"}
+{"ts": 1793206075.392205, "time": "2026-10-28T18:47:55.392+02:00", "kind": "poll_error", "phase": "recovery", "text": "timed out"}
+{"ts": 1793206144.3789196, "time": "2026-10-28T18:49:04.378+02:00", "kind": "stop", "phase": "recovery", "text": ""}

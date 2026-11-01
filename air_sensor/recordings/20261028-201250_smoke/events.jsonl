@@ -1,0 +1,19 @@
+{"ts": 1793211170.0752923, "time": "2026-10-28T20:12:50.075+02:00", "kind": "phase", "phase": "baseline", "text": "baseline"}
+{"ts": 1793211623.0879207, "time": "2026-10-28T20:20:23.087+02:00", "kind": "poll_error", "phase": "baseline", "text": "timed out"}
+{"ts": 1793211745.0755246, "time": "2026-10-28T20:22:25.075+02:00", "kind": "phase", "phase": "event", "text": "event"}
+{"ts": 1793211783.1170201, "time": "2026-10-28T20:23:03.117+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793211812.0906048, "time": "2026-10-28T20:23:32.090+02:00", "kind": "poll_error", "phase": "event", "text": "timed out"}
+{"ts": 1793211829.0787807, "time": "2026-10-28T20:23:49.078+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211831.0821683, "time": "2026-10-28T20:23:51.082+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211833.083516, "time": "2026-10-28T20:23:53.083+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211835.0867827, "time": "2026-10-28T20:23:55.086+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211837.090092, "time": "2026-10-28T20:23:57.090+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211839.0934196, "time": "2026-10-28T20:23:59.093+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211841.0966022, "time": "2026-10-28T20:24:01.096+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211843.0996945, "time": "2026-10-28T20:24:03.099+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211845.103096, "time": "2026-10-28T20:24:05.103+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211847.1063278, "time": "2026-10-28T20:24:07.106+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211849.1095662, "time": "2026-10-28T20:24:09.109+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211851.1128218, "time": "2026-10-28T20:24:11.112+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211853.1161594, "time": "2026-10-28T20:24:13.116+02:00", "kind": "poll_error", "phase": "event", "text": "<urlopen error timed out>"}
+{"ts": 1793211853.1602333, "time": "2026-10-28T20:24:13.160+02:00", "kind": "stop", "phase": "event", "text": ""}

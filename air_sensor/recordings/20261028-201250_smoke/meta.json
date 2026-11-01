@@ -1,0 +1,17 @@
+{
+  "label": "smoke",
+  "note": "",
+  "host": "10.247.177.251",
+  "device": {
+    "name": "canary",
+    "firmware": "1.1.0"
+  },
+  "interval_s": 1.0,
+  "started": "2026-10-28T20:12:50.074+02:00",
+  "started_ts": 1793211170.074287,
+  "ended": "2026-10-28T20:24:13.160+02:00",
+  "ended_ts": 1793211853.1603994,
+  "duration_s": 683.1,
+  "samples": 654,
+  "poll_failures": 16
+}
