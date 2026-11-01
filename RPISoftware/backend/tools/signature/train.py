@@ -40,8 +40,9 @@ def train_forest(features: list[SignatureFeatures], labels: list[str], *, n_esti
 
 
 def export(clf: RandomForestClassifier, version: str = MODEL_VERSION) -> dict:
+    """A forest, or a single DecisionTreeClassifier exported as a one-tree forest."""
     trees = []
-    for estimator in clf.estimators_:
+    for estimator in getattr(clf, "estimators_", [clf]):
         t = estimator.tree_
         values = []
         for left, row in zip(t.children_left, t.value[:, 0, :]):
