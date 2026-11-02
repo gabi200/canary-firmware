@@ -38,8 +38,9 @@ cluster/     three-Pi mode (section 3): Patroni and keepalived images, hailo-oll
 
 - Raspberry Pi 4 or 5 (2 GB RAM or more) with **64-bit** Raspberry Pi OS (Bookworm or
   newer), on the same LAN or IoT VLAN as the sensors. Check: `uname -m` prints `aarch64`.
-- A **DHCP reservation** (or a static IP) for the Pi: each sensor stores the Pi's IP
-  address in its settings.
+- No reserved address needed: the hub announces itself as **`canary-hub.local`** (the
+  `announcer` service, mDNS), which sensors use as their MQTT host and the app finds by itself.
+  The Pi's `avahi-daemon` must run (it does by default on Raspberry Pi OS).
 - The sensors flashed with the firmware in `../air_sensor` / `../water_sensor`.
 
 ### 1.2 Install Docker (once)
@@ -81,7 +82,7 @@ gitignored) and prints, for each new sensor, the values to type into its portal:
 ```
 -- Sensor 'air-kitchen': enter in its setup portal ------------------------------
    MQTT enabled (0 or 1)               : 1
-   MQTT host                           : 192.168.1.50
+   MQTT host                           : canary-hub.local
    MQTT port                           : 1883
    MQTT user                           : air-kitchen
    MQTT password (leave blank to keep) : 3f1c9a...        <- shown only now: store it
@@ -312,7 +313,8 @@ lists the deliveries (`GET /api/v1/incidents/{id}/escalations`). To watch retrie
   them. Avoid passwords in command arguments (`-P`, `--password`): other local processes
   can read them. Prefer the options file above and the `MQTT_PASSWORD` environment variable
   for the simulators.
-- Give the Pi a **DHCP reservation / static IP**, and use that IP as the sensors' MQTT host.
+- Use `canary-hub.local` as the sensors' MQTT host: it follows the Pi's address when DHCP or the
+  hotspot changes it.
 
 ### Optional: per-device ACLs
 
@@ -558,8 +560,12 @@ the default; nothing in this section changes it.
   card wears out and stalls, and a stalled Pi looks like a dead one (needless failovers). Keep at
   least **8 GB free** per Pi: the images alone take about 1.5 GB, building them on the Pi more.
 - **Wired Ethernet**, all three on the same LAN / VLAN as the sensors.
-- **DHCP reservations for the three Pis, plus one free address for the VIP**, outside the DHCP pool
-  and used by nothing else. Example: VIP `192.168.1.10`, `processing` `.11`, `web` `.12`, `ai` `.13`.
+- **Four fixed addresses in a private `/24` the network (router or hotspot) does not hand out**:
+  one per Pi plus the VIP. They are added to each Pi's Wi-Fi/Ethernet profile next to its DHCP
+  address (step 2 prints the `nmcli` lines), so the cluster keeps working when the hotspot phone,
+  and with it the DHCP subnet, changes. Example: VIP `10.91.13.240`, `processing` `.170`, `web`
+  `.188`, `ai` `.241`. Sensors and the app never use these: they find the hub as
+  `canary-hub.local`, at the hub Pi's DHCP address.
 - Optional: a **Raspberry Pi AI HAT+ 2** on the AI Pi (section 3.4).
 - No firewall between the Pis (Raspberry Pi OS has none by default). Otherwise open TCP 80, 1883,
   2379, 2380 (etcd), 5432 (Postgres), 8000 (backend), 8008 (Patroni), 8010 (canary-updater) and IP protocol 112 (VRRP).
@@ -574,13 +580,15 @@ the default; nothing in this section changes it.
 1. On **all three** Pis: install Docker and get the code (sections 1.2 and 1.3).
 2. On **one** Pi only, write the shared settings (sensor logins can be added here too, section 1.4):
    ```bash
-   scripts/pi_setup.sh --cluster 192.168.1.10 192.168.1.11 192.168.1.12 192.168.1.13 air-kitchen
+   scripts/pi_setup.sh --cluster 10.91.13.240 10.91.13.170 10.91.13.188 10.91.13.241 air-kitchen
    #                             VIP          processing   web          ai
    ```
    Besides section 1.4's secrets it writes `CANARY_CLUSTER_MODE=triple`, `COMPOSE_PROFILES=cluster`
    (so `docker compose` also starts etcd, postgres, pgproxy and keepalived), the four addresses, the
-   cluster and database passwords, the database URL (through `pgproxy`), and the broker host and
-   public URL (the VIP). It also records which Pi it runs on (`CANARY_NODE_NAME`, `CANARY_NODE_IP`).
+   cluster and database passwords, the database URL (through `pgproxy`), the broker host (the VIP,
+   for the processing Pi's backend) and the public URL (`canary-hub.local`). It also records which
+   Pi it runs on (`CANARY_NODE_NAME`, `CANARY_NODE_IP`), and prints, per Pi, the `sudo nmcli`
+   line that adds its fixed address: run each on its Pi before step 5.
 3. Copy `.env` and `mosquitto/config/passwd` to the other two Pis. The script prints the commands:
    ```bash
    scp .env pi@192.168.1.12:canary-firmware/RPISoftware/.env
@@ -594,12 +602,14 @@ the default; nothing in this section changes it.
    ```bash
    docker compose ps                              # + etcd, postgres, pgproxy, keepalived
    docker compose exec postgres patronictl list   # one Leader, one Sync Standby, one Replica
-   curl -s http://192.168.1.10/health             # through the VIP: "cluster": {"mode": "triple", ...}
+   curl -s http://canary-hub.local/health         # the hub Pi: "cluster": {"mode": "triple", ...}
+   avahi-browse -rt _canary-hub._tcp              # exactly one "Canary hub", node=web normally
    ```
-   The dashboard at **`http://<VIP>/`** (sign in as `admin`, `mihai` or `tehnician`) shows the Pis
+   The dashboard at **`http://canary-hub.local/`** (sign in as `admin`, `mihai` or `tehnician`) shows the Pis
    under **Administration → Hub** (`/admin/hub`): alive or not, what each runs, who holds the VIP.
-7. Use the **VIP** everywhere: as each sensor's **MQTT host** (the portal values `pi_setup.sh` prints
-   already say so), for the dashboard and for the app (`--dart-define=CANARY_API=http://<VIP>`).
+7. Use **`canary-hub.local`** everywhere: as each sensor's **MQTT host** (the portal values
+   `pi_setup.sh` prints already say so) and for the dashboard. The app finds the hub by itself.
+   The name always points at the Pi holding the VIP, at its DHCP address, and moves with it.
 
 ### 3.3 Day to day
 

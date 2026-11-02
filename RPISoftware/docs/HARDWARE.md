@@ -489,7 +489,7 @@ a broken socket is dropped.
 | `CANARY_CLUSTER_MODE` | `single` | `single`: one Pi runs everything. `triple`: three redundant Pis (RUNME.md section 3) |
 | `CANARY_NODE_NAME` | `hub` | triple: this Pi's home role, `processing`, `web` or `ai` (written per Pi by `scripts/pi_setup.sh`) |
 | `CANARY_PROCESSING_IP` / `_WEB_IP` / `_AI_IP` | unset | triple: the three Pis' LAN addresses |
-| `CANARY_VIP` | unset | triple: the floating hub address (sensors' MQTT host, dashboard and app URL) |
+| `CANARY_VIP` | unset | triple: the floating hub address inside the cluster (processing Pi's broker connection); sensors, dashboard and app use `canary-hub.local`, announced at the VIP holder's DHCP address |
 | `CANARY_CLUSTER_SECRET` | unset | triple: key of the node-to-node calls (`X-Canary-Cluster-Key` on `/internal/...`, never proxied by nginx) |
 | `CANARY_VRRP_STATE_FILE` | `/run/canary/vrrp_state` | triple: where keepalived writes whether this Pi holds the hub address |
 
@@ -503,7 +503,7 @@ added to `.env`. In triple mode `scripts/pi_setup.sh --cluster` writes the clust
 
 | Work | Runs on | When that Pi is down |
 | --- | --- | --- |
-| Hub address (VIP): broker for the sensors, dashboard, API for the app | the `web` Pi (keepalived) | moves to `processing`, then `ai` (a few seconds) |
+| Hub address (VIP, and `canary-hub.local` + `_canary-hub._tcp` from the `announcer`): broker for the sensors, dashboard, API for the app | the `web` Pi (keepalived) | moves to `processing`, then `ai` (a few seconds) |
 | Processing: MQTT subscription, detection, incidents, notifications, retention | holder of the `processing` lease (`cluster_leases`, 15 s, renewed every 2 s) | `web`, then `ai`, after the lease expires; back home 30 s after the Pi returns |
 | AI: triangulation, signature shadow model, incident brief (`POST /internal/ai/{task}`) | the `ai` Pi (AI HAT+ 2 for the brief) | computed by the caller itself (CPU; briefs fall back to the template) |
 | Database | Patroni Postgres primary (synchronous replica on another Pi) | a replica is promoted |

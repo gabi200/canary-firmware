@@ -298,7 +298,9 @@ if [[ ${#cluster_ips[@]} -gt 0 ]]; then
   # pgproxy (HAProxy, one per Pi) forwards to whichever Pi holds the Postgres primary.
   set_env CANARY_DATABASE_URL "postgresql+asyncpg://canary:$db_password@pgproxy:5432/canary"
   set_env CANARY_MQTT_HOST "${cluster_ips[0]}" # the broker of whichever Pi holds the floating IP
-  public_url="http://${cluster_ips[0]}" # shareable links (household invites) use the floating IP
+  # Fallback base of shareable links (household invites); the backend prefers the address the
+  # request came in on. canary-hub.local is announced by the "announcer" service.
+  public_url="http://canary-hub.local"
   http_port="$(env_value CANARY_HTTP_PORT)"
   if [[ -n "$http_port" && "$http_port" != 80 ]]; then public_url+=":$http_port"; fi
   set_env CANARY_PUBLIC_URL "$public_url"
@@ -410,11 +412,10 @@ if "${compose[@]}" ps --status running --services 2>/dev/null | grep -qx mosquit
 fi
 
 # ---------------------------------------------------------------- 3. what to type where
-if [[ $cluster -eq 1 ]]; then
-  hub_host="${CANARY_HUB_HOST:-$(env_value CANARY_VIP)}" # sensors and clients use the floating IP
-else
-  hub_host="${CANARY_HUB_HOST:-$(lan_ip)}"
-fi
+# Sensors and clients use the name the "announcer" service publishes over mDNS: it follows the
+# Pi that holds the hub and its current address, whatever subnet the hotspot hands out.
+hub_host="${CANARY_HUB_HOST:-canary-hub.local}"
+this_ip="$(lan_ip)"
 http_port="$(env_value CANARY_HTTP_PORT)"
 web_url="http://$hub_host/"
 if [[ -n "$http_port" && "$http_port" != "80" ]]; then
@@ -424,17 +425,12 @@ fi
 echo
 echo "== Canary hub ================================================================"
 echo "Broker     : $hub_host:1883 (plaintext MQTT: trusted LAN / IoT VLAN only)"
+echo "             this Pi right now: $this_ip:1883 (changes with the hotspot; prefer the name)"
 echo "Secrets    : $ENV_FILE (mode 600) and mosquitto/config/passwd - never commit them"
-case "$hub_host" in
-  "<pi-ip>" | 127.*)
-    echo "WARNING    : could not detect the Pi's LAN address (got '$hub_host')."
-    echo "             Re-run with CANARY_HUB_HOST=<pi-lan-ip> scripts/pi_setup.sh ..."
-    ;;
-esac
 if [[ $cluster -eq 1 ]]; then
-  echo "Tip        : DHCP reservations for the three Pis; keep the floating IP outside the DHCP pool."
+  echo "Tip        : the three Pi addresses and the floating IP are fixed and outside the hotspot's range; sensors and the app find the hub as canary-hub.local."
 else
-  echo "Tip        : give the Pi a DHCP reservation / static IP: the sensors store this address."
+  echo "Tip        : sensors and the app find the hub as canary-hub.local (the announcer service); no reserved address needed."
 fi
 
 for i in "${!names[@]}"; do
@@ -477,6 +473,17 @@ if [[ $cluster -eq 1 ]]; then
   echo "Pis        : processing $(node_ip processing), web $(node_ip web), ai $(node_ip ai)"
   echo "Floating IP: $(env_value CANARY_VIP)   (front door: held by web, else processing, else ai)"
   echo
+  # The cluster addresses are fixed extra addresses on each Pi's Wi-Fi profile, so a new hotspot
+  # (same SSID, another subnet) does not break etcd, Patroni or keepalived. Once per Pi, with sudo.
+  wifi_profile="$(nmcli -t -f NAME,TYPE con show --active 2>/dev/null |
+    awk -F: '$2 == "802-11-wireless" { print $1; exit }' || true)"
+  wifi_profile="${wifi_profile:-<wifi-profile>}"
+  echo "Fixed addresses, once on each Pi (Wi-Fi profile here: '$wifi_profile'; on another Pi:"
+  echo "nmcli -t -f NAME,TYPE con show --active):"
+  for name in processing web ai; do
+    echo "   $name: sudo nmcli con mod '$wifi_profile' +ipv4.addresses $(node_ip "$name")/24 && sudo nmcli con up '$wifi_profile'"
+  done
+  echo
   echo "All three Pis use the same .env and mosquitto/config/passwd. After --cluster, new sensors"
   echo "or --rotate on this Pi, copy both to the other two (same user and checkout path assumed)"
   echo "and run scripts/pi_setup.sh there (it picks that Pi's role and reloads its broker):"
@@ -506,5 +513,5 @@ echo "   sudo cp $ROOT/cluster/canary-updater.service /etc/systemd/system/"
 echo "   sudo sed -i 's|^User=.*|User=$updater_user|' /etc/systemd/system/canary-updater.service"
 echo "   sudo sed -i 's|^WorkingDirectory=.*|WorkingDirectory=$ROOT/cluster|' /etc/systemd/system/canary-updater.service"
 echo "   sudo systemctl daemon-reload && sudo systemctl enable --now canary-updater"
-echo "Mobile app : flutter run --dart-define=CANARY_API=${web_url%/}"
+echo "Mobile app : finds the hub on the Wi-Fi by itself (flutter build apk --release; no address)"
 echo "Watch MQTT : RUNME.md, section 'Verify the sensors'"
