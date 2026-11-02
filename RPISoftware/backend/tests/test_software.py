@@ -193,3 +193,29 @@ async def test_call_speaks_http_with_the_key(monkeypatch):
     assert "X-Canary-Updater-Key: k" in seen["head"]
     monkeypatch.setattr(settings, "updater_port", 1)  # nothing listens there
     assert await software.call("127.0.0.1", "GET", "/status", timeout=1) == (0, {})
+
+
+async def test_head_comes_from_the_pi_that_fetched_last(client, helpers, triple):
+    table, _ = helpers
+    table[IPS["processing"]] = {("GET", "/status"): (200, pi_status("processing", behind=3, fetched_at="2026-11-02T08:00:00Z")),
+                                ("GET", "/incoming"): (200, {"head": {"sha": OLD}, "commits": []})}
+    table[IPS["web"]] = {("GET", "/status"): (200, pi_status("web", behind=1, fetched_at="2026-11-02T10:00:00Z")),
+                         ("GET", "/incoming"): (200, {"head": {"sha": NEW}, "commits": [{"sha": NEW}]})}
+    body = (await client.get("/api/v1/hub/software", headers=await hdr(client))).json()
+    assert body["github"]["head"]["sha"] == NEW
+    assert body["incoming"] == [{"sha": NEW}]
+
+
+async def test_rollout_relay_waits_for_the_peer_checks(client, helpers, triple, monkeypatch):
+    table, _ = helpers
+    seen = {}
+
+    async def fake(host, method, path, body=None, timeout=2.0):
+        seen[path] = timeout
+        return (202, {}) if path == "/rollout" else (0, {})
+
+    monkeypatch.setattr(software, "call", fake)
+    resp = await client.post("/api/v1/hub/software/update", json={"scope": "all", "commit": NEW},
+                             headers=await hdr(client))
+    assert resp.status_code == 200
+    assert seen["/rollout"] >= 50

@@ -12,6 +12,7 @@ PI_TIMEOUT_S = 3600
 POLL_S = 3
 ORDER = ("ai", "processing", "web")
 KEY_HEADER = "X-Canary-Updater-Key"
+CHECK_TIMEOUT_S = 45  # a peer may fetch from GitHub (25 s at most) before it answers
 
 
 class Rollout:
@@ -21,8 +22,10 @@ class Rollout:
     def _url(self, name: str, path: str) -> str:
         return f"http://{self.cfg.peers[name]}:{self.cfg.port}{path}"
 
-    def _call(self, method: str, name: str, path: str, body: dict | None = None) -> tuple[int, dict]:
-        return self.r.http(method, self._url(name, path), body=body, headers={KEY_HEADER: self.cfg.key}, timeout=5)
+    def _call(self, method: str, name: str, path: str, body: dict | None = None,
+              timeout: float = 5) -> tuple[int, dict]:
+        return self.r.http(method, self._url(name, path), body=body, headers={KEY_HEADER: self.cfg.key},
+                           timeout=timeout)
 
     def order(self) -> list[str]:
         if not self.cfg.triple:
@@ -34,22 +37,19 @@ class Rollout:
     def begin(self, sha: str) -> None:
         if (self.local.state().get("rollout") or {}).get("outcome") == "running":
             raise Refused("an update is already running on this Pi")
+        if self.cfg.triple:
+            if health.patroni_members(self.cfg, self.r) is None:
+                raise Refused("no Pi's Patroni answers: the database leader cannot be moved safely")
+            if problem := health.problem(self.cfg, self.r):
+                raise Refused(f"this Pi is not healthy: {problem}")
         for name in self.cfg.peers:
             if name == self.cfg.node:
                 continue
-            status, st = self._call("GET", name, "/status")
-            if status != 200:
+            status, body = self._call("POST", name, "/check", {"commit": sha}, timeout=CHECK_TIMEOUT_S)
+            if status == 0:
                 raise Refused(f"the {name} Pi's updater does not answer")
-            if st.get("state") in BUSY:
-                raise Refused(f"an update is already running on the {name} Pi")
-            if st.get("state") == "failed":
-                raise Refused(f"the {name} Pi's last update failed: check it first")
-            if st.get("branch") != "main":
-                raise Refused(f"the {name} Pi is not on branch main")
-            if st.get("dirty"):
-                raise Refused(f"the {name} Pi has local changes")
-            if st.get("ahead"):
-                raise Refused(f"the {name} Pi has commits that are not on GitHub")
+            if status != 200:
+                raise Refused(f"the {name} Pi: {body.get('error') or f'its updater answered {status}'}")
         self.local.preflight(sha, check_peers=True)
         order = self.order()
         self.local.update_state(rollout={"commit": sha, "order": order, "results": {n: "waiting" for n in order},
@@ -79,7 +79,7 @@ class Rollout:
 
     def _update_self(self, sha: str) -> tuple[str, str | None]:
         try:
-            self.local.begin(sha, check_peers=False)
+            self.local.begin(sha, check_peers=True)  # the Pi before passed its health wait
         except Refused as exc:
             return "failed", str(exc)
         self.local.run()

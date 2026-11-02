@@ -37,6 +37,7 @@ class FakePi:
         runner.on_http("GET", "http://127.0.0.1:8000/health", lambda b: (200, {"status": "ok"}) if self.healthy else (0, {}))
         for name, ip in cfg.peers.items():
             runner.on_http("GET", f"http://{ip}:8000/health", (200, {"status": "ok"}))
+            runner.on_http("GET", f"http://{ip}:8010/health", (200, {"problem": None}))
             runner.on_http("GET", f"http://{ip}:8008/cluster", lambda b: (200, self._members()))
         self.switchover_works = True
 

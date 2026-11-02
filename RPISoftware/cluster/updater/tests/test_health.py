@@ -79,8 +79,10 @@ def test_patroni_not_checked_on_one_pi(tmp_path, runner):
     assert health.patroni_problem(make_cfg(tmp_path, triple=False), runner) is None
 
 
-def test_peer_problem(tmp_path, runner):
+def test_peer_problem_asks_the_peers_updater_for_full_health(tmp_path, runner):
     cfg = make_cfg(tmp_path)
-    assert health.peer_problem(cfg, runner, "ai") == "the ai Pi is not healthy"
-    runner.on_http("GET", "http://10.0.0.13:8000/health", (200, {"status": "ok"}))
+    assert health.peer_problem(cfg, runner, "ai") == "the ai Pi's updater does not answer"
+    runner.on_http("GET", "http://10.0.0.13:8010/health", (200, {"problem": "postgres is exited"}))
+    assert health.peer_problem(cfg, runner, "ai") == "the ai Pi is not healthy: postgres is exited"
+    runner.on_http("GET", "http://10.0.0.13:8010/health", (200, {"problem": None}))
     assert health.peer_problem(cfg, runner, "ai") is None

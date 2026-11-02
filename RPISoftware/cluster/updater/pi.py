@@ -69,9 +69,26 @@ class PiUpdater:
 
     # ------------------------------------------------------------------ actions
     def recover(self) -> None:
-        if self.state()["state"] in BUSY:
-            self.update_state(state="failed",
-                              error="the updater stopped during the update (power cut or crash): check this Pi")
+        """At start: an update or rollout this process was running when it died is over."""
+        self.fail("the updater stopped during the update (power cut or crash): check this Pi",
+                  only_if_busy=True)
+
+    def fail(self, error: str, only_if_busy: bool = False) -> None:
+        """Record a job that ended without a result (an exception, or the helper dying)."""
+        with self.lock:
+            s = self.state()
+            changes: dict = {}
+            if s["state"] in BUSY or not only_if_busy:
+                changes.update(state="failed", error=error)
+            rollout = s.get("rollout")
+            if isinstance(rollout, dict) and rollout.get("outcome") == "running":
+                results = dict(rollout.get("results") or {})
+                if rollout.get("current"):
+                    results[rollout["current"]] = "failed"
+                changes["rollout"] = {**rollout, "results": results, "current": None, "outcome": "stopped",
+                                      "reason": f"interrupted: {error}"}
+            if changes:
+                self.update_state(**changes)
 
     def fetch(self) -> None:
         res = gitops.fetch(self.r, self.cfg.repo)
@@ -89,6 +106,8 @@ class PiUpdater:
         repo = self.cfg.repo
         if self.state()["state"] in BUSY:
             raise Refused("an update is already running on this Pi")
+        if self.state()["state"] == "failed":
+            raise Refused("this Pi's last update failed: check it first")
         if gitops.branch(self.r, repo) != "main":
             raise Refused("not on branch main")
         if gitops.dirty(self.r, repo):
@@ -101,6 +120,16 @@ class PiUpdater:
             for name in self.cfg.peers:
                 if name != self.cfg.node and (problem := health.peer_problem(self.cfg, self.r, name)):
                     raise Refused(problem)
+
+    def check(self, sha: str) -> None:
+        """Could this Pi take `sha` now (for a rollout's coordinator)? Fetches once if the commit is new here."""
+        try:
+            self.preflight(sha, check_peers=False)
+        except Refused as exc:
+            if str(exc) != "unknown commit: fetch first":
+                raise
+            self.fetch()
+            self.preflight(sha, check_peers=False)
 
     def begin(self, sha: str, check_peers: bool = True) -> None:
         with self.lock:
@@ -165,7 +194,9 @@ class PiUpdater:
         """Three Pis: if this Pi's Postgres leads, hand leadership to a healthy replica first."""
         if not self.cfg.triple:
             return
-        members = health.patroni_members(self.cfg, self.r) or []
+        members = health.patroni_members(self.cfg, self.r)
+        if members is None:
+            raise _Step("could not move the database off this Pi: no Pi's Patroni answers")
         if not any(m.get("name") == self.cfg.node and m.get("role") == "leader" for m in members):
             return
         others = [m for m in members if m.get("name") != self.cfg.node and m.get("state") in ("running", "streaming")]

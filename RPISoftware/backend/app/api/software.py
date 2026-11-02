@@ -73,7 +73,8 @@ async def software_update(
         _host(req.scope)
     _configured()
     if req.scope == "all":
-        await _relay(cluster.node_name(), "/rollout", {"commit": req.commit}, 202)
+        # the coordinating Pi checks every other Pi first (each may fetch): nginx allows 120 s here
+        await _relay(cluster.node_name(), "/rollout", {"commit": req.commit}, 202, timeout=100)
     else:
         await _relay(req.scope, "/update", {"commit": req.commit}, 202)
     session.add(AuditLogEntry(actor=principal.user_id, action="software_update", target=req.scope,

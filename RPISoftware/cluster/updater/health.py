@@ -81,5 +81,9 @@ def problem(cfg: Config, r: Runner) -> str | None:
 
 
 def peer_problem(cfg: Config, r: Runner, name: str) -> str | None:
-    status, body = r.http("GET", f"http://{cfg.peers[name]}:{API_PORT}/health", timeout=3)
-    return None if status == 200 and body.get("status") == "ok" else f"the {name} Pi is not healthy"
+    """Ask the other Pi's updater for its full health (containers, backend, its Postgres member)."""
+    status, body = r.http("GET", f"http://{cfg.peers[name]}:{cfg.port}/health",
+                          headers={"X-Canary-Updater-Key": cfg.key}, timeout=15)
+    if status != 200:
+        return f"the {name} Pi's updater does not answer"
+    return f"the {name} Pi is not healthy: {body['problem']}" if body.get("problem") else None

@@ -10,7 +10,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
-from updater import gitops
+from updater import gitops, health
 from updater.config import Config
 from updater.pi import PiUpdater, Refused
 from updater.rollout import KEY_HEADER, Rollout
@@ -38,6 +38,8 @@ def make_server(cfg: Config, local: PiUpdater, rollout: Rollout, host: str, port
         def body() -> None:
             try:
                 work()
+            except Exception as exc:  # noqa: BLE001 - never leave the Pi "updating" with nobody told
+                local.fail(f"the updater hit an unexpected error: {exc!r}")
             finally:
                 job.release()
             if local.state()["restart_needed"]:
@@ -82,6 +84,8 @@ def make_server(cfg: Config, local: PiUpdater, rollout: Rollout, host: str, port
                 return self._send(404, None)
             if self.path == "/status":
                 return self._send(200, local.status())
+            if self.path == "/health":
+                return self._send(200, {"problem": health.problem(cfg, local.r)})
             if self.path == "/incoming":
                 return self._send(200, {"head": gitops.head(local.r, cfg.repo, gitops.REMOTE),
                                         "commits": gitops.incoming(local.r, cfg.repo)})
@@ -96,6 +100,17 @@ def make_server(cfg: Config, local: PiUpdater, rollout: Rollout, host: str, port
             if self.path == "/dismiss":
                 local.dismiss()
                 return self._send(200, local.status())
+            if self.path == "/check":
+                sha = self._commit()
+                if sha is None:
+                    return self._send(422, {"error": "commit must be a 40-character hex id"})
+                if job.locked():
+                    return self._send(409, {"error": BUSY_MSG})
+                try:
+                    local.check(sha)
+                except Refused as exc:
+                    return self._send(409, {"error": str(exc)})
+                return self._send(200, {})
             if self.path in ("/update", "/rollout"):
                 sha = self._commit()
                 if sha is None:

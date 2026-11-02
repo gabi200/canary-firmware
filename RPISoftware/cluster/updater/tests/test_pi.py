@@ -86,8 +86,8 @@ def test_preflight_refusals(tmp_path, runner, arrange, reason):
 
 def test_preflight_refuses_when_a_peer_is_unhealthy(tmp_path, runner):
     up, pi, _ = setup(tmp_path, runner)
-    runner.on_http("GET", "http://10.0.0.13:8000/health", (0, {}))
-    with pytest.raises(Refused, match="the ai Pi is not healthy"):
+    runner.on_http("GET", "http://10.0.0.13:8010/health", (200, {"problem": "web is exited"}))
+    with pytest.raises(Refused, match="the ai Pi is not healthy: web is exited"):
         up.begin(NEW)
     up.begin(NEW, check_peers=False)  # inside a rollout the coordinator checked already
     assert up.status()["state"] == "updating"
@@ -150,3 +150,25 @@ def test_fetch_records_time_and_error(tmp_path, runner):
     runner.on(("git", "fetch"), Result(128, "fatal: unable to access 'https://github.com/'\n"))
     up.fetch()
     assert up.status()["fetch_error"] == "fatal: unable to access 'https://github.com/'"
+
+
+def test_recover_stops_an_interrupted_rollout(tmp_path, runner):
+    up, pi, store = setup(tmp_path, runner)
+    store.save({"state": "idle", "rollout": {"commit": NEW, "order": ["ai", "web", "processing"],
+                                             "results": {"ai": "updating", "web": "waiting", "processing": "waiting"},
+                                             "current": "ai", "outcome": "running", "reason": None}})
+    up.recover()
+    r = up.state()["rollout"]
+    assert (r["outcome"], r["current"], r["results"]["ai"]) == ("stopped", None, "failed")
+    assert "interrupted" in r["reason"]
+
+
+def test_no_switchover_without_patroni_refuses(tmp_path, runner):
+    up, pi, _ = setup(tmp_path, runner, node="web")
+    for ip in ("10.0.0.11", "10.0.0.12", "10.0.0.13"):
+        runner.on_http("GET", f"http://{ip}:8008/cluster", (0, {}))
+    up.begin(NEW, check_peers=False)
+    up.run()
+    s = up.state()
+    assert not runner.ran("git", "merge")
+    assert s["error"] == "could not move the database off this Pi: no Pi's Patroni answers"

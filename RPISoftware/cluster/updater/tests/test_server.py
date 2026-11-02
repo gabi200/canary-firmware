@@ -108,3 +108,31 @@ def test_dismiss(hub):
     local.update_state(state="rolled_back", error="x")
     status, body = call(base, "POST", "/dismiss")
     assert (status, body["state"]) == (200, "idle")
+
+
+def test_job_exception_marks_failed(hub, runner):
+    base, pi, local, _ = hub
+
+    def boom(args):
+        raise PermissionError("docker: permission denied")
+
+    runner.on(("docker", "compose", "up"), boom)
+    assert call(base, "POST", "/rollout", {"commit": NEW})[0] == 202
+    for _ in range(200):
+        if local.state()["state"] == "failed":
+            break
+        time.sleep(0.01)
+    s = local.state()
+    assert s["state"] == "failed"
+    assert "permission denied" in s["error"]
+    assert s["rollout"]["outcome"] == "stopped"
+    assert call(base, "POST", "/update", {"commit": NEW}) == (409, {"error": "this Pi's last update failed: check it first"})
+
+
+def test_check_and_health(hub, runner):
+    base, pi, local, _ = hub
+    assert call(base, "GET", "/health") == (200, {"problem": None})
+    assert call(base, "POST", "/check", {"commit": NEW}) == (200, {})
+    pi.known.discard(NEW)
+    assert call(base, "POST", "/check", {"commit": NEW}) == (409, {"error": "unknown commit: fetch first"})
+    assert runner.ran("git", "fetch")  # it fetched once before refusing

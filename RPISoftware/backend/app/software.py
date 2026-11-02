@@ -76,15 +76,14 @@ async def overview() -> dict:
                                 "status": body if ok else None})
     if not statuses:
         return result
-    # newest commits: from the Pi furthest behind, so the list covers every Pi
-    furthest = max(statuses, key=lambda n: statuses[n].get("behind") or 0)
-    status, incoming = await call(hosts[furthest], "GET", "/incoming")
+    # GitHub's head from the Pi that fetched last: the others' copy of origin/main may be older
+    newest = max(statuses, key=lambda n: statuses[n].get("fetched_at") or "")
+    status, incoming = await call(hosts[newest], "GET", "/incoming")
     if status == 200:
         result["github"]["head"] = incoming.get("head")
         result["incoming"] = incoming.get("commits") or []
-    latest = max(statuses.values(), key=lambda s: s.get("fetched_at") or "")
-    result["github"]["fetched_at"] = latest.get("fetched_at")
-    result["github"]["fetch_error"] = latest.get("fetch_error")
+    result["github"]["fetched_at"] = statuses[newest].get("fetched_at")
+    result["github"]["fetch_error"] = statuses[newest].get("fetch_error")
     rollouts = [s["rollout"] for s in statuses.values() if isinstance(s.get("rollout"), dict)]
     running = [r for r in rollouts if r.get("outcome") == "running"]
     if running or rollouts:
