@@ -102,7 +102,8 @@ docker compose ps                   # mosquitto, backend, web: "Up ... (healthy)
 curl -s localhost/health            # {"status":"ok","service":"canary-backend",...}
 ```
 
-It starts again by itself after a reboot (`restart: unless-stopped`). To update:
+It starts again by itself after a reboot (`restart: unless-stopped`). To update, install the
+updater once (section 1.11) and use **Administration → Hub → Software**, or by hand:
 `git pull && docker compose up -d --build`.
 
 ### 1.6 Connect each ESP32
@@ -339,6 +340,57 @@ default.
 
 ---
 
+### 1.11 Updating the hub
+
+Each Pi runs a small helper outside Docker, `canary-updater` (`cluster/updater`, Python standard
+library only). The dashboard and `scripts/hub_update.sh` ask it to update; it does the `git` and
+`docker compose` work, because the dashboard's own containers are rebuilt during an update.
+
+**Install it once** (on every Pi of a three-Pi hub). `scripts/pi_setup.sh` writes the key
+(`CANARY_UPDATER_KEY` in `.env`) and prints these lines with your user and path filled in:
+
+```bash
+sudo cp cluster/canary-updater.service /etc/systemd/system/
+sudo sed -i "s|^User=.*|User=$USER|" /etc/systemd/system/canary-updater.service
+sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$PWD/cluster|" /etc/systemd/system/canary-updater.service
+sudo systemctl daemon-reload && sudo systemctl enable --now canary-updater
+docker compose up -d     # the backend reads the new key from .env
+```
+
+It listens on port 8010 (the Pi's own address on three Pis) and answers only requests carrying
+the key. Logs: `journalctl -u canary-updater`.
+
+**From the dashboard:** **Administration → Hub** (admin, manager and technician accounts) shows
+the newest commit on GitHub `main`, the commits not yet on every Pi, and on each Pi card the commit
+it runs. The Pis check GitHub every 15 minutes; **Check now** checks at once.
+
+- **Update all Pis** updates one Pi at a time. Each must be healthy on the new commit (its
+  containers, `/health`, and on three Pis its Postgres member) before the next starts. The Pi
+  holding the database leader goes last, and its leadership is handed to a replica before it
+  restarts.
+- **Update this Pi** updates only that Pi, for trying a change first.
+- **Automatic rollback:** if the build fails, or the Pi is not healthy within 5 minutes, it goes
+  back to the commit it ran before and says **rolled back** with the reason and the log. During
+  "Update all" the rollout stops there; the Pis not reached keep their version. If the rollback
+  fails too, the Pi shows **failed**: check it with `docker compose logs`.
+
+An update is refused while a Pi is down or its updater does not answer, while another update
+runs, or when a Pi's checkout has local changes, commits that are not on GitHub, or is not on
+`main`. Every update is written to the audit log.
+
+**From a shell** (on any Pi, same rules): `scripts/hub_update.sh status | fetch | all |
+processing | web | ai | hub`.
+
+**Check on real Pis** after installing or changing the updater:
+
+1. One Pi: **Update this Pi** on a Pi that is behind: it ends **Up to date** on the new commit.
+2. **Update all Pis** on three Pis: `docker compose exec postgres patronictl list` during the
+   rollout shows the leader moving before its Pi restarts; the dashboard (VIP) stays usable apart
+   from a short reconnect.
+3. Push a commit that breaks the backend (e.g. a syntax error in `app/main.py`), **Update all
+   Pis**: the first Pi rolls back, the rollout stops, the other two keep running. Revert the
+   commit afterwards.
+
 ## 2. Laptop development
 
 ### 2.0 One-command smoke (no Docker, no Flutter)
@@ -508,7 +560,7 @@ the default; nothing in this section changes it.
   and used by nothing else. Example: VIP `192.168.1.10`, `processing` `.11`, `web` `.12`, `ai` `.13`.
 - Optional: a **Raspberry Pi AI HAT+ 2** on the AI Pi (section 3.4).
 - No firewall between the Pis (Raspberry Pi OS has none by default). Otherwise open TCP 80, 1883,
-  2379, 2380 (etcd), 5432 (Postgres), 8000 (backend), 8008 (Patroni) and IP protocol 112 (VRRP).
+  2379, 2380 (etcd), 5432 (Postgres), 8000 (backend), 8008 (Patroni), 8010 (canary-updater) and IP protocol 112 (VRRP).
 - **The same time on all three.** Raspberry Pi OS sets its clock over the internet; on a LAN
   without internet, point `systemd-timesyncd` at a local NTP server (most routers have one: `NTP=`
   in `/etc/systemd/timesyncd.conf`). Incidents, events and device commands carry timestamps from
@@ -553,7 +605,7 @@ the default; nothing in this section changes it.
 |---|---|
 | Add a sensor | on any one Pi `scripts/pi_setup.sh water-bath`, then copy `mosquitto/config/passwd` to the other two and run `scripts/pi_setup.sh` there (it reloads their brokers). Until then the new login works only on that Pi's broker |
 | Simulators | `docker compose --profile sim run --rm hw-sim ...` from any Pi: they publish to the broker behind the VIP, like the sensors |
-| Update | one Pi at a time: `git pull && docker compose up -d --build`, then wait until `patronictl list` shows it `streaming` again |
+| Update | **Administration → Hub → Software** or `scripts/hub_update.sh all` (section 1.11; install the updater on all three Pis). By hand: one Pi at a time, `git pull && docker compose up -d --build`, then wait until `patronictl list` shows it `streaming` again |
 | Logs | per Pi: `docker compose logs -f backend` (who processes, lease changes), `docker compose logs postgres pgproxy keepalived etcd` |
 | Back up the database | on any Pi: `docker compose exec -T postgres pg_dump -U postgres canary > canary-$(date +%F).sql` |
 | Change a cluster setting in `.env` | change it on all three Pis (copy the file), then `docker compose up -d` on each |
