@@ -6,6 +6,8 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "../auth/AuthContext";
+import { canSeeCluster } from "../lib/cluster";
+import { isBusy } from "../lib/software";
 import { api } from "./client";
 import type {
   AdminFloor,
@@ -20,6 +22,7 @@ import type {
   FirmwareUpdate,
   NodeFirmware,
   NodeFirmwareDetail,
+  SoftwareOverview,
   UnitKind,
 } from "./types";
 
@@ -263,3 +266,38 @@ export function usePushFirmware() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "firmware"] }),
   });
 }
+
+/** Hub software (GET /hub/software): every 10 s, every 3 s while an update runs. */
+export function useSoftware() {
+  const { token, session } = useAuth();
+  return useQuery({
+    queryKey: ["software"],
+    queryFn: () => api.get<SoftwareOverview>(`/api/v1/hub/software`, token),
+    enabled: canSeeCluster(session?.role),
+    refetchInterval: (q) => (q.state.data && isBusy(q.state.data) ? 3_000 : 10_000),
+    retry: false,
+  });
+}
+
+function useSoftwareAction<V>(call: (token: string | null, v: V) => Promise<SoftwareOverview>) {
+  const { token } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: V) => call(token, v),
+    onSuccess: (data) => qc.setQueryData(["software"], data),
+  });
+}
+
+/** Ask every Pi's updater to check GitHub now. */
+export const useSoftwareFetch = () =>
+  useSoftwareAction<void>((token) => api.post<SoftwareOverview>(`/api/v1/hub/software/fetch`, token));
+
+/** scope "all" (one Pi at a time) or one Pi's name. */
+export const useSoftwareUpdate = () =>
+  useSoftwareAction<{ scope: string; commit: string }>((token, body) =>
+    api.post<SoftwareOverview>(`/api/v1/hub/software/update`, token, body),
+  );
+
+/** Clear a Pi's "rolled back" / "failed" notice. */
+export const useSoftwareDismiss = () =>
+  useSoftwareAction<string>((token, name) => api.post<SoftwareOverview>(`/api/v1/hub/software/dismiss`, token, { name }));

@@ -844,3 +844,69 @@ export interface Scenario {
   loads: { edge_id: string; people: number; capacity_ppm: number; minutes_to_clear: number }[];
   stranded_people: number;
 }
+
+/** A commit as the Pis' updaters report it (GET /hub/software). */
+export interface SoftwareCommit {
+  sha: string;
+  subject: string;
+  date: string;
+  author?: string;
+}
+
+export type PiUpdateState = "idle" | "updating" | "rolling_back" | "rolled_back" | "failed";
+export type RolloutResult = "waiting" | "updating" | "done" | "rolled_back" | "failed";
+
+/** "Update all Pis": one Pi at a time, the database leader last; stops at the first Pi that fails. */
+export interface SoftwareRollout {
+  commit: string;
+  order: string[];
+  results: Record<string, RolloutResult>;
+  current: string | null;
+  outcome: "running" | "done" | "stopped";
+  reason: string | null;
+  started_at: string;
+}
+
+/** One Pi's canary-updater /status. */
+export interface PiSoftwareStatus {
+  node: string;
+  commit: SoftwareCommit | null;
+  branch: string;
+  /** uncommitted changes in the checkout: updates refused */
+  dirty: boolean;
+  /** commits on GitHub main this Pi does not have */
+  behind: number;
+  /** commits this Pi has that GitHub main does not: updates refused */
+  ahead: number;
+  state: PiUpdateState;
+  step: string | null;
+  target: string | null;
+  previous: string | null;
+  error: string | null;
+  log: string[];
+  rollout: SoftwareRollout | null;
+  restart_needed: boolean;
+  fetched_at: string | null;
+  fetch_error: string | null;
+}
+
+export interface SoftwareNode {
+  name: string;
+  /** null in single mode */
+  ip: string | null;
+  /** false: the Pi is down or its updater is not installed */
+  reachable: boolean;
+  status: PiSoftwareStatus | null;
+}
+
+/** GET /hub/software (system_admin, hoa_manager, technician). */
+export interface SoftwareOverview {
+  /** false: CANARY_UPDATER_KEY missing in .env */
+  configured: boolean;
+  mode: "single" | "triple";
+  github: { head: SoftwareCommit | null; fetched_at: string | null; fetch_error: string | null };
+  /** commits on GitHub main not yet on every Pi, newest first (at most 30) */
+  incoming: SoftwareCommit[];
+  nodes: SoftwareNode[];
+  rollout: SoftwareRollout | null;
+}
