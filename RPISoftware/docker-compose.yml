@@ -226,6 +226,25 @@ services:
       - cluster_state:/run/canary   # vrrp_state: MASTER | BACKUP | FAULT | STOP, read by the backend
     logging: *logging
 
+  # Announces the hub as canary-hub.local and _canary-hub._tcp (sensors and the app find it by
+  # name, whatever subnet the hotspot hands out). One Pi: always. Three Pis: only the Pi holding
+  # the floating IP, while its etcd has quorum. Uses the host's avahi-daemon over D-Bus.
+  announcer:
+    build: ./cluster/announcer
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      CANARY_CLUSTER_MODE: ${CANARY_CLUSTER_MODE:-}
+      CANARY_NODE_NAME: ${CANARY_NODE_NAME:-}
+      CANARY_VIP: ${CANARY_VIP:-}
+      CANARY_PROCESSING_IP: ${CANARY_PROCESSING_IP:-}
+      CANARY_WEB_IP: ${CANARY_WEB_IP:-}
+      CANARY_AI_IP: ${CANARY_AI_IP:-}
+    volumes:
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      - cluster_state:/run/canary:ro
+    logging: *logging
+
   # --- Simulators: profile "sim", never started by a plain `docker compose up` ---
 
   # Firmware-accurate ESP32 air + water nodes (status documents of docs/HARDWARE.md).

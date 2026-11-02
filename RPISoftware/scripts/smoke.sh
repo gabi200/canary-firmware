@@ -34,6 +34,11 @@ echo "==================== Hub infra (static) ==============="
   for script in scripts/*.sh cluster/*/*.sh; do bash -n "$script" || exit 1; done
   python3 -c 'import ast, sys; [ast.parse(open(p).read(), p) for p in sys.argv[1:]]' \
     simulator/hw_sim.py simulator/simulate.py || exit 1
+  if python3 -m pytest --version >/dev/null 2>&1; then
+    python3 -m pytest -q -p no:cacheprovider cluster/announcer/test_announcer.py || exit 1
+  else
+    echo "(pytest not installed for python3: announcer tests not run)"
+  fi
   if docker compose version >/dev/null 2>&1; then
     # Dummy secrets: only the file's syntax and interpolation are checked.
     CANARY_MQTT_PASSWORD=smoke CANARY_JWT_SECRET=smoke \
