@@ -67,6 +67,9 @@ final sessionProvider =StateNotifierProvider<SessionController, AuthSession?>(
 final incidentControllerProvider =
     StateNotifierProvider<IncidentController, IncidentsState>((ref) {
   final session = ref.watch(sessionProvider);
+  // A new hub address (failover to another Pi, new hotspot) rebuilds the controller, and with
+  // it the live socket, on the new address.
+  ref.watch(hubProvider.select((hub) => hub.url));
   // Tolerates a null session (idle controller) so transient rebuilds during
   // logout don't throw; the UI still gates real screens on sessionProvider.
   return IncidentController(

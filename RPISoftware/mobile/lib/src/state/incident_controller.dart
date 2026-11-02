@@ -96,7 +96,12 @@ class IncidentController extends StateNotifier<IncidentsState> {
   void _connectWs() {
     final session = _session;
     if (session == null) return;
-    final ws = WsClient(baseUrl: _api.baseUrl, buildingId: session.buildingId, token: session.token);
+    final ws = WsClient(
+      baseUrl: _api.baseUrl,
+      buildingId: session.buildingId,
+      token: session.token,
+      onUnreachable: () => _api.onUnreachable?.call(),
+    );
     _ws = ws;
     ws.events.listen(_onEvent);
     ws.connection.listen((up) {

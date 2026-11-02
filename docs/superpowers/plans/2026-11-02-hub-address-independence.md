@@ -260,7 +260,8 @@ No code. Depends on Tasks 1, 2 and 4 being on `main` (Task 3 is the app; it is v
 git push origin main
 for ip in 10.247.177.188 10.247.177.170 10.247.177.92; do
   git push canary@$ip:canary-firmware origin/main:refs/remotes/origin/main
-  ssh canary@$ip 'cd ~/canary-firmware && git merge -q --ff-only origin/main && cd RPISoftware && docker compose up -d --build'
+  ssh canary@$ip 'cd ~/canary-firmware && git merge -q --ff-only origin/main && cd RPISoftware && scripts/pi_setup.sh && docker compose up -d --build'
+  # pi_setup.sh writes CANARY_ANNOUNCE=1 (Raspberry Pi detected); without it the announcer stays silent
   # wait until `docker compose ps` shows every service healthy before the next Pi
 done
 ```
@@ -333,7 +334,7 @@ git commit -m "Resolve a .local MQTT host over mDNS before connecting"
 
 - [ ] **Step 1:** Build a release APK **without** `--dart-define=CANARY_API` (`cd RPISoftware/mobile && flutter build apk --release`), install on a phone joined to the hotspot (not the hotspot phone).
 - [ ] **Step 2:** First start shows "Looking for the hub…" briefly, then the sign-in; Settings shows `http://10.247.177.188:8000`.
-- [ ] **Step 3:** Failover (Task 5 Step 3): the app shows a short reconnect, then works; Settings shows the new address.
+- [ ] **Step 3:** Failover by **powering off the hub Pi** (not just stopping keepalived: the old backend would keep answering): the app shows a short reconnect, live alarms come back on the new Pi, and Settings shows the new address. Power the Pi back on; after the 30 s preempt delay the app follows the name back.
 - [ ] **Step 4:** Create a household invite in the app; the link is `http://10.247.177.188/join/<code>` and opens the join page in the phone's browser.
 
 ---

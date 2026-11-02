@@ -25,7 +25,11 @@ class HubController extends StateNotifier<HubState> {
     required HubProbe probe,
   })  : _locatorFor = locatorFor,
         _probe = probe,
-        super(const HubState(searching: true)) {
+        super(HubState(url: _storage.hubUrl, searching: true)) {
+    // Cold start: use the last address at once (the app opens, the offline check-in queue
+    // works) and confirm or replace it in the background.
+    final saved = state.url;
+    if (saved != null) _api.baseUrl = saved;
     _api.onUnreachable = locate;
     locate();
   }

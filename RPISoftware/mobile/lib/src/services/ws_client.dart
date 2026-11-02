@@ -11,7 +11,12 @@ import '../config.dart';
 /// connection it reconnects with capped backoff; consumers stay subscribed.
 /// [connection] says whether the socket is actually open.
 class WsClient {
-  WsClient({required this.baseUrl, required this.buildingId, required this.token});
+  WsClient({required this.baseUrl, required this.buildingId, required this.token, this.onUnreachable});
+
+  /// Called after every failed connect from the second in a row on: the hub may have moved to
+  /// another Pi (failover) or another subnet (new hotspot); the owner looks for it again.
+  final void Function()? onUnreachable;
+  int _failedConnects = 0;
 
   /// The hub's REST base (e.g. http://10.247.177.188:8000); the socket uses ws:// on it.
   final String baseUrl;
@@ -45,6 +50,7 @@ class WsClient {
       channel.ready.then((_) {
         if (_closed || _channel != channel) return;
         _backoff = const Duration(seconds: 1);
+        _failedConnects = 0;
         _status.add(true);
       }, onError: (Object _) {});
       // Three-Pi hub: the socket runs through the floating hub address. If the Pi behind it
@@ -82,6 +88,7 @@ class WsClient {
     _ping?.cancel();
     if (_closed) return;
     _status.add(false);
+    if (++_failedConnects >= 2) onUnreachable?.call();
     _sub?.cancel();
     _channel = null;
     _retry?.cancel();

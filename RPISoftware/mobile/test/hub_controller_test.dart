@@ -92,4 +92,41 @@ void main() {
     expect(await c.useManual('http://10.247.177.188:8000/'), isTrue);
     expect(c.state.url, hub);
   });
+
+  test('a saved address is used at once while the search runs (cold start away from the hub)', () async {
+    await storage.saveHubUrl(hub);
+    final gate = Completer<void>();
+    final c = HubController(storage, api, locatorFor: (_) => HubLocator(
+          probe: (url) async {
+            await gate.future;
+            return false;
+          },
+          browse: (_) async => const [],
+          wifiIp: () async => null,
+        ), probe: (u) async => false);
+    expect(c.state.url, hub);
+    expect(c.state.searching, isTrue);
+    expect(api.baseUrl, hub);
+    gate.complete();
+    await c.ready;
+    expect(c.state.url, hub); // nothing better found: keep the saved one
+  });
+
+  test('a search that finds nothing does not stop later searches', () async {
+    var searches = 0;
+    final c = HubController(storage, api, locatorFor: (_) => HubLocator(
+          probe: (url) async => false,
+          browse: (_) async {
+            searches++;
+            return const [];
+          },
+          wifiIp: () async => null,
+        ), probe: (u) async => false);
+    await c.ready;
+    for (var n = 0; n < 4; n++) {
+      await expectLater(api.activeIncidents('b'), throwsA(isA<ApiException>()));
+      await c.ready;
+    }
+    expect(searches, greaterThanOrEqualTo(3)); // the start, then again after each later failure
+  });
 }

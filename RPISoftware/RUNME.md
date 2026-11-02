@@ -409,7 +409,9 @@ cd backend && .venv/bin/python -m pytest -q              # backend only: 95 pass
 
 ### 2.1 The whole hub in Docker
 
-Same as on the Pi (sections 1.4, 1.5, 1.8), on Docker Desktop or colima (arm64 or amd64):
+Same as on the Pi (sections 1.4, 1.5, 1.8), on Docker Desktop or colima (arm64 or amd64).
+On a laptop `pi_setup.sh` writes `CANARY_ANNOUNCE=0`, so the laptop never announces
+`canary-hub.local` and cannot take sensors or phones away from a real hub on the same Wi-Fi:
 
 ```bash
 scripts/pi_setup.sh            # .env + broker user "hub"

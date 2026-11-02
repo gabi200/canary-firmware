@@ -136,14 +136,16 @@ void main() {
       return ApiClient(dio: dio);
     }
 
-    test('two failures with no response fire onUnreachable once', () async {
+    test('fires from the second failure with no response on, every time', () async {
+      // Not just once: a search that found nothing must not end the searching for good
+      // (the hub controller runs one search at a time).
       final api = client([null, null, null]);
       var fired = 0;
       api.onUnreachable = () => fired++;
       for (var n = 0; n < 3; n++) {
         await expectLater(api.activeIncidents('b'), throwsA(isA<ApiException>()));
       }
-      expect(fired, 1);
+      expect(fired, 2);
     });
 
     test('an HTTP response in between resets the count', () async {

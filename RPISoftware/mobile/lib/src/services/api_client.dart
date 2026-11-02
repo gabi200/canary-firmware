@@ -57,8 +57,10 @@ class ApiClient {
       handler.next(response);
     }, onError: (e, handler) {
       if (e.response == null) {
-        // No answer at all: the hub moved (new hotspot, failover). Two in a row -> look again.
-        if (++_failuresWithoutResponse == 2) onUnreachable?.call();
+        // No answer at all: the hub moved (new hotspot, failover). From the second in a row on,
+        // every failure asks for a search (the hub controller runs one at a time), so a search
+        // that found nothing (Pis still rebooting) is followed by another.
+        if (++_failuresWithoutResponse >= 2) onUnreachable?.call();
       } else {
         _failuresWithoutResponse = 0;
       }
@@ -78,7 +80,8 @@ class ApiClient {
   /// Called when an authenticated request gets 401 (set by the session owner).
   void Function()? onUnauthorized;
 
-  /// Called once after two requests in a row got no HTTP response (set by the hub locator).
+  /// Called on every request, from the second in a row, that got no HTTP response (set by
+  /// the hub controller, which ignores calls while a search runs).
   void Function()? onUnreachable;
 
   /// The hub's REST base, e.g. http://10.247.177.188:8000; set by the hub locator.

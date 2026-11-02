@@ -266,6 +266,18 @@ fi
 # Key of canary-updater (cluster/canary-updater.service), the host-side helper that updates the
 # hub from the dashboard. The same on all three Pis: it travels with the copied .env.
 add_secret CANARY_UPDATER_KEY "$(rand_hex 32)"
+# The "announcer" service publishes canary-hub.local only where CANARY_ANNOUNCE=1: on a Raspberry
+# Pi by default, never on a laptop running the stack for development (it would take the name from
+# the real hub on the same Wi-Fi). Set it in .env to override; it is never changed once present.
+if ! grep -q '^CANARY_ANNOUNCE=' "$ENV_FILE"; then
+  if tr -d '\0' </proc/device-tree/model 2>/dev/null | grep -q 'Raspberry Pi'; then
+    printf 'CANARY_ANNOUNCE=1\n' >>"$ENV_FILE"
+    note "CANARY_ANNOUNCE=1: this Pi announces the hub as canary-hub.local"
+  else
+    printf 'CANARY_ANNOUNCE=0\n' >>"$ENV_FILE"
+    note "CANARY_ANNOUNCE=0: not a Raspberry Pi, the hub name is not announced from here"
+  fi
+fi
 
 # ---------------------------------------------------------------- 1b. three Pis
 # --cluster: what the three Pis share. Secrets are generated once and kept; the addresses and

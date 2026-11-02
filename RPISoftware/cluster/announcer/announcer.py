@@ -38,7 +38,9 @@ def log(msg: str) -> None:
     print(f"[announcer] {msg}", flush=True)
 
 
-def should_announce(cluster_mode: str, vrrp_state: str | None, etcd_healthy: bool) -> bool:
+def should_announce(enabled: bool, cluster_mode: str, vrrp_state: str | None, etcd_healthy: bool) -> bool:
+    if not enabled:  # CANARY_ANNOUNCE=1 only on Pis (scripts/pi_setup.sh), never a dev laptop
+        return False
     if cluster_mode != "triple":
         return True
     return vrrp_state == "MASTER" and etcd_healthy
@@ -124,11 +126,51 @@ def _route_get() -> str:
         return ""
 
 
+class AvahiProc:
+    """An avahi-publish process. When another machine already holds the name, avahi-publish
+    does not exit: it renames itself ("canary-hub-2.local") and keeps running, and sensors
+    would never find the hub. poll() treats that rename as an exit (after stopping the
+    process), so the Publisher publishes the real name again on a later loop."""
+
+    def __init__(self, cmd: list[str]):
+        self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        assert self._proc.stdout is not None
+        os.set_blocking(self._proc.stdout.fileno(), False)
+        self._output = b""
+        self._collided = False
+
+    def poll(self) -> int | None:
+        if not self._collided:
+            try:
+                chunk = self._proc.stdout.read() if self._proc.stdout else None
+            except OSError:
+                chunk = None
+            if chunk:
+                self._output = (self._output + chunk)[-4096:]
+                if b"Name collision" in self._output:
+                    self._collided = True
+                    log(f"name collision ({self._output.decode(errors='replace').strip().splitlines()[-1]}), will retry")
+                    self.terminate()
+        code = self._proc.poll()
+        if self._collided:
+            return code if code is not None else 1
+        return code
+
+    def terminate(self) -> None:
+        if self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+
+
 def _spawn(cmd: list[str]) -> Proc:
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL)
+    return AvahiProc(cmd)
 
 
 def main() -> None:
+    enabled = os.environ.get("CANARY_ANNOUNCE", "") == "1"
     mode = os.environ.get("CANARY_CLUSTER_MODE", "")
     node = os.environ.get("CANARY_NODE_NAME") or "hub"
     cluster_ips = {ip for ip in (os.environ.get(v, "") for v in (
@@ -141,12 +183,13 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    log(f"started: mode={mode or 'single'} node={node}")
+    log(f"started: mode={mode or 'single'} node={node}"
+        + ("" if enabled else " (CANARY_ANNOUNCE is not 1: not announcing; scripts/pi_setup.sh sets it)"))
     while True:
         state = _read_vrrp_state() if mode == "triple" else None
         healthy = _etcd_healthy() if mode == "triple" else True
         address = routable_ipv4(_route_get(), cluster_ips)
-        wanted = should_announce(mode, state, healthy) and address is not None
+        wanted = should_announce(enabled, mode, state, healthy) and address is not None
         publisher.apply((address, node) if wanted and address else None)
         time.sleep(LOOP_S)
 

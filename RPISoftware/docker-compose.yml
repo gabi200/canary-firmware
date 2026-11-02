@@ -234,6 +234,7 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
+      CANARY_ANNOUNCE: ${CANARY_ANNOUNCE:-0}   # 1 on Pis (scripts/pi_setup.sh); 0 on dev laptops
       CANARY_CLUSTER_MODE: ${CANARY_CLUSTER_MODE:-}
       CANARY_NODE_NAME: ${CANARY_NODE_NAME:-}
       CANARY_VIP: ${CANARY_VIP:-}

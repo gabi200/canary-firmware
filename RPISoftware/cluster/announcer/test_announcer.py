@@ -5,7 +5,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from announcer import Publisher, publish_commands, routable_ipv4, should_announce  # noqa: E402
+import time  # noqa: E402
+
+from announcer import AvahiProc, Publisher, publish_commands, routable_ipv4, should_announce  # noqa: E402
 
 
 class FakeProc:
@@ -36,11 +38,18 @@ class FakeSpawn:
 
 
 def test_should_announce():
-    assert should_announce("", None, False)  # one Pi: always
-    assert should_announce("triple", "MASTER", True)
-    assert not should_announce("triple", "MASTER", False)  # no quorum: stay silent
-    assert not should_announce("triple", "BACKUP", True)
-    assert not should_announce("triple", None, True)
+    assert should_announce(True, "", None, False)  # one Pi: always
+    assert should_announce(True, "triple", "MASTER", True)
+    assert not should_announce(True, "triple", "MASTER", False)  # no quorum: stay silent
+    assert not should_announce(True, "triple", "BACKUP", True)
+    assert not should_announce(True, "triple", None, True)
+
+
+def test_not_enabled_never_announces():
+    # A developer laptop running the stack must not take canary-hub.local from the real hub:
+    # only Pis set up by scripts/pi_setup.sh (CANARY_ANNOUNCE=1) announce.
+    assert not should_announce(False, "", None, True)
+    assert not should_announce(False, "triple", "MASTER", True)
 
 
 def test_routable_ipv4():
@@ -104,3 +113,32 @@ def test_spawn_failure_is_retried():
     pub.apply(("10.0.0.5", "web"))  # must not raise
     pub.apply(("10.0.0.5", "web"))
     assert sorted(p.cmd for p in spawn.procs) == sorted(publish_commands("10.0.0.5", "web"))
+
+
+def _poll_until_exit(proc, seconds=3.0):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        code = proc.poll()
+        if code is not None:
+            return code
+        time.sleep(0.05)
+    return None
+
+
+def test_renamed_publisher_counts_as_exited():
+    # avahi-publish does not exit when another machine holds the name: it renames itself
+    # ("canary-hub-2.local") and keeps running. That must be treated as a failed publish.
+    proc = AvahiProc(["sh", "-c", "echo \"Name collision, picking new name 'canary-hub-2.local'.\" >&2; sleep 30"])
+    try:
+        assert _poll_until_exit(proc) is not None
+    finally:
+        proc.terminate()
+
+
+def test_healthy_publisher_keeps_running():
+    proc = AvahiProc(["sh", "-c", "echo \"Established under name 'canary-hub.local'\"; sleep 30"])
+    try:
+        time.sleep(0.3)
+        assert proc.poll() is None
+    finally:
+        proc.terminate()
