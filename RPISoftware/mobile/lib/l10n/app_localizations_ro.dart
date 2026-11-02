@@ -51,6 +51,25 @@ class AppLocalizationsRo extends AppLocalizations {
   }
 
   @override
+  String get hubSearching => 'Caut hubul…';
+
+  @override
+  String get hubNotFound =>
+      'Niciun hub găsit pe acest Wi-Fi. Verifică dacă telefonul este conectat la Wi-Fi-ul clădirii.';
+
+  @override
+  String get hubRetry => 'Caută din nou';
+
+  @override
+  String get hubManualLabel => 'Adresa hubului (ex. 10.0.0.5)';
+
+  @override
+  String get hubManualConnect => 'Conectează';
+
+  @override
+  String get hubManualFailed => 'Niciun hub nu răspunde la această adresă.';
+
+  @override
   String loginFailed(String reason) {
     return 'Autentificarea a eșuat: $reason';
   }

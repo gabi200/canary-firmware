@@ -160,10 +160,12 @@ curl -s -X PATCH $HUB/api/v1/nodes/air-kitchen -H "Authorization: Bearer $TOKEN"
   -H 'content-type: application/json' -d '{"zone_id":"zone_kitchen","name":"Kitchen air"}'
 ```
 
-Mobile app (analysis only; see [`mobile/README.md`](./mobile/README.md)):
+Mobile app (analysis only; see [`mobile/README.md`](./mobile/README.md)). On the same
+Wi-Fi it finds the hub by itself (`_canary-hub._tcp`, announced by the `announcer`
+service); no address is built in:
 ```bash
-flutter run --dart-define=CANARY_API=http://<pi-ip>          # through nginx (port 80)
-flutter run --dart-define=CANARY_API=http://<pi-ip>:8000     # straight to the backend
+flutter build apk --release
+flutter run --dart-define=CANARY_API=http://<pi-ip>:8000     # development: try this address first
 ```
 
 ### 1.8 Test without hardware

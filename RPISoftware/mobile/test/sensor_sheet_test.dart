@@ -139,6 +139,7 @@ Future<_Hub> _pumpHome(WidgetTester tester, {String language = 'ro'}) async {
   await tester.pumpWidget(ProviderScope(
     overrides: [
       storageProvider.overrideWithValue(storage),
+      hubFound(storage),
       apiClientProvider.overrideWith((ref) => ApiClient(
             dio: Dio(BaseOptions(baseUrl: 'http://hub.test'))..httpClientAdapter = hub,
             languageCode: () => ref.read(languageCodeProvider),

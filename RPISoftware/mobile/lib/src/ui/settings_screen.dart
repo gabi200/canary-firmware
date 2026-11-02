@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config.dart';
 import '../i18n.dart';
 import '../state/account_providers.dart';
 import '../state/providers.dart';
@@ -124,7 +123,7 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.dns),
             title: Text(l10n.server),
-            subtitle: const Text(Config.apiBase),
+            subtitle: Text(ref.watch(hubProvider).url ?? ''),
           ),
           const SizedBox(height: 24),
           Padding(

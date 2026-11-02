@@ -176,6 +176,42 @@ abstract class AppLocalizations {
   /// **'Server: {url}'**
   String serverAddress(String url);
 
+  /// No description provided for @hubSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for the hub…'**
+  String get hubSearching;
+
+  /// No description provided for @hubNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No hub found on this Wi-Fi. Check that the phone is on the building\'s Wi-Fi.'**
+  String get hubNotFound;
+
+  /// No description provided for @hubRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Search again'**
+  String get hubRetry;
+
+  /// No description provided for @hubManualLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Hub address (e.g. 10.0.0.5)'**
+  String get hubManualLabel;
+
+  /// No description provided for @hubManualConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get hubManualConnect;
+
+  /// No description provided for @hubManualFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No hub answers at that address.'**
+  String get hubManualFailed;
+
   /// No description provided for @loginFailed.
   ///
   /// In en, this message translates to:

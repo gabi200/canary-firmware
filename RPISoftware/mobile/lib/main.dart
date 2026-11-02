@@ -11,6 +11,7 @@ import 'src/state/providers.dart';
 import 'src/theme.dart';
 import 'src/models/household.dart';
 import 'src/ui/care_profiles_screen.dart';
+import 'src/ui/find_hub_screen.dart';
 import 'src/ui/invite_accept_screen.dart';
 import 'src/ui/home_screen.dart';
 import 'src/ui/manager_dashboard_screen.dart';
@@ -59,8 +60,11 @@ class CanaryApp extends ConsumerWidget {
       l10nProvider,
       (_, l10n) => Notifications.instance.setLocalizations(l10n),
     );
+    final hubFound = ref.watch(hubProvider.select((hub) => hub.url != null));
     final Widget home;
-    if (session == null) {
+    if (!hubFound) {
+      home = const FindHubScreen();
+    } else if (session == null) {
       home = const OnboardingScreen();
     } else if (session.isResident) {
       home = const HomeScreen();

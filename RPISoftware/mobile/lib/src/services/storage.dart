@@ -23,6 +23,7 @@ class Storage {
   static const _kThemeMode = 'theme_mode';
   static const _kSectionsCollapsed = 'home_sections_collapsed';
   static const _kRoomsExpanded = 'home_rooms_expanded';
+  static const _kHubUrl = 'hub_url';
 
   static Future<Storage> create() async => Storage(await SharedPreferences.getInstance());
 
@@ -112,6 +113,10 @@ class Storage {
   }
 
   Future<void> clearQueue() => _prefs.remove(_kQueue);
+
+  // --- hub address (last one found on the network) ---
+  String? get hubUrl => _prefs.getString(_kHubUrl);
+  Future<void> saveHubUrl(String url) => _prefs.setString(_kHubUrl, url);
 
   Future<void> replaceQueue(List<PendingCheckIn> items) =>
       _prefs.setStringList(_kQueue, items.map((e) => jsonEncode(e.toJson())).toList());

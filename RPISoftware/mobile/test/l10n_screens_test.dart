@@ -18,7 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'support/fake_hub.dart' show openAllSensors;
+import 'support/fake_hub.dart' show hubFound, openAllSensors;
 
 class _FakeHub implements HttpClientAdapter {
   final requests = <RequestOptions>[];
@@ -131,6 +131,7 @@ Future<(Storage, _FakeHub, List<Override>)> _setUp(WidgetTester tester, {require
     hub,
     <Override>[
       storageProvider.overrideWithValue(storage),
+      hubFound(storage),
       apiClientProvider.overrideWith((ref) => ApiClient(
             dio: Dio(BaseOptions(baseUrl: 'http://hub.test'))..httpClientAdapter = hub,
             languageCode: () => ref.read(languageCodeProvider),

@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:canary_resident/src/models/auth.dart';
 import 'package:canary_resident/src/services/api_client.dart';
+import 'package:canary_resident/src/services/hub_locator.dart';
 import 'package:canary_resident/src/services/storage.dart';
+import 'package:canary_resident/src/state/hub_controller.dart';
 import 'package:canary_resident/src/state/incident_controller.dart';
 import 'package:canary_resident/src/state/providers.dart';
 import 'package:canary_resident/src/ui/widgets/room_tiles.dart';
@@ -80,9 +82,23 @@ Future<Storage> signedInStorage({String role = 'resident', String language = 'ro
 List<Override> hubOverrides(Storage storage, FakeHub hub, {IncidentsState? incidents}) => [
       storageProvider.overrideWithValue(storage),
       apiClientProvider.overrideWith((ref) => fakeApi(hub, () => ref.read(languageCodeProvider))),
+      hubFound(storage),
       incidentControllerProvider.overrideWith(
         (ref) => FakeIncidents(ref.watch(apiClientProvider), storage, incidents)),
     ];
+
+/// The hub is "found" at once (http://hub.test:8000): no network search in widget tests.
+Override hubFound(Storage storage) => hubProvider.overrideWith((ref) => HubController(
+      storage,
+      ref.watch(apiClientProvider),
+      locatorFor: (_) => HubLocator(
+        probe: (_) async => true,
+        browse: (_) async => const [],
+        wifiIp: () async => null,
+        override: 'http://hub.test:8000',
+      ),
+      probe: (_) async => true,
+    ));
 
 Future<void> settle(WidgetTester tester, [int frames = 10]) async {
   for (var i = 0; i < frames; i++) {

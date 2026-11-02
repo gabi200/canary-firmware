@@ -50,6 +50,25 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get hubSearching => 'Looking for the hub…';
+
+  @override
+  String get hubNotFound =>
+      'No hub found on this Wi-Fi. Check that the phone is on the building\'s Wi-Fi.';
+
+  @override
+  String get hubRetry => 'Search again';
+
+  @override
+  String get hubManualLabel => 'Hub address (e.g. 10.0.0.5)';
+
+  @override
+  String get hubManualConnect => 'Connect';
+
+  @override
+  String get hubManualFailed => 'No hub answers at that address.';
+
+  @override
   String loginFailed(String reason) {
     return 'Login failed: $reason';
   }

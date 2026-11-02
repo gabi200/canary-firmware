@@ -11,8 +11,10 @@ import '../config.dart';
 /// connection it reconnects with capped backoff; consumers stay subscribed.
 /// [connection] says whether the socket is actually open.
 class WsClient {
-  WsClient({required this.buildingId, required this.token});
+  WsClient({required this.baseUrl, required this.buildingId, required this.token});
 
+  /// The hub's REST base (e.g. http://10.247.177.188:8000); the socket uses ws:// on it.
+  final String baseUrl;
   final String buildingId;
   final String token;
 
@@ -32,7 +34,7 @@ class WsClient {
 
   void connect() {
     if (_closed) return;
-    final uri = Uri.parse('${Config.wsBase}/api/v1/ws/incidents')
+    final uri = Uri.parse('${Config.wsBaseFor(baseUrl)}/api/v1/ws/incidents')
         .replace(queryParameters: {'building_id': buildingId, 'token': token});
     try {
       final channel = WebSocketChannel.connect(uri);

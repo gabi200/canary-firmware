@@ -38,7 +38,7 @@ class ApiClient {
       : _languageCode = languageCode,
         _dio = dio ??
             Dio(BaseOptions(
-              baseUrl: Config.apiBase,
+              baseUrl: Config.apiOverride,
               connectTimeout: const Duration(seconds: 5),
               receiveTimeout: const Duration(seconds: 8),
             )) {
@@ -52,7 +52,16 @@ class ApiClient {
         options.headers['Accept-Language'] = lang;
       }
       handler.next(options);
+    }, onResponse: (response, handler) {
+      _failuresWithoutResponse = 0;
+      handler.next(response);
     }, onError: (e, handler) {
+      if (e.response == null) {
+        // No answer at all: the hub moved (new hotspot, failover). Two in a row -> look again.
+        if (++_failuresWithoutResponse == 2) onUnreachable?.call();
+      } else {
+        _failuresWithoutResponse = 0;
+      }
       // The hub rejected the token (expired after 8 h, or a new hub key): sign out.
       if (e.response?.statusCode == 401 && e.requestOptions.headers['Authorization'] != null) {
         onUnauthorized?.call();
@@ -64,9 +73,20 @@ class ApiClient {
   final Dio _dio;
   final String Function()? _languageCode;
   String? _token;
+  int _failuresWithoutResponse = 0;
 
   /// Called when an authenticated request gets 401 (set by the session owner).
   void Function()? onUnauthorized;
+
+  /// Called once after two requests in a row got no HTTP response (set by the hub locator).
+  void Function()? onUnreachable;
+
+  /// The hub's REST base, e.g. http://10.247.177.188:8000; set by the hub locator.
+  String get baseUrl => _dio.options.baseUrl;
+  set baseUrl(String url) {
+    _dio.options.baseUrl = url;
+    _failuresWithoutResponse = 0;
+  }
 
   void setToken(String? token) => _token = token;
 

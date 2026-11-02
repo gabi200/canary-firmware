@@ -16,6 +16,7 @@ import 'package:canary_resident/src/state/providers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'support/fake_hub.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -230,7 +231,7 @@ void main() {
   testWidgets('onboarding follows the saved language and the RO / EN toggle', (tester) async {
     final storage = await _storage({'language': 'ro'});
     await tester.pumpWidget(ProviderScope(
-      overrides: [storageProvider.overrideWithValue(storage)],
+      overrides: [storageProvider.overrideWithValue(storage), hubFound(storage)],
       child: const CanaryApp(),
     ));
     await tester.pumpAndSettle();

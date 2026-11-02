@@ -104,7 +104,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         : Text(l10n.linkMyUnit),
                   ),
                   const SizedBox(height: 12),
-                  Text(l10n.serverAddress(Config.apiBase),
+                  Text(l10n.serverAddress(ref.watch(hubProvider).url ?? ''),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: context.palette.faint, fontSize: 12)),
                 ],

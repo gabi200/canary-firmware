@@ -1,17 +1,15 @@
 /// App-wide configuration.
 ///
-/// Defaults target the local Canary backend from an Android emulator
-/// (10.0.2.2 == host loopback). Override at build time, e.g.:
-///   flutter run --dart-define=CANARY_API=http://192.168.1.20:8000
+/// The hub's address is found at run time (services/hub_locator.dart). For development,
+/// an address can be given at build time; it is tried first, and discovery still runs
+/// when it stops answering, e.g. from an Android emulator (10.0.2.2 == host loopback):
+///   flutter run --dart-define=CANARY_API=http://10.0.2.2:8000
 class Config {
-  /// REST base, e.g. http://10.0.2.2:8000
-  static const String apiBase = String.fromEnvironment(
-    'CANARY_API',
-    defaultValue: 'http://10.0.2.2:8000',
-  );
+  /// REST base tried before discovery, e.g. http://10.0.2.2:8000. Empty: discover only.
+  static const String apiOverride = String.fromEnvironment('CANARY_API');
 
-  /// WebSocket base, e.g. ws://10.0.2.2:8000
-  static String get wsBase => apiBase.replaceFirst(RegExp(r'^http'), 'ws');
+  /// WebSocket base for a REST base: http://x:8000 -> ws://x:8000.
+  static String wsBaseFor(String apiBase) => apiBase.replaceFirst(RegExp(r'^http'), 'ws');
 
   /// Default building for the MVP (matches the seeded bld_007).
   static const String defaultBuildingId = String.fromEnvironment(

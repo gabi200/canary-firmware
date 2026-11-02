@@ -3,11 +3,14 @@ import 'dart:ui' show Locale;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config.dart';
 import '../i18n.dart';
 import '../models/auth.dart';
 import '../models/evacuation.dart';
 import '../services/api_client.dart';
+import '../services/hub_locator.dart';
 import '../services/storage.dart';
+import 'hub_controller.dart';
 import 'incident_controller.dart';
 import 'locale_controller.dart';
 import 'session_controller.dart';
@@ -44,7 +47,18 @@ final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(languageCode: () => ref.read(languageCodeProvider)),
 );
 
-final sessionProvider = StateNotifierProvider<SessionController, AuthSession?>(
+/// The hub's address, found on the network (services/hub_locator.dart). The app shows
+/// FindHubScreen until it has one.
+final hubProvider = StateNotifierProvider<HubController, HubState>(
+  (ref) => HubController(
+    ref.watch(storageProvider),
+    ref.watch(apiClientProvider),
+    locatorFor: (saved) => HubLocator.network(override: Config.apiOverride, saved: saved),
+    probe: probeHub,
+  ),
+);
+
+final sessionProvider =StateNotifierProvider<SessionController, AuthSession?>(
   (ref) => SessionController(ref.watch(storageProvider), ref.watch(apiClientProvider)),
 );
 

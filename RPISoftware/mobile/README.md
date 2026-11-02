@@ -78,16 +78,24 @@ tap **"I'm safe / evacuated"** → backend unaccounted count drops.
 
 The Pi serves the API over plain HTTP on the local network: nginx on port 80
 proxies `/api` and the WebSocket, and the backend itself listens on `:8000`.
-Put the phone on the same Wi-Fi as the Pi and point the app at it (the WebSocket
-URL is derived automatically, `http` → `ws`):
+Put the phone on the same Wi-Fi as the Pi. The app finds the hub by itself
+(`lib/src/services/hub_locator.dart`): the hub announces `_canary-hub._tcp`, and when
+that is not seen the app tries every address of the phone's /24 on port 8000. The
+address that answered is remembered, and the search runs again when the hub stops
+answering (a new hotspot phone, a failover). If nothing is found, the app asks for the
+address. Installable builds need no address:
+
+```bash
+flutter build apk --release
+flutter build ios --release
+```
+
+For development, `CANARY_API` is tried first (the search still runs if it stops
+answering; the WebSocket URL is derived automatically, `http` → `ws`):
 
 ```bash
 flutter run --dart-define=CANARY_API=http://<pi-ip>          # via nginx (:80)
 flutter run --dart-define=CANARY_API=http://<pi-ip>:8000     # straight to the backend
-
-# installable builds keep the same define
-flutter build apk --release --dart-define=CANARY_API=http://<pi-ip>
-flutter build ios --release --dart-define=CANARY_API=http://<pi-ip>
 ```
 
 Add `--dart-define=CANARY_BUILDING=<id>` if the hub's building is not `bld_007`.
