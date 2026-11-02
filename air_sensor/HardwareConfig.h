@@ -86,6 +86,8 @@ constexpr uint8_t LED_PWM_RESOLUTION_BITS = 8;
 // drives the pin low. Add an external pull-down if the chirp is unwanted.
 constexpr uint8_t BUZZER_PIN = 39;
 constexpr bool BUZZER_ACTIVE_HIGH = true;
+// One short beep at every boot, so a dead buzzer is noticed at install or after a power cut.
+constexpr uint32_t STARTUP_BEEP_MS = 150;
 
 // GPIO0 is the ESP32-S3 boot strapping pin, so it cannot be held during reset
 // without entering the ROM download mode. A hold while the firmware runs

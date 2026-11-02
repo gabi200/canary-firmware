@@ -440,6 +440,11 @@ void setup() {
   digitalWrite(Hardware::BUZZER_PIN,
                Hardware::outputLevel(false, Hardware::BUZZER_ACTIVE_HIGH));
   pinMode(Hardware::BUZZER_PIN, OUTPUT);
+  digitalWrite(Hardware::BUZZER_PIN,
+               Hardware::outputLevel(true, Hardware::BUZZER_ACTIVE_HIGH));
+  delay(Hardware::STARTUP_BEEP_MS);
+  digitalWrite(Hardware::BUZZER_PIN,
+               Hardware::outputLevel(false, Hardware::BUZZER_ACTIVE_HIGH));
   configureLedPin(Hardware::LED_RED_PIN);
   configureLedPin(Hardware::LED_GREEN_PIN);
   configureLedPin(Hardware::LED_BLUE_PIN);
