@@ -31,6 +31,7 @@ from app.api.motion import router as motion_router
 from app.api.zone_normal import router as zone_normal_router
 from app.api.water_impact import router as water_impact_router
 from app.api.scenario import router as scenario_router
+from app.api.software import router as software_router
 from app.api.routes import router
 from app import cluster
 from app.care.service import CareUnavailable
@@ -181,6 +182,7 @@ app.include_router(motion_router)
 app.include_router(zone_normal_router)
 app.include_router(water_impact_router)
 app.include_router(scenario_router)
+app.include_router(software_router)
 
 
 @app.exception_handler(CareUnavailable)

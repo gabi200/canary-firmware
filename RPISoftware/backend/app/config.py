@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     vip: str = ""  # triple: the floating address of the hub (sensors, dashboard, app)
     cluster_secret: str = ""  # triple: node-to-node API key, written by scripts/pi_setup.sh --cluster
     vrrp_state_file: str = "/run/canary/vrrp_state"  # keepalived writes MASTER / BACKUP / FAULT here
+    # --- software updates: canary-updater on every Pi's host (cluster/updater, RUNME.md) ---
+    updater_key: str = ""  # CANARY_UPDATER_KEY, written by scripts/pi_setup.sh; empty: updates unavailable
+    updater_port: int = 8010
 
     # --- AI accelerator: Raspberry Pi AI HAT+ 2 serving an LLM through hailo-ollama ---
     llm_url: str = ""  # e.g. http://host.docker.internal:11434; empty: incident briefs use a template
