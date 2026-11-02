@@ -13,7 +13,9 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from urllib.parse import urlsplit
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,9 +120,27 @@ async def _invite_profile(session: AsyncSession, invite: HouseholdInvite) -> Car
 # --------------------------------------------------------------------------- #
 # Inviter
 # --------------------------------------------------------------------------- #
+def invite_url(public_url: str, host_header: str | None, code: str) -> str:
+    """The join link: the host the hub was reached on (it changes with the hotspot's subnet, and
+    phone browsers cannot open canary-hub.local), with the scheme and dashboard port of
+    CANARY_PUBLIC_URL. The app calls port 8000 directly, so the request's own port is dropped."""
+    base = public_url.rstrip("/")
+    if not host_header:
+        return f"{base}/join/{code}"
+    parts = urlsplit(base)
+    host = host_header.strip()
+    if host.startswith("["):  # IPv6 literal, maybe with a port
+        host = host[: host.index("]") + 1]
+    else:
+        host = host.split(":", 1)[0]
+    port = f":{parts.port}" if parts.port else ""
+    return f"{parts.scheme}://{host}{port}/join/{code}"
+
+
 @router.post("/me/household/invites", response_model=HouseholdInviteCreated, status_code=status.HTTP_201_CREATED)
 async def create_invite(
     req: HouseholdInviteIn,
+    request: Request,
     principal: Principal = Depends(require_roles(Role.resident)),
     session: AsyncSession = Depends(get_session),
 ) -> HouseholdInviteCreated:
@@ -150,7 +170,7 @@ async def create_invite(
                        with_care_profile=req.care_profile_id is not None))
     await session.commit()
     return HouseholdInviteCreated(
-        id=invite.id, code=code, url=f"{settings.public_url.rstrip('/')}/join/{code}", app_url=f"canary://join/{code}",
+        id=invite.id, code=code, url=invite_url(settings.public_url, request.headers.get("host"), code), app_url=f"canary://join/{code}",
         unit_id=unit.id, unit_label=unit.label, care_profile_id=invite.care_profile_id, expires_ts=invite.expires_ts,
     )
 

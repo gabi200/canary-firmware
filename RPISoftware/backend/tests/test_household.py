@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, text, update
 
+from app.api.household import invite_url
 from app.db import SessionLocal
 from app.models import AuditLogEntry, CareProfile, HouseholdInvite, HouseholdInviteAttempt, ResidentUnit, User
 from tests.conftest import auth_token
@@ -54,7 +55,7 @@ async def test_create_list_revoke_store_only_the_hash(client):
     ana, ioana = await _hdr(client, "ana"), await _hdr(client, "ioana")
     invite = await _invite(client)
     assert set(invite) == CREATED_KEYS and len(invite["code"]) >= 20
-    assert invite["url"] == f"http://localhost/join/{invite['code']}"
+    assert invite["url"] == f"http://test/join/{invite['code']}"  # the host the request came in on
     assert invite["app_url"] == f"canary://join/{invite['code']}"
     expires = datetime.fromisoformat(invite["expires_ts"].replace("Z", "+00:00"))
     assert timedelta(hours=71) < expires - datetime.now(timezone.utc) <= timedelta(hours=72)
@@ -243,3 +244,10 @@ async def test_preview_and_accept_attempts_are_capped_per_user_per_hour(client):
         await s.execute(update(HouseholdInviteAttempt).values(ts=datetime.now(timezone.utc) - timedelta(hours=2)))
         await s.commit()
     assert (await client.get(f"/api/v1/household/invites/{invite['code']}", headers=dan)).status_code == 200
+
+
+def test_invite_url_uses_request_host_and_public_port():
+    assert invite_url("http://canary-hub.local", "10.247.177.188:8000", "c") == "http://10.247.177.188/join/c"
+    assert invite_url("http://10.91.13.240:8080", "10.247.177.188", "c") == "http://10.247.177.188:8080/join/c"
+    assert invite_url("http://localhost", None, "c") == "http://localhost/join/c"
+    assert invite_url("http://localhost", "[fe80::1]:8000", "c") == "http://[fe80::1]/join/c"
