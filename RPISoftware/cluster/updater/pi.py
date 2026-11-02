@@ -95,6 +95,8 @@ class PiUpdater:
             raise Refused("this Pi has local changes")
         if not gitops.on_main(self.r, repo, sha):
             raise Refused("unknown commit: fetch first")
+        if gitops.counts(self.r, repo)[1] > 0:
+            raise Refused("this Pi has commits that are not on GitHub")
         if self.cfg.triple and check_peers:
             for name in self.cfg.peers:
                 if name != self.cfg.node and (problem := health.peer_problem(self.cfg, self.r, name)):

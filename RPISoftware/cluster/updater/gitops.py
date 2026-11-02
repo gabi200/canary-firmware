@@ -51,7 +51,7 @@ def incoming(r: Runner, repo: Path, limit: int = 30) -> list[dict]:
 
 
 def fetch(r: Runner, repo: Path) -> Result:
-    return _git(r, repo, "fetch", "--quiet", "origin", "main", timeout=120)
+    return _git(r, repo, "fetch", "--quiet", "origin", "main", timeout=25)  # the dashboard waits for it
 
 
 def on_main(r: Runner, repo: Path, sha: str) -> bool:

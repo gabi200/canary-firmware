@@ -74,6 +74,7 @@ def test_git_failure_rolls_back(tmp_path, runner):
     (lambda up, pi: setattr(pi, "branch", "dev"), "not on branch main"),
     (lambda up, pi: setattr(pi, "dirty", True), "this Pi has local changes"),
     (lambda up, pi: pi.known.discard(NEW), "unknown commit: fetch first"),
+    (lambda up, pi: up.r.on(("git", "rev-list"), Result(0, "0\t2\n")), "this Pi has commits that are not on GitHub"),
 ])
 def test_preflight_refusals(tmp_path, runner, arrange, reason):
     up, pi, _ = setup(tmp_path, runner, triple=False)

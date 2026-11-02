@@ -263,6 +263,9 @@ if ! grep -q '^CANARY_MQTT_PASSWORD=' "$ENV_FILE"; then
   printf 'CANARY_MQTT_PASSWORD=%s\n' "$(rand_hex 16)" >>"$ENV_FILE"
   note "generated CANARY_MQTT_PASSWORD (broker user '$HUB_USER')"
 fi
+# Key of canary-updater (cluster/canary-updater.service), the host-side helper that updates the
+# hub from the dashboard. The same on all three Pis: it travels with the copied .env.
+add_secret CANARY_UPDATER_KEY "$(rand_hex 32)"
 
 # ---------------------------------------------------------------- 1b. three Pis
 # --cluster: what the three Pis share. Secrets are generated once and kept; the addresses and
@@ -496,5 +499,12 @@ else
 fi
 echo "Dashboard  : $web_url   (sign in as mihai, dispecer or admin)"
 echo "API docs   : ${web_url}docs"
+updater_user="${SUDO_USER:-$(id -un)}"
+if [[ $cluster -eq 1 ]]; then where="on every Pi"; else where="once"; fi
+echo "Updates    : install the updater $where (Administration -> Hub, scripts/hub_update.sh):"
+echo "   sudo cp $ROOT/cluster/canary-updater.service /etc/systemd/system/"
+echo "   sudo sed -i 's|^User=.*|User=$updater_user|' /etc/systemd/system/canary-updater.service"
+echo "   sudo sed -i 's|^WorkingDirectory=.*|WorkingDirectory=$ROOT/cluster|' /etc/systemd/system/canary-updater.service"
+echo "   sudo systemctl daemon-reload && sudo systemctl enable --now canary-updater"
 echo "Mobile app : flutter run --dart-define=CANARY_API=${web_url%/}"
 echo "Watch MQTT : RUNME.md, section 'Verify the sensors'"

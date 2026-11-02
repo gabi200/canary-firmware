@@ -1,0 +1,27 @@
+# Canary hub: canary-updater updates this Pi's checkout and containers when the dashboard asks
+# (Administration -> Hub -> Software, or scripts/hub_update.sh). Install it once on every Pi,
+# from RPISoftware (scripts/pi_setup.sh prints these lines with your user and path filled in):
+#
+#   sudo cp cluster/canary-updater.service /etc/systemd/system/
+#   sudo sed -i "s|^User=.*|User=$USER|" /etc/systemd/system/canary-updater.service
+#   sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$PWD/cluster|" /etc/systemd/system/canary-updater.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now canary-updater
+#
+# It runs as your login user (owner of the checkout, member of the docker group), on port 8010,
+# and answers only requests carrying CANARY_UPDATER_KEY from .env. Logs: journalctl -u canary-updater
+
+[Unit]
+Description=Canary hub software updater
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/canary-firmware/RPISoftware/cluster
+ExecStart=/usr/bin/python3 -m updater
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

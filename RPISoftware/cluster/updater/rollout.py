@@ -48,6 +48,8 @@ class Rollout:
                 raise Refused(f"the {name} Pi is not on branch main")
             if st.get("dirty"):
                 raise Refused(f"the {name} Pi has local changes")
+            if st.get("ahead"):
+                raise Refused(f"the {name} Pi has commits that are not on GitHub")
         self.local.preflight(sha, check_peers=True)
         order = self.order()
         self.local.update_state(rollout={"commit": sha, "order": order, "results": {n: "waiting" for n in order},
