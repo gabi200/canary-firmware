@@ -13,9 +13,10 @@ constexpr uint32_t TASK_STACK_BYTES = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 1;  // below the loop task and the network tasks
 constexpr uint8_t WIDTH = 128;
 
+// Landscape, rotated 180° (U8G2_R2) to match how the panel is mounted.
 // Full frame buffer: one 1 KB sendBuffer() per refresh. With the clock and
 // data pins given, U8g2 begins Wire on them itself.
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE,
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R2, U8X8_PIN_NONE,
                                           Hardware::DISPLAY_SCL_PIN,
                                           Hardware::DISPLAY_SDA_PIN);
 
