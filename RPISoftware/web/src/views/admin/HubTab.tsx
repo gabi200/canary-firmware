@@ -12,6 +12,7 @@ import { rich, useT } from "../../i18n";
 import { piLabel, roleLabel, runnerOf, sortNodes, sortRoles, statusLines, takenOver } from "../../lib/cluster";
 import { fmtAgo, fmtClock, fmtDateTime } from "../../lib/time";
 import { AdminUnavailable } from "./AdminUnavailable";
+import { PiSoftware, SoftwarePanel } from "./SoftwarePanel";
 
 function PiCard({ node, cluster }: { node: ClusterNode; cluster: ClusterStatus }) {
   const { t, lang } = useT();
@@ -70,6 +71,7 @@ function PiCard({ node, cluster }: { node: ClusterNode; cluster: ClusterStatus }
         <div className="hub-note small t-attention">{t("hub.clockOff", { s: node.clock_skew_s.toFixed(1) })}</div>
       )}
       {elsewhere && <div className="hub-note small t-attention">{t("hub.homeElsewhere", { pi: piLabel(elsewhere.name, t) })}</div>}
+      <PiSoftware name={node.name} />
     </article>
   );
 }
@@ -108,6 +110,7 @@ export function HubTab() {
           ))}
         </ul>
       )}
+      <SoftwarePanel />
       <div className="dev-grid">
         {sortNodes(c.nodes).map((n) => (
           <PiCard key={n.name} node={n} cluster={c} />

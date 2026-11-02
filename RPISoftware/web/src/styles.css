@@ -913,6 +913,22 @@ select.input { padding-right: 6px; }
 .hub-roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
 .hub-accel { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
 .hub-note { margin-top: 10px; font-weight: 600; }
+/* hub software updates (SoftwarePanel) */
+.sw-panel { margin-bottom: 16px; min-width: 0; overflow-wrap: anywhere; }
+.sw-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }
+.sw-head-text { min-width: 0; }
+.sw-new { margin-top: 12px; font-weight: 700; }
+.sw-commits { margin: 6px 0 4px; padding-left: 18px; }
+.sw-commits li { margin: 2px 0; }
+.sw-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.sw-rollout { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sw-steps { margin: 6px 0; padding-left: 20px; }
+.sw-step.done b { color: var(--green); }
+.sw-step.updating b { color: var(--accent); }
+.sw-step.rolled_back b, .sw-step.failed b { color: var(--red); }
+.sw-pi { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.sw-pi-line { margin: 8px 0 0; }
+.sw-log { max-height: 200px; overflow: auto; white-space: pre-wrap; font-size: 12px; background: var(--panel-2); padding: 8px; border-radius: 8px; }
 
 /* incident brief (dispatch) */
 .brief-status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted); font-size: 14px; }
