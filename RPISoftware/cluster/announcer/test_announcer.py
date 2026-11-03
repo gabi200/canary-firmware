@@ -7,7 +7,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import time  # noqa: E402
 
-from announcer import AvahiProc, Publisher, publish_commands, routable_ipv4, should_announce  # noqa: E402
+import socket  # noqa: E402
+import struct  # noqa: E402
+
+from announcer import (  # noqa: E402
+    AvahiProc,
+    Publisher,
+    a_record_answer,
+    asks_for_hub,
+    publish_commands,
+    routable_ipv4,
+    should_announce,
+)
 
 
 class FakeProc:
@@ -142,3 +153,39 @@ def test_healthy_publisher_keeps_running():
         assert proc.poll() is None
     finally:
         proc.terminate()
+
+
+def _query(name: str, qtype: int = 1, flags: int = 0, qclass: int = 1) -> bytes:
+    labels = b"".join(bytes([len(p)]) + p.encode() for p in name.split(".")) + b"\x00"
+    return struct.pack(">HHHHHH", 0, flags, 1, 0, 0, 0) + labels + struct.pack(">HH", qtype, qclass)
+
+
+def test_asks_for_hub_a_and_any_questions():
+    assert asks_for_hub(_query("canary-hub.local"))
+    assert asks_for_hub(_query("Canary-Hub.LOCAL"))
+    assert asks_for_hub(_query("canary-hub.local", qtype=255))
+    assert asks_for_hub(_query("canary-hub.local", qclass=0x8001))  # unicast-response bit
+
+
+def test_asks_for_hub_ignores_other_questions_and_answers():
+    assert not asks_for_hub(_query("canary3.local"))
+    assert not asks_for_hub(_query("canary-hub.local", qtype=28))  # AAAA
+    assert not asks_for_hub(_query("canary-hub.local", flags=0x8400))  # a response
+    assert not asks_for_hub(b"")
+    assert not asks_for_hub(b"\x00" * 12 + b"\x3f")  # truncated name
+
+
+def test_asks_for_hub_finds_the_name_after_a_compressed_question():
+    first = b"\x07_canary\x04_tcp\x05local\x00" + struct.pack(">HH", 12, 1)
+    # Second question: "canary-hub" + pointer to "local" inside the first one (offset 12 + 13).
+    second = b"\x0acanary-hub\xc0" + bytes([12 + 13]) + struct.pack(">HH", 1, 1)
+    packet = struct.pack(">HHHHHH", 0, 0, 2, 0, 0, 0) + first + second
+    assert asks_for_hub(packet)
+
+
+def test_a_record_answer_is_an_authoritative_cache_flush_a_record():
+    packet = a_record_answer("10.72.33.188")
+    assert packet[:12] == struct.pack(">HHHHHH", 0, 0x8400, 0, 1, 0, 0)
+    assert packet[12:30] == b"\x0acanary-hub\x05local\x00"
+    assert packet[30:40] == struct.pack(">HHIH", 1, 0x8001, 120, 4)
+    assert packet[40:] == socket.inet_aton("10.72.33.188")
