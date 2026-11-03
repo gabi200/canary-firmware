@@ -1,6 +1,7 @@
 #include "AirController.h"
 #include "Auth.h"
 #include "DeviceConfig.h"
+#include "ESPmDNS.h"
 #include "Hostname.h"
 #include "MqttService.h"
 #include "MqttServiceTestSupport.h"
@@ -530,7 +531,7 @@ RuntimeStatus mqttRuntimeStatus() {
 DeviceConfig mqttConfig() {
   DeviceConfig cfg = validDeviceConfig();
   cfg.mqttEnabled = true;
-  std::strcpy(cfg.mqttHost, "broker.local");
+  std::strcpy(cfg.mqttHost, "broker.lan");
   std::strcpy(cfg.mqttBaseTopic, "canary");
   return cfg;
 }
@@ -558,7 +559,7 @@ void testMqttWorkerUsesImmutableNetworkConfigSnapshot() {
   mqtt.begin();
   std::strcpy(cfg.mqttHost, "changed-after-begin");
   runFakeMqttTaskAt(0);
-  CHECK(fakeMqttHost == "broker.local");
+  CHECK(fakeMqttHost == "broker.lan");
 }
 
 void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
@@ -579,7 +580,7 @@ void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
   CHECK(fakeMqttKeepAlive == 30);
   CHECK(fakeMqttSocketTimeout == 2);
   CHECK(fakeWifiConnectionTimeoutMs == 2000);
-  CHECK(fakeMqttHost == "broker.local");
+  CHECK(fakeMqttHost == "broker.lan");
   CHECK(fakeMqttPort == 1883);
   CHECK(fakeMqttClientId == "canary-123456");
   CHECK(fakeMqttWillTopic == "canary/availability");
@@ -606,6 +607,7 @@ void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
 void testMqttReconnectBackoffMakesOneAttemptWhenDue() {
   resetFakeMqtt();
   fakeMqttConnectResult = false;
+  fakeMdnsHosts.push_back({"canary-hub", IPAddress(10, 72, 33, 188)});
   AirController controller(config());
   DeviceConfig cfg = mqttConfig();
   MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
@@ -616,6 +618,49 @@ void testMqttReconnectBackoffMakesOneAttemptWhenDue() {
   runFakeMqttTaskAt(2999);
   runFakeMqttTaskAt(3000);
   CHECK(fakeMqttConnectCalls == 3);
+}
+
+void testMqttFallsBackToTheAnnouncedHubName() {
+  // A sensor set up with the hub's old fixed address: after the hotspot moved to another
+  // subnet that address is unreachable, and the next attempt asks mDNS for canary-hub.local.
+  resetFakeMqtt();
+  fakeMqttConnectResult = false;
+  fakeMdnsHosts.push_back({"canary-hub", IPAddress(10, 72, 33, 188)});
+  AirController controller(config());
+  DeviceConfig cfg = mqttConfig();
+  std::strcpy(cfg.mqttHost, "10.91.13.240");
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  runFakeMqttTaskAt(0);
+  CHECK(fakeMqttConnectCalls == 1);
+  CHECK(fakeMqttHost == "10.91.13.240");
+  CHECK(fakeMdnsQueries.empty());
+
+  fakeMqttConnectResult = true;
+  runFakeMqttTaskAt(1000);
+  CHECK(fakeMqttConnectCalls == 2);
+  CHECK(fakeMdnsQueries.size() == 1);
+  CHECK(fakeMdnsQueries[0] == "canary-hub");
+  CHECK(fakeMqttHost == "10.72.33.188");
+  CHECK(mqtt.connected());
+}
+
+void testMqttUnresolvedMdnsNameSkipsTheConnectAndRetries() {
+  resetFakeMqtt();
+  AirController controller(config());
+  DeviceConfig cfg = mqttConfig();
+  std::strcpy(cfg.mqttHost, "canary-hub.local");
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  runFakeMqttTaskAt(0);
+  CHECK(fakeMqttConnectCalls == 0);
+  CHECK(!mqtt.connected());
+
+  fakeMdnsHosts.push_back({"canary-hub", IPAddress(10, 72, 33, 188)});
+  runFakeMqttTaskAt(1000);
+  CHECK(fakeMqttConnectCalls == 1);
+  CHECK(fakeMqttHost == "10.72.33.188");
+  CHECK(mqtt.connected());
 }
 
 void testMqttSilenceIsAppliedOnTheSafetyLoop() {
@@ -799,6 +844,8 @@ int main() {
   testMqttWorkerUsesImmutableNetworkConfigSnapshot();
   testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat();
   testMqttReconnectBackoffMakesOneAttemptWhenDue();
+  testMqttFallsBackToTheAnnouncedHubName();
+  testMqttUnresolvedMdnsNameSkipsTheConnectAndRetries();
   testMqttSilenceIsAppliedOnTheSafetyLoop();
   testMqttReportsRejectedAndUnknownCommands();
   testMqttStatusSerializationRetriesWithoutErrorFlooding();

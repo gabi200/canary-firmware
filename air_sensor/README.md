@@ -353,6 +353,12 @@ particulate sizes. Warm-up accepts 10–3600 seconds and the alarm silence
 window accepts 30–3600 seconds. The MQTT port must not be zero, and a broker
 host is required when MQTT is enabled.
 
+Use `canary-hub.local` as the broker host: the hub announces that name over mDNS from whichever
+Pi holds it. If the saved host cannot be reached (lookup fails, no TCP connection), the next
+attempt uses `canary-hub.local`, then the saved host again, alternately (`HubHost.h`). A sensor
+set up with the hub's old fixed address therefore reconnects after a firmware update alone. A
+broker that refuses the login does not switch hosts.
+
 Stored passwords and tokens are not rendered back into the portal: leave a
 secret field blank to retain its existing value. Submitted secrets are cleared
 from the WiFiManager parameter buffers before the portal can render another

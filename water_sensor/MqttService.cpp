@@ -1,6 +1,7 @@
 #include "MqttService.h"
 
 #include <Arduino.h>
+#include <ESPmDNS.h>
 
 #include <cctype>
 #include <cstdio>
@@ -15,6 +16,8 @@ constexpr uint16_t MQTT_SOCKET_TIMEOUT_SECONDS = 2;
 constexpr uint32_t STATUS_HEARTBEAT_MS = 60000;
 constexpr uint32_t STATUS_RETRY_MS = 1000;
 constexpr uint32_t RECONNECT_MAX_MS = 30000;
+// Bounds one mDNS lookup of a ".local" broker name on the network task.
+constexpr uint32_t MDNS_QUERY_TIMEOUT_MS = 1500;
 constexpr uint32_t NETWORK_TASK_STACK_BYTES = 8192;
 constexpr UBaseType_t NETWORK_TASK_PRIORITY = tskIDLE_PRIORITY + 1;
 constexpr size_t COMMAND_BYTES = 24;
@@ -84,6 +87,8 @@ MqttService::MqttService(const DeviceConfig& config, LeakController& controller,
       publishedStatusGeneration_(0),
       meshStatusGeneration_(0),
       networkConfigured_(false),
+      hubPicker_(),
+      serverAddress_{},
       meshMessage_{},
       nextStatusRetryMs_(0),
       statusDirty_(true),
@@ -289,6 +294,7 @@ void MqttService::processNetwork(uint32_t nowMs) {
 void MqttService::configureNetworkClient() {
   wifiClient_.setConnectionTimeout(MQTT_SOCKET_TIMEOUT_SECONDS * 1000UL);
   mqttClient_.setServer(networkConfig_.mqttHost, networkConfig_.mqttPort);
+  hubPicker_.reset(networkConfig_.mqttHost);
   mqttClient_.setBufferSize(MQTT_BUFFER_BYTES);
   mqttClient_.setKeepAlive(MQTT_KEEPALIVE_SECONDS);
   mqttClient_.setSocketTimeout(MQTT_SOCKET_TIMEOUT_SECONDS);
@@ -378,6 +384,20 @@ bool MqttService::queueStatusError() {
   return true;
 }
 
+bool MqttService::resolveMdnsHost(const char* host) {
+  char label[sizeof(networkConfig_.mqttHost)];
+  if (!HubHost::mdnsLabel(host, label, sizeof(label))) {
+    return false;
+  }
+  const IPAddress address = MDNS.queryHost(label, MDNS_QUERY_TIMEOUT_MS);
+  if (address == IPAddress()) {
+    return false;
+  }
+  const int written = std::snprintf(serverAddress_, sizeof(serverAddress_), "%s",
+                                    address.toString().c_str());
+  return written > 0 && static_cast<size_t>(written) < sizeof(serverAddress_);
+}
+
 bool MqttService::connect(uint32_t nowMs) {
   char sanitizedName[sizeof(networkConfig_.deviceName)];
   size_t nameLength = 0;
@@ -405,15 +425,33 @@ bool MqttService::connect(uint32_t nowMs) {
     return false;
   }
 
+  // The saved broker host, or the hub's announced name after the saved host was unreachable
+  // (HubHost.h). A ".local" name is looked up over mDNS here and connected to by address.
+  const char* host = hubPicker_.current();
+  bool resolvedOk = true;
+  if (HubHost::isMdnsName(host)) {
+    resolvedOk = resolveMdnsHost(host);
+    if (resolvedOk) {
+      mqttClient_.setServer(serverAddress_, networkConfig_.mqttPort);
+    }
+  } else {
+    mqttClient_.setServer(host, networkConfig_.mqttPort);
+  }
+
   const bool useCredentials = networkConfig_.mqttUser[0] != '\0';
-  const bool success = useCredentials
+  const bool success = resolvedOk && (useCredentials
                            ? mqttClient_.connect(clientId, networkConfig_.mqttUser,
                                                  networkConfig_.mqttPassword,
                                                  availabilityTopic_, 1, true,
                                                  "offline")
                            : mqttClient_.connect(clientId, availabilityTopic_, 1,
-                                                 true, "offline");
+                                                 true, "offline"));
   if (!success) {
+    // state() < 0: no TCP connection or timeout; > 0: the broker refused the login.
+    const int state = resolvedOk ? mqttClient_.state() : -2;
+    hubPicker_.onFailure(state < 0);
+    Serial.printf("[mqtt] connect failed: host=%s state=%d; next host=%s\n", host, state,
+                  hubPicker_.current());
     nextConnectMs_ = nowMs + reconnectDelayMs_;
     reconnectDelayMs_ = reconnectDelayMs_ < RECONNECT_MAX_MS / 2
                             ? reconnectDelayMs_ * 2

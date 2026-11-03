@@ -119,6 +119,12 @@ that is `water-sensor-setup`. Join that access point and complete the portal.
 The API token is mandatory and must be 12–64 characters. MQTT is optional; set
 MQTT enabled to `1` and provide a broker host to use it, or leave it disabled.
 
+Use `canary-hub.local` as the broker host: the hub announces that name over mDNS from whichever
+Pi holds it. If the saved host cannot be reached (lookup fails, no TCP connection), the next
+attempt uses `canary-hub.local`, then the saved host again, alternately (`HubHost.h`). A sensor
+set up with the hub's old fixed address therefore reconnects after a firmware update alone. A
+broker that refuses the login does not switch hosts.
+
 Portal fields are device name, MQTT enabled/host/port/user/password/base topic,
 API token, wet/dry thresholds, debounce milliseconds, and alarm seconds. The
 defaults are MQTT disabled, port 1883, base topic `water-sensor`, wet threshold

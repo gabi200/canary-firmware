@@ -1,5 +1,6 @@
 #include "Auth.h"
 #include "DeviceConfig.h"
+#include "ESPmDNS.h"
 #include "Hostname.h"
 #include "LeakController.h"
 #include "MqttService.h"
@@ -393,7 +394,7 @@ static RuntimeStatus mqttRuntimeStatus() {
 static DeviceConfig mqttConfig() {
   DeviceConfig cfg = validDeviceConfig();
   cfg.mqttEnabled = true;
-  std::strcpy(cfg.mqttHost, "broker.local");
+  std::strcpy(cfg.mqttHost, "broker.lan");
   std::strcpy(cfg.mqttBaseTopic, "water-sensor");
   return cfg;
 }
@@ -423,7 +424,7 @@ static void testMqttWorkerUsesImmutableNetworkConfigSnapshot() {
   mqtt.begin();
   std::strcpy(cfg.mqttHost, "changed-after-begin");
   runFakeMqttTaskAt(0);
-  CHECK(fakeMqttHost == "broker.local");
+  CHECK(fakeMqttHost == "broker.lan");
 }
 
 static void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
@@ -447,7 +448,7 @@ static void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
   CHECK(fakeMqttKeepAlive == 30);
   CHECK(fakeMqttSocketTimeout == 2);
   CHECK(fakeWifiConnectionTimeoutMs == 2000);
-  CHECK(fakeMqttHost == "broker.local");
+  CHECK(fakeMqttHost == "broker.lan");
   CHECK(fakeMqttPort == 1883);
   CHECK(fakeMqttClientId == "water-sensor-123456");
   CHECK(fakeMqttWillTopic == "water-sensor/availability");
@@ -476,6 +477,7 @@ static void testMqttReconnectBackoffMakesOneAttemptWhenDue() {
   // make this test fail.
   resetFakeMqtt();
   fakeMqttConnectResult = false;
+  fakeMdnsHosts.push_back({"canary-hub", IPAddress(10, 72, 33, 188)});
   LeakController controller(config());
   ConfigStore store;
   DeviceConfig cfg = mqttConfig();
@@ -487,6 +489,32 @@ static void testMqttReconnectBackoffMakesOneAttemptWhenDue() {
   runFakeMqttTaskAt(2999);
   runFakeMqttTaskAt(3000);
   CHECK(fakeMqttConnectCalls == 3);
+}
+
+static void testMqttFallsBackToTheAnnouncedHubName() {
+  // Saved with the hub's old fixed address, unreachable after the hotspot moved to another
+  // subnet: the next attempt asks mDNS for canary-hub.local and connects there.
+  resetFakeMqtt();
+  fakeMqttConnectResult = false;
+  fakeMdnsHosts.push_back({"canary-hub", IPAddress(10, 72, 33, 188)});
+  LeakController controller(config());
+  ConfigStore store;
+  DeviceConfig cfg = mqttConfig();
+  std::strcpy(cfg.mqttHost, "10.91.13.240");
+  MqttService mqtt(cfg, controller, store, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  runFakeMqttTaskAt(0);
+  CHECK(fakeMqttConnectCalls == 1);
+  CHECK(fakeMqttHost == "10.91.13.240");
+  CHECK(fakeMdnsQueries.empty());
+
+  fakeMqttConnectResult = true;
+  runFakeMqttTaskAt(1000);
+  CHECK(fakeMqttConnectCalls == 2);
+  CHECK(fakeMdnsQueries.size() == 1);
+  CHECK(fakeMdnsQueries[0] == "canary-hub");
+  CHECK(fakeMqttHost == "10.72.33.188");
+  CHECK(mqtt.connected());
 }
 
 static void testMqttValveCommandPersistsImmediatelyAndRejectsWetOpen() {
@@ -678,6 +706,7 @@ int main() {
   testMqttWorkerUsesImmutableNetworkConfigSnapshot();
   testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat();
   testMqttReconnectBackoffMakesOneAttemptWhenDue();
+  testMqttFallsBackToTheAnnouncedHubName();
   testMqttValveCommandPersistsImmediatelyAndRejectsWetOpen();
   testMqttStatusSerializationRetriesWithoutErrorFlooding();
   testMqttPersistenceFailureKeepsMainLoopRetryState();

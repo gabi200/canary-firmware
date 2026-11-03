@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ConfigStore.h"
+#include "HubHost.h"
 #include "MeshLink.h"
 #include "StatusJson.h"
 
@@ -44,6 +45,7 @@ class MqttService {
   bool queueCommandResult(const char* command, bool accepted, const char* detail);
   bool queueStatusError();
   bool connect(uint32_t nowMs);
+  bool resolveMdnsHost(const char* host);
   void publishPendingResult();
   void publishPendingStatusError();
   void publishStatus(uint32_t nowMs);
@@ -79,6 +81,9 @@ class MqttService {
   uint32_t publishedStatusGeneration_;
   uint32_t meshStatusGeneration_;
   bool networkConfigured_;
+  HubHost::Picker hubPicker_;
+  // Dotted address of a resolved ".local" broker; PubSubClient keeps this pointer.
+  char serverAddress_[16];
   MeshMessage meshMessage_;
 
   // Main-loop-owned state.

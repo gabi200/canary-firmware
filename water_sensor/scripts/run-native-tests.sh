@@ -29,8 +29,8 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -I"$repo_dir" \
   -o "$mesh_binary_path"
 "$mesh_binary_path"
 
-# Water and air nodes relay each other's frames: the mesh code must match.
-for file in MeshFrame.h MeshLink.h MeshLink.cpp; do
+# Water and air nodes relay each other's frames and find the hub the same way: these must match.
+for file in MeshFrame.h MeshLink.h MeshLink.cpp HubHost.h; do
   if ! cmp -s "$repo_dir/$file" "$repo_dir/../air_sensor/$file"; then
     echo "$file differs from ../air_sensor/$file" >&2
     exit 1

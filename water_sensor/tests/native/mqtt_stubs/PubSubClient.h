@@ -44,6 +44,7 @@ class PubSubClient {
   bool connect(const char* clientId, const char* willTopic, uint8_t willQos,
                bool willRetained, const char* willMessage);
   bool connected() const;
+  int state() const { return connected() ? 0 : -2; }
   bool publish(const char* topic, const char* payload, bool retained = false);
   bool publish(const char* topic, const uint8_t* payload, unsigned int length,
                bool retained);

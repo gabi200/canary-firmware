@@ -1,6 +1,7 @@
 #include "MqttServiceTestSupport.h"
 
 #include "Arduino.h"
+#include "ESPmDNS.h"
 #include "ConfigStore.h"
 #include "MeshLink.h"
 #include "PubSubClient.h"
@@ -21,6 +22,19 @@ bool fakeStatusSerializationResult = true;
 const char* fakeStatusJson = "{\"safe\":true}";
 
 bool fakeMqttConnectResult = true;
+std::vector<FakeMdnsHost> fakeMdnsHosts;
+std::vector<std::string> fakeMdnsQueries;
+MDNSResponder MDNS;
+
+IPAddress MDNSResponder::queryHost(const char* host, uint32_t) {
+  fakeMdnsQueries.emplace_back(host);
+  for (const FakeMdnsHost& entry : fakeMdnsHosts) {
+    if (entry.label == host) {
+      return entry.address;
+    }
+  }
+  return IPAddress();
+}
 int fakeMqttConnectCalls = 0;
 int fakeMqttLoopCalls = 0;
 int fakeMqttBufferSize = 0;
@@ -81,6 +95,8 @@ void resetFakeMqtt() {
   fakeMeshInbox.clear();
   fakeMeshForwards = 0;
   fakeMqttConnectResult = true;
+  fakeMdnsHosts.clear();
+  fakeMdnsQueries.clear();
   fakeMqttConnectCalls = 0;
   fakeMqttLoopCalls = 0;
   fakeMqttBufferSize = 0;

@@ -16,6 +16,12 @@ g++ "${common_flags[@]}" -I"$repo_dir/tests/native/stubs" \
   -o "$safety_binary"
 "$safety_binary"
 
+hub_host_binary="$out_dir/canary-hub-host-tests"
+g++ "${common_flags[@]}" \
+  "$repo_dir/tests/native/hub_host_test.cpp" \
+  -o "$hub_host_binary"
+"$hub_host_binary"
+
 readers_binary="$out_dir/canary-reader-frame-tests"
 g++ "${common_flags[@]}" \
   "$repo_dir/Ze03Reader.cpp" \
