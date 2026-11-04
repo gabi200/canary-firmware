@@ -19,6 +19,7 @@ os.environ["CANARY_CARE_KEY"] = "dGVzdC1vbmx5LWNhcmUta2V5LTMyLWJ5dGVzLWxvbmc="  
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
+from app import demo_bridge  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -53,6 +54,7 @@ async def client() -> AsyncClient:
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
+    await demo_bridge.drain()
     await engine.dispose()
     _remove_db_files()
 
