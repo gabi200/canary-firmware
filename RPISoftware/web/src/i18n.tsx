@@ -45,6 +45,13 @@ const en = {
   "nav.dispatch": "Dispatch",
   "nav.sensors": "Sensors",
   "topbar.live": "Live",
+  "mode.badge": "DEMO",
+  "mode.label": "Hub mode",
+  "mode.demo": "Demo",
+  "mode.real": "Real",
+  "mode.failed": "Could not switch the mode.",
+  "mode.realAlarm": "Real alarm in Canary Live",
+  "mode.switchToReal": "Switch to Real",
   "topbar.reconnecting": "Reconnecting…",
   "topbar.signOut": "Sign out",
 
@@ -55,7 +62,6 @@ const en = {
 
   "login.tagline": "Operations console — managers & emergency services",
   "login.username": "Username",
-  "login.buildingId": "Building ID",
   "login.demoAccounts": "Demo accounts",
   "login.signingIn": "Signing in…",
   "login.signIn": "Sign in",
@@ -1215,6 +1221,13 @@ const ro: Record<MsgKey, string> = {
   "nav.dispatch": "Dispecerat",
   "nav.sensors": "Senzori",
   "topbar.live": "Live",
+  "mode.badge": "DEMO",
+  "mode.label": "Mod hub",
+  "mode.demo": "Demo",
+  "mode.real": "Real",
+  "mode.failed": "Nu s-a putut schimba modul.",
+  "mode.realAlarm": "Alarmă reală în Canary Live",
+  "mode.switchToReal": "Treci pe Real",
   "topbar.reconnecting": "Se reconectează…",
   "topbar.signOut": "Deconectare",
 
@@ -1225,7 +1238,6 @@ const ro: Record<MsgKey, string> = {
 
   "login.tagline": "Consolă operațională — administratori și servicii de urgență",
   "login.username": "Utilizator",
-  "login.buildingId": "ID clădire",
   "login.demoAccounts": "Conturi demo",
   "login.signingIn": "Se autentifică…",
   "login.signIn": "Autentificare",

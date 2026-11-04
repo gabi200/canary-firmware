@@ -11,10 +11,10 @@ class Config {
   /// WebSocket base for a REST base: http://x:8000 -> ws://x:8000.
   static String wsBaseFor(String apiBase) => apiBase.replaceFirst(RegExp(r'^http'), 'ws');
 
-  /// Default building for the MVP (matches the seeded bld_007).
+  /// Building to sign in on until the hub's mode says which one is shown.
   static const String defaultBuildingId = String.fromEnvironment(
     'CANARY_BUILDING',
-    defaultValue: 'bld_007',
+    defaultValue: 'bld_live',
   );
 
   /// Remote push via FCM. Off by default so the app runs without Firebase config.

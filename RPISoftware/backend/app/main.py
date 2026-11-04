@@ -28,6 +28,7 @@ from app.api.device_commands import router as commands_router
 from app.api.firmware import router as firmware_router
 from app.api.household import router as household_router
 from app.api.motion import router as motion_router
+from app.api.mode import router as mode_router
 from app.api.zone_normal import router as zone_normal_router
 from app.api.water_impact import router as water_impact_router
 from app.api.scenario import router as scenario_router
@@ -122,9 +123,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if settings.auto_create_schema:
             await init_db()
         if settings.auto_seed:
-            from app.seed import seed_if_empty
+            from app.db import SessionLocal
+            from app.seed import ensure_live_building, seed_if_empty
 
             await seed_if_empty()
+            async with SessionLocal() as session:
+                await ensure_live_building(session)  # hubs seeded before Canary Live existed
 
     from app.notify import escalation
 
@@ -183,6 +187,7 @@ app.include_router(zone_normal_router)
 app.include_router(water_impact_router)
 app.include_router(scenario_router)
 app.include_router(software_router)
+app.include_router(mode_router)
 
 
 @app.exception_handler(CareUnavailable)

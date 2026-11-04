@@ -24,7 +24,7 @@ import { SignalBadge } from "../components/SignalBadge";
 import { SignatureBadge } from "../components/SignatureBadge";
 import { StatusPill } from "../components/StatusPill";
 import { ApartmentTrendChart } from "../components/TrendChart";
-import { config } from "../config";
+import { useAuth } from "../auth/AuthContext";
 import { useT } from "../i18n";
 import { buildZoneNames, hazardLabel, zoneLabel } from "../lib/labels";
 
@@ -43,6 +43,9 @@ export function ManagerView() {
   const active = (incidents.data ?? []).filter((i) => !CLOSED.has(i.state));
   const primary = active[0] ?? null;
 
+  const { buildingId, hubMode } = useAuth();
+  // the gas-leak simulator belongs to Demo only: Real never gets simulated readings
+  const demo = hubMode?.mode === "demo";
   const residents = useResidents();
   const roster = useRoster(primary?.id ?? null);
   const zoneNames = buildZoneNames(zones.data);
@@ -57,7 +60,7 @@ export function ManagerView() {
       device_id: "dev_gas_kitchen",
       sensor_type: "combustible_gas",
       location: {
-        building_id: config.defaultBuildingId,
+        building_id: buildingId,
         floor_id: "flr_03",
         unit_id: "unit_0312",
         zone_id: "zone_kitchen",
@@ -170,6 +173,7 @@ export function ManagerView() {
         </div>
       </div>
 
+      {demo && (
       <Card title={t("manager.demo")} className="">
         <div className="row">
           <div className="grow muted small">{t("manager.demoText")}</div>
@@ -178,6 +182,7 @@ export function ManagerView() {
           </button>
         </div>
       </Card>
+      )}
     </>
   );
 }

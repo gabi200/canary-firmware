@@ -411,3 +411,30 @@ class HwSimUnchanged(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DemoSimulator(unittest.TestCase):
+    def test_base_prefix_applied(self):
+        cfg = bs.parse_config(config(room(zone_id="zone_kitchen"), room(zone_id="zone_bath", nodes=["air"], air_base="x")))
+        bs.apply_base_prefix(cfg.rooms, "demo-")
+        self.assertEqual(cfg.rooms[0].bases, {"air": "demo-air-kitchen", "water": "demo-water-kitchen"})
+        self.assertEqual(cfg.rooms[1].bases, {"air": "demo-x"})
+
+    def test_base_prefix_default_is_empty_and_env(self):
+        self.assertEqual(sim_args().base_prefix, "")
+        with mock.patch.dict(os.environ, {"BASE_PREFIX": "demo-"}):
+            self.assertEqual(sim_args().base_prefix, "demo-")
+
+    def test_base_prefix_too_long_is_an_error(self):
+        cfg = bs.parse_config(config(room(air_base="a" * 62)))
+        with self.assertRaises(bs.ConfigError):
+            bs.apply_base_prefix(cfg.rooms, "demo-")
+
+    def test_no_console_flag(self):
+        self.assertFalse(sim_args().no_console)
+        self.assertTrue(sim_args(argv=["--no-console"]).no_console)
+
+    def test_demo_config_is_all_normal(self):
+        cfg = bs.load_config(str(HERE / "rooms.demo.json"))
+        self.assertTrue(cfg.rooms)
+        self.assertEqual({r.scenario for r in cfg.rooms}, {"normal"})

@@ -1,5 +1,39 @@
 # Canary AI feature demo
 
+## Demo and Real mode
+
+The hub is in one mode at a time. Flip it with the **Demo / Real** switch in the dashboard's top
+bar (`mihai` or `admin` only; everyone else sees the mode but cannot change it). Dashboard and
+phones follow within 5 s. A fresh hub starts in **Real**.
+
+| | Real | Demo |
+|---|---|---|
+| Building | `bld_live` "Canary Live" (room "Presentation") | `bld_007` "Demo" |
+| Sensors | the real ESP32 nodes | `demo-*` nodes from the `demo-sim` service |
+| "Simulate gas leak" | hidden | shown |
+| What-If tab | hidden | shown |
+
+Before presenting:
+- On **one** Pi, `.env` has `COMPOSE_PROFILES=cluster,demo` (starts `demo-sim`). Check that Demo
+  shows live readings and no incident.
+- Phones need a rebuilt app to follow the mode. It has not been compiled yet: run
+  `cd mobile && flutter pub get && flutter test && flutter analyze` first.
+- Every section below that uses `mihai` and the kitchen, `bld_007` or "Simulate gas leak" needs
+  **Demo** mode. Real mode shows only the real sensors.
+
+**Simulate gas leak (Demo only).** It opens a simulated incident. Once it starts alarming, the hub
+also sends a buzzer TEST to the online real air sensors and a valve CLOSE to the online real water
+sensors in Canary Live, and phones get the notification. This happens only while the hub is in Demo.
+- The real valve **stays closed** until someone sends OPEN from the dashboard. Do this after the demo.
+- Commands to one node are limited to one per 3 s: a mirrored command can skip a node commanded in
+  the previous 3 s, and an OPEN or SILENCE right after the mirror can be refused. Retry.
+
+**Real alarms always go off.** If a real sensor alarms while the hub is in Demo, the screens show a
+"Real alarm in Canary Live" banner (phones too, with a notification). The dashboard banner offers
+**Switch to Real** to `mihai` / `admin`.
+
+Real sensors that stop reporting stay visible, marked *lost*.
+
 ## F3a: fusion explanation
 
 1. Start the existing Canary stack, sign in to the web dashboard as `mihai`, and open **Dispatch**.
@@ -47,7 +81,7 @@ Log in to the dashboard as `mihai` (manager).
 5. **Unplug a board.** Pull its power. The broker publishes its Last Will, or the board falls silent
    for 60 s. The room shows *Unavailable* (dashed grey chip), never green.
 6. **Rooms with no board** show *No presence sensor* in the card and no chip on the plan.
-7. **Alarm unaffected.** Press "Simulate gas leak" with a board showing *No recent motion* in the
+7. **Alarm unaffected.** In Demo, press "Simulate gas leak" with a board showing *No recent motion* in the
    kitchen: the incident still goes straight to evacuation.
 
 Not shown to dispatchers or residents (the endpoint answers 403; the card and chips are hidden).

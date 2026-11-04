@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config.dart';
 import '../i18n.dart';
 import '../state/providers.dart';
 import 'widgets/language_toggle.dart';
@@ -15,7 +14,6 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _username = TextEditingController(text: 'ana');
-  final _building = TextEditingController(text: Config.defaultBuildingId);
   bool _busy = false;
 
   /// Why the last login failed, or null. Kept as the error (not text) so the
@@ -25,7 +23,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   void dispose() {
     _username.dispose();
-    _building.dispose();
     super.dispose();
   }
 
@@ -35,7 +32,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _error = null;
     });
     try {
-      await ref.read(sessionProvider.notifier).login(_username.text.trim(), _building.text.trim());
+      await ref.read(sessionProvider.notifier).login(_username.text.trim());
     } catch (e) {
       setState(() => _error = e);
     } finally {
@@ -78,10 +75,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     decoration: InputDecoration(labelText: l10n.username, border: const OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _building,
-                    decoration: InputDecoration(labelText: l10n.buildingId, border: const OutlineInputBorder()),
-                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,

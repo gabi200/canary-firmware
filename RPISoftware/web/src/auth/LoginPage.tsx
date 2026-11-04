@@ -12,7 +12,6 @@ export function LoginPage() {
   const { t } = useT();
   const navigate = useNavigate();
   const [username, setUsername] = useState("mihai");
-  const [buildingId, setBuildingId] = useState(config.defaultBuildingId);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -21,7 +20,7 @@ export function LoginPage() {
     setBusy(true);
     setErr(null);
     try {
-      await login(username.trim(), buildingId.trim());
+      await login(username.trim());
       navigate("/");
     } catch (e) {
       setErr((e as Error).message);
@@ -47,10 +46,6 @@ export function LoginPage() {
             <div className="field">
               <label htmlFor="login-username">{t("login.username")}</label>
               <input id="login-username" value={username} onChange={(e) => setUsername(e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="login-building">{t("login.buildingId")}</label>
-              <input id="login-building" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} />
             </div>
             <div className="btn-row" style={{ marginBottom: 12 }} role="group" aria-label={t("login.demoAccounts")}>
               {["mihai", "dispecer", "tehnician", "admin"].map((u) => (

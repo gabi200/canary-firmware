@@ -15,7 +15,7 @@ export const config = {
     }
     return this.apiBase.replace(/^http/, "ws");
   },
-  defaultBuildingId: "bld_007",
+  defaultBuildingId: "bld_live",
   /** Incident states that put the building into an alarming posture. */
   alarmingStates: new Set(["alarm", "escalation", "evacuation"]),
 };

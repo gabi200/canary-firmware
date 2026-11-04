@@ -17,6 +17,7 @@ import 'room_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/care_hint_card.dart';
 import 'widgets/home_banner.dart';
+import 'widgets/mode_strip.dart';
 import 'widgets/room_tiles.dart';
 import 'widgets/safety_sign.dart';
 import 'widgets/status_pill.dart';
@@ -86,6 +87,7 @@ class HomeScreen extends ConsumerWidget {
         // The resident's home ("Ap. 12 · Etaj 3"), the picked one with several.
         title: Text(home.unit(scope.unit?.id)?.title ?? home.title ?? l10n.appTitle),
         actions: [
+          const DemoChip(),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: l10n.settings,
@@ -109,6 +111,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               sliver: SliverList.list(
                 children: [
+                  const RealAlarmBanner(),
                   HomeStatusBanner(
                     status: status,
                     where: status.incident == null ? null : whereOf(status.incident!),

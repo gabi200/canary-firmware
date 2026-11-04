@@ -122,6 +122,18 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// Chip shown while the hub is in demo mode.
+  ///
+  /// In en, this message translates to:
+  /// **'DEMO'**
+  String get modeBadge;
+
+  /// Banner: an incident is open in the real building while the hub shows the demo.
+  ///
+  /// In en, this message translates to:
+  /// **'Real alarm in Canary Live'**
+  String get modeRealAlarm;
+
   /// Connection indicator: the live WebSocket feed is up.
   ///
   /// In en, this message translates to:

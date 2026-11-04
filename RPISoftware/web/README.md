@@ -83,8 +83,8 @@ npm run dev               # http://localhost:5173, talks to http://localhost:800
 echo "VITE_API_BASE=http://192.168.1.20:8000" > .env
 ```
 
-Sign in as **`mihai`** (manager) or **`dispecer`** (dispatcher); building **`bld_007`**.
-Trigger a hazard from the Manager view's "Simulate gas leak" button, or (from `RPISoftware/`):
+Sign in as **`mihai`** (manager) or **`dispecer`** (dispatcher). Switch the top bar to **Demo** for building `bld_007`.
+Trigger a hazard from the Manager view's "Simulate gas leak" button (Demo only), or (from `RPISoftware/`):
 
 ```bash
 docker compose --profile sim run --rm simulator --scenario gas_leak   # legacy demo sensors

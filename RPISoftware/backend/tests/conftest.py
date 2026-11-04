@@ -11,12 +11,15 @@ os.environ.setdefault("CANARY_DATABASE_URL", "sqlite+aiosqlite:///./test_canary.
 os.environ["CANARY_MQTT_ENABLED"] = "false"
 os.environ["CANARY_AUTO_CREATE_SCHEMA"] = "false"
 os.environ["CANARY_AUTO_SEED"] = "false"
+os.environ.setdefault("CANARY_DEFAULT_BUILDING_ID", "bld_007")  # hardware tests land here
+os.environ.setdefault("CANARY_DEFAULT_ZONE_ID", "zone_hallway")
 os.environ["CANARY_JWT_SECRET"] = "test-secret"
 os.environ["CANARY_CARE_KEY"] = "dGVzdC1vbmx5LWNhcmUta2V5LTMyLWJ5dGVzLWxvbmc="  # Fernet test key
 
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
+from app import demo_bridge  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -51,6 +54,7 @@ async def client() -> AsyncClient:
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
+    await demo_bridge.drain()
     await engine.dispose()
     _remove_db_files()
 

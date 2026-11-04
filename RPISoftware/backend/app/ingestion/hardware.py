@@ -389,8 +389,8 @@ async def _handle_availability(base: str, raw: bytes, retain: bool, now: datetim
 # Helpers
 # --------------------------------------------------------------------------- #
 async def _register(session: AsyncSession, base: str, kind: NodeKind, doc: dict, now: datetime) -> Node | None:
-    """Create the node + its channel Device rows in the default building/zone."""
-    zone = await _landing_zone(session)
+    """Create the node + its channel Device rows in the building its base prefix selects."""
+    zone = await _landing_zone(session, base)
     if zone is None:
         log.warning("cannot register node %r: building %r has no zone (CANARY_DEFAULT_BUILDING_ID/_ZONE_ID)",
                     base, settings.default_building_id)
@@ -417,7 +417,8 @@ async def _register(session: AsyncSession, base: str, kind: NodeKind, doc: dict,
         created_ts=now,
     )
     session.add(node)
-    session.add(NodeInbox(node_id=node_id, ts=now))  # waits for a technician to place it
+    if not _is_demo_base(base):  # demo nodes are placed by building_sim, not a technician
+        session.add(NodeInbox(node_id=node_id, ts=now))
     for channel, sensor_type in NODE_CHANNELS[kind]:
         await session.merge(_channel_device(node, channel, sensor_type, zone, now))
     log.info("registered %s node %s (base %r) in %s/%s", kind.value, node_id, base, zone.building_id, zone.id)
@@ -448,14 +449,21 @@ async def _add_missing_devices(session: AsyncSession, node: Node, kind: NodeKind
             session.add(_channel_device(node, channel, sensor_type, zone, now))
 
 
-async def _landing_zone(session: AsyncSession) -> Zone | None:
-    """The configured default zone, else the default building's first zone."""
-    zone = await session.get(Zone, settings.default_zone_id)
-    if zone is not None and zone.building_id == settings.default_building_id:
+def _is_demo_base(base: str) -> bool:
+    return base.startswith(settings.demo_base_prefix)
+
+
+async def _landing_zone(session: AsyncSession, base: str) -> Zone | None:
+    """Demo-prefixed bases land in the Demo building (hallway zone if present); every other
+    base in the configured default zone, else the default building's first zone."""
+    if _is_demo_base(base):
+        building_id, zone_id = settings.demo_building_id, "zone_hallway"
+    else:
+        building_id, zone_id = settings.default_building_id, settings.default_zone_id
+    zone = await session.get(Zone, zone_id)
+    if zone is not None and zone.building_id == building_id:
         return zone
-    return await session.scalar(
-        select(Zone).where(Zone.building_id == settings.default_building_id).order_by(Zone.id).limit(1)
-    )
+    return await session.scalar(select(Zone).where(Zone.building_id == building_id).order_by(Zone.id).limit(1))
 
 
 def _device_liveness(node: Node):

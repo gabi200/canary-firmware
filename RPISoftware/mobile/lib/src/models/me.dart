@@ -11,6 +11,7 @@ class MeProfile {
     this.phone,
     this.email,
     this.units = const [],
+    this.otherUnitIds = const {},
   });
 
   final String userId;
@@ -20,6 +21,23 @@ class MeProfile {
   final String? phone;
   final String? email;
   final List<MeUnit> units;
+
+  /// Units of other buildings, set by [forBuilding]: not "my home" here, and
+  /// what care profiles and the household list are filtered against.
+  final Set<String> otherUnitIds;
+
+  /// Only the units of [buildingId] (a unit with no building, from an older
+  /// hub, stays). The hub lists a resident's units in every building.
+  MeProfile forBuilding(String buildingId) => MeProfile(
+        userId: userId,
+        username: username,
+        role: role,
+        displayName: displayName,
+        phone: phone,
+        email: email,
+        units: [for (final u in units) if (u.buildingId == null || u.buildingId == buildingId) u],
+        otherUnitIds: {for (final u in units) if (u.buildingId != null && u.buildingId != buildingId) u.unitId},
+      );
 
   /// The caller's own homes (care profiles attach to these).
   List<UnitRef> get residentialUnits => [

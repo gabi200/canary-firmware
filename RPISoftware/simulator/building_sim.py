@@ -262,6 +262,18 @@ def parse_config(data: object) -> Config:
     return Config(building_id, rooms, units)
 
 
+def apply_base_prefix(rooms: list[Room], prefix: str) -> None:
+    """Prepend prefix to every base, so the hub, the pre-flight and the nodes all use the same names."""
+    if not prefix:
+        return
+    for room in rooms:
+        for node, base in room.bases.items():
+            try:
+                room.bases[node] = hw_sim.valid_base(prefix + base)
+            except argparse.ArgumentTypeError as exc:
+                raise ConfigError(f"room {room.zone_id}: {node} base {prefix + base!r}: {exc}") from None
+
+
 def load_config(path: str) -> Config:
     file = Path(path)
     if not file.is_absolute() and not file.exists() and (Path(__file__).parent / file).exists():
@@ -836,6 +848,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--scenario", action="append", default=[], metavar="ROOM=SCENARIO",
                    help="override a room's scenario, e.g. kitchen=gas or bucatarie=gaz; all=SCENARIO "
                         "or a bare SCENARIO for every room (repeatable)")
+    p.add_argument("--base-prefix", default=os.environ.get("BASE_PREFIX", ""), metavar="PREFIX",
+                   help="prepended to every node base topic, e.g. demo- (env BASE_PREFIX; default none)")
+    p.add_argument("--no-console", action="store_true",
+                   help="do not read stdin; run until SIGTERM, Ctrl-C or --duration")
     p.add_argument("--only", default="", metavar="ROOM,ROOM", help="simulate only these rooms")
     p.add_argument("--hub", default=os.environ.get("HUB_URL") or "http://localhost:8000",
                    help="hub REST API (env HUB_URL, default http://localhost:8000)")
@@ -877,6 +893,7 @@ def main(argv: list[str] | None = None) -> int:
         overrides = parse_overrides(args.scenario, rooms)
         for room in rooms:
             room.scenario = overrides.get(room.zone_id, room.scenario)
+        apply_base_prefix(rooms, args.base_prefix)
     except ConfigError as exc:
         print(f"building_sim: {exc}", file=sys.stderr)
         return 2
@@ -918,8 +935,11 @@ def main(argv: list[str] | None = None) -> int:
             threading.Thread(target=place_nodes, args=(hub, cfg.building_id, rooms, building.stop_event),
                              daemon=True).start()
         print(building.listing(), flush=True)
-        log("building", "running; type e.g. 'bucatarie gaz', 'toate normal', 'list', 'help' or 'quit'")
-        threading.Thread(target=read_console, args=(building,), daemon=True).start()
+        if args.no_console:
+            log("building", "running; no console (stop with SIGTERM)")
+        else:
+            log("building", "running; type e.g. 'bucatarie gaz', 'toate normal', 'list', 'help' or 'quit'")
+            threading.Thread(target=read_console, args=(building,), daemon=True).start()
         building.run(args.duration)
     except ConnectError as exc:
         log("building", f"error: {exc}")

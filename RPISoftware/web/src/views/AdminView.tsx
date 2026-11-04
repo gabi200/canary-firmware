@@ -28,8 +28,11 @@ const TABS: { id: string; label: MsgKey }[] = [
 
 export function AdminView() {
   const { t } = useT();
-  const { buildingId, session } = useAuth();
-  const tabs = session?.role === "technician" ? TABS.filter((x) => x.id !== "accounts") : TABS;
+  const { buildingId, session, hubMode } = useAuth();
+  // the what-if runs on a simulated graph: no simulated data in Real mode
+  const tabs = TABS.filter(
+    (x) => (x.id !== "whatif" || hubMode?.mode === "demo") && (x.id !== "accounts" || session?.role !== "technician"),
+  );
   const tab = useParams()["*"]?.split("/")[0] ?? "";
   if (!tabs.some((x) => x.id === tab)) return <Navigate to={`/admin/${tabs[0].id}`} replace />;
 

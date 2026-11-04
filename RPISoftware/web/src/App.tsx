@@ -3,7 +3,9 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { JoinPage } from "./auth/JoinPage";
 import { LoginPage } from "./auth/LoginPage";
+import { useT } from "./i18n";
 import { RequireAuth } from "./auth/RequireAuth";
+import { RealAlarmBanner } from "./components/RealAlarmBanner";
 import { Topbar } from "./components/Topbar";
 import { useIncidentSocket } from "./realtime/useIncidentSocket";
 import { AdminView } from "./views/AdminView";
@@ -12,13 +14,18 @@ import { ManagerView } from "./views/ManagerView";
 import { SensorsView } from "./views/SensorsView";
 
 function AuthedLayout() {
-  const { session, token, buildingId } = useAuth();
-  // Hook is always called (stable order); it no-ops until a token exists.
-  const { connected } = useIncidentSocket(buildingId, token);
+  const { session, token, buildingId, modeReady } = useAuth();
+  const { t } = useT();
+  // Hook is always called (stable order); it no-ops until a token exists, and waits for the
+  // first mode answer so the socket does not open on the wrong building first.
+  const { connected } = useIncidentSocket(buildingId, modeReady ? token : null);
   if (!session) return <Navigate to="/login" replace />;
+  // no screen renders before the mode is known: Real data must not flash during Demo
+  if (!modeReady) return <div className="muted" style={{ padding: 24 }}>{t("common.loading")}</div>;
   return (
     <div className="app">
       <Topbar connected={connected} />
+      <RealAlarmBanner />
       <Outlet />
     </div>
   );

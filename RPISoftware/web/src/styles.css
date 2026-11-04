@@ -986,3 +986,7 @@ select.input { padding-right: 6px; }
   .fw-targets label { grid-template-columns: 20px minmax(0, 1fr); }
   .fw-targets label > :nth-child(n + 3) { grid-column: 2; }
 }
+
+/* hub mode switch and real-alarm banner */
+.mode-switch { display: inline-flex; gap: 4px; }
+.real-alarm-banner { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: rgba(248,81,73,0.18); border-bottom: 2px solid var(--red); color: var(--text); }

@@ -30,7 +30,9 @@ async def test_get_me_for_a_resident_and_for_staff(client):
         "user_id": "usr_ana", "username": "ana", "display_name": "Ana Popescu", "role": "resident",
         "phone": "+40700000001", "email": "", "language": "ro",
         "units": [{"unit_id": "unit_0312", "unit_label": "Ap. 12", "building_id": "bld_007", "floor_label": "Etaj 3",
-                   "kind": "residential"}],
+                   "kind": "residential"},
+                  {"unit_id": "unit_live", "unit_label": "Live", "building_id": "bld_live", "floor_label": "Parter",
+                   "kind": "common"}],
     }
     staff = (await client.get(ME, headers=await _hdr(client, "mihai"))).json()
     assert set(staff) == ME_KEYS and (staff["role"], staff["units"]) == ("hoa_manager", [])

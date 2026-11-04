@@ -17,15 +17,24 @@ class CareProfilesController extends AsyncNotifier<List<CareProfile>> {
   Future<List<CareProfile>> build() async {
     final session = ref.watch(sessionProvider);
     if (session == null || !session.isResident) return const [];
-    return ref.watch(apiClientProvider).careProfiles();
+    final api = ref.watch(apiClientProvider);
+    final other = await otherBuildingUnitIds(ref);
+    return _inThisBuilding(await api.careProfiles(), other);
   }
+
+  /// Profiles on a home of another building belong to the other mode's screens.
+  List<CareProfile> _inThisBuilding(List<CareProfile> all, Set<String> other) =>
+      [for (final p in all) if (!other.contains(p.unitId)) p];
 
   ApiClient get _api => ref.read(apiClientProvider);
 
   /// Refetch, keeping the current list on screen meanwhile.
   Future<void> refresh() async {
     state = const AsyncLoading<List<CareProfile>>().copyWithPrevious(state);
-    state = await AsyncValue.guard(_api.careProfiles);
+    state = await AsyncValue.guard(() async {
+      final other = (await ref.read(meProvider.future))?.otherUnitIds ?? const <String>{};
+      return _inThisBuilding(await _api.careProfiles(), other);
+    });
   }
 
   /// Create ([id] null) or update; throws [ApiException] (422 / 404 / 409 / 503).

@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import demo_bridge
 from app.analytics.false_alarm import MICRO_LEAK_TREND, ReadingSample, classify
 from app.analytics.service import AnalyticsService, _epoch
 from app.analytics.signature.rules import SignatureAssessment
@@ -402,3 +403,5 @@ class IncidentService:
         incident.state = to_state.value
         incident.updated_ts = _now()
         await self.notifier.on_state(incident, to_state)
+        # Sent after this transaction commits, from its own session; never raises into this path.
+        demo_bridge.queue(self.session, incident, from_state, to_state)

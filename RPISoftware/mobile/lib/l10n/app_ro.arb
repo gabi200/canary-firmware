@@ -5,6 +5,8 @@
   "language": "Limbă",
   "languageHint": "Folosită și pentru analiza senzorilor primită de la hub.",
   "settings": "Setări",
+  "modeBadge": "DEMO",
+  "modeRealAlarm": "Alarmă reală în Canary Live",
   "live": "Live",
   "reconnecting": "Se reconectează…",
   "allClear": "Totul e în regulă",

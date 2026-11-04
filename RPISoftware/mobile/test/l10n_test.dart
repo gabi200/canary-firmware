@@ -237,7 +237,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Conectează-mi apartamentul'), findsOneWidget);
     expect(find.text('Utilizator'), findsOneWidget);
-    expect(find.text('ID clădire'), findsOneWidget);
 
     await tester.tap(find.text('EN'));
     await tester.pumpAndSettle();
