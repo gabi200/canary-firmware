@@ -107,7 +107,7 @@ async def test_preview_never_shows_needs_and_dead_codes_look_alike(client):
     assert set(preview) == PREVIEW_KEYS
     assert (preview["building_name"], preview["unit_label"], preview["floor_label"], preview["inviter_name"],
             preview["has_care_profile"], preview["care_profile_name"]) == (
-        "Bloc A1", "Ap. 12", "Etaj 3", "Ana Popescu", True, "Bunica Maria")
+        "Demo", "Ap. 12", "Etaj 3", "Ana Popescu", True, "Bunica Maria")
     assert NOTE not in resp.text and "wheelchair" not in resp.text
     assert (await client.get(f"/api/v1/household/invites/{invite['code']}",
                              headers=await _hdr(client, "mihai"))).status_code == 200  # any authenticated user

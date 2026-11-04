@@ -481,7 +481,7 @@ async def test_residents_only_reach_their_own_building(client, monkeypatch):
         assert (await client.get(url, headers=mihai)).status_code == 200, url
     assert (await client.get("/api/v1/buildings/bld_008/summary", headers=vlad)).status_code == 200
     assert [b["id"] for b in (await client.get("/api/v1/buildings", headers=vlad)).json()] == ["bld_008"]
-    assert {b["id"] for b in (await client.get("/api/v1/buildings", headers=mihai)).json()} == {"bld_007", "bld_008"}
+    assert {b["id"] for b in (await client.get("/api/v1/buildings", headers=mihai)).json()} == {"bld_007", "bld_008", "bld_live"}
 
     [incident] = await _active(client)
     for path in ("", "/events"):

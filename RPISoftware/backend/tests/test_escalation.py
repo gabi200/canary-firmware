@@ -131,7 +131,7 @@ async def test_events_are_signed_and_carry_no_personal_data(client, partner):
         assert headers["x-canary-signature"] == expected
         assert set(event) == PAYLOAD_KEYS and set(event["incident"]) == INCIDENT_KEYS
         assert event["schema"] == "canary.escalation.v1"
-        assert event["building"] == {"id": "bld_007", "name": "Bloc A1", "address": "Str. Exemplu 12, Bucuresti"}
+        assert event["building"] == {"id": "bld_007", "name": "Demo", "address": "Str. Exemplu 12, Bucuresti"}
         assert (event["incident"]["id"], event["incident"]["hazard_type"]) == (incident_id, "combustible_gas")
         assert event["incident"]["primary_zone_label"] == "Bucătărie"
         assert set(event["accounting"]) == {"occupancy_total", "accounted", "unaccounted", "needs_help",

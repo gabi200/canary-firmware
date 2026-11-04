@@ -59,7 +59,8 @@ async def test_only_admins_and_managers_and_only_their_buildings(client):
     assert all(set(u) == USER_KEYS for u in users)
     by_name = {u["username"]: u for u in users}
     assert {"ana", "ioana", "radu", "elena", "mihai"} <= set(by_name) and "vlad" not in by_name
-    assert by_name["ana"]["units"] == [{"unit_id": "unit_0312", "unit_label": "Ap. 12"}]
+    assert by_name["ana"]["units"] == [{"unit_id": "unit_0312", "unit_label": "Ap. 12"},
+                                          {"unit_id": "unit_live", "unit_label": "Live"}]
     assert by_name["ana"]["active"] is True
     assert {u["username"] for u in (await client.get("/api/v1/admin/users", headers=mara)).json()} == {"mara", "vlad"}
     assert {"vlad", "ana", "admin"} <= {u["username"] for u in (await client.get("/api/v1/admin/users",

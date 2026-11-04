@@ -122,9 +122,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if settings.auto_create_schema:
             await init_db()
         if settings.auto_seed:
-            from app.seed import seed_if_empty
+            from app.db import SessionLocal
+            from app.seed import ensure_live_building, seed_if_empty
 
             await seed_if_empty()
+            async with SessionLocal() as session:
+                await ensure_live_building(session)  # hubs seeded before Canary Live existed
 
     from app.notify import escalation
 

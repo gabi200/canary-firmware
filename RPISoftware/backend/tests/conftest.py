@@ -11,6 +11,8 @@ os.environ.setdefault("CANARY_DATABASE_URL", "sqlite+aiosqlite:///./test_canary.
 os.environ["CANARY_MQTT_ENABLED"] = "false"
 os.environ["CANARY_AUTO_CREATE_SCHEMA"] = "false"
 os.environ["CANARY_AUTO_SEED"] = "false"
+os.environ.setdefault("CANARY_DEFAULT_BUILDING_ID", "bld_007")  # hardware tests land here
+os.environ.setdefault("CANARY_DEFAULT_ZONE_ID", "zone_hallway")
 os.environ["CANARY_JWT_SECRET"] = "test-secret"
 os.environ["CANARY_CARE_KEY"] = "dGVzdC1vbmx5LWNhcmUta2V5LTMyLWJ5dGVzLWxvbmc="  # Fernet test key
 

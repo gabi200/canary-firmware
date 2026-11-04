@@ -26,8 +26,14 @@ class Settings(BaseSettings):
     mqtt_subscribe: str = "#"
 
     # --- hardware nodes (docs/HARDWARE.md) ---
-    default_building_id: str = "bld_007"  # where auto-registered nodes land
-    default_zone_id: str = "zone_hallway"
+    default_building_id: str = "bld_live"  # where auto-registered nodes land
+    default_zone_id: str = "zone_live"
+    demo_building_id: str = "bld_007"
+    live_building_id: str = "bld_live"
+    live_zone_id: str = "zone_live"
+    demo_base_prefix: str = "demo-"  # MQTT base prefix of the simulated demo nodes
+    # real nodes that existed before Canary Live: moved there once, when it is first created
+    live_node_ids: list[str] = ["canary", "water-sensor"]
 
     # --- retention: prune raw snapshots, readings, occupancy older than this (<= 0 disables) ---
     retention_days: int = 14

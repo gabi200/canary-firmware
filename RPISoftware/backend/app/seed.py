@@ -9,6 +9,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.nodes import NodeService
+from app.config import settings
 from app.db import SessionLocal
 from app.enums import ExternalIntegrationKind, Role, SensorType
 from app.models import (
@@ -18,6 +20,7 @@ from app.models import (
     EvacuationRoute,
     ExternalIntegration,
     Floor,
+    Node,
     ResidentUnit,
     StaffBuilding,
     Unit,
@@ -158,6 +161,38 @@ async def seed(session: AsyncSession) -> None:
         )
     )
 
+    await session.commit()
+    await ensure_live_building(session)
+
+
+async def ensure_live_building(session: AsyncSession) -> None:
+    """Idempotent: name the demo building "Demo" and create the real "Canary Live" building.
+    Pre-existing real nodes move into it only on the run that creates it, in the same
+    transaction, so a crash cannot leave the building without its nodes. Nodes are never deleted."""
+    demo = await session.get(Building, settings.demo_building_id)
+    if demo is not None and demo.name == "Bloc A1":
+        demo.name = "Demo"
+    live_id = settings.live_building_id
+    if await session.get(Building, live_id) is None:
+        session.add(Building(id=live_id, name="Canary Live", address="", timezone="Europe/Bucharest"))
+        await session.flush()
+        session.add(Floor(id="flr_live", building_id=live_id, level=0, label="Parter"))
+        await session.flush()
+        session.add(Unit(id="unit_live", building_id=live_id, floor_id="flr_live", label="Live", kind="common"))
+        await session.flush()
+        zone = Zone(id=settings.live_zone_id, building_id=live_id, floor_id="flr_live", unit_id="unit_live",
+                    label="Presentation", kind="hallway", pos_x=0.0, pos_y=0.0)
+        session.add(zone)
+        session.add(StaffBuilding(user_id="usr_mihai", building_id=live_id))
+        for user_id in ("usr_ana", "usr_ioana", "usr_radu", "usr_elena"):
+            if await session.get(User, user_id) is not None:
+                session.add(ResidentUnit(user_id=user_id, unit_id="unit_live", building_id=live_id))
+        await session.flush()
+        svc = NodeService(session)
+        for node_id in settings.live_node_ids:
+            node = await session.get(Node, node_id)
+            if node is not None and node.building_id == settings.demo_building_id:
+                await svc.move(node, zone)
     await session.commit()
 
 
