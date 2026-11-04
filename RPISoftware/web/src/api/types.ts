@@ -5,6 +5,13 @@ export interface Token {
   user_id: string;
 }
 
+/** GET/PUT /api/v1/mode: the hub-wide demo/real switch. */
+export interface HubMode {
+  mode: "demo" | "real";
+  building_id: string;
+  live_alarm: boolean;
+}
+
 export interface Building {
   id: string;
   name: string;

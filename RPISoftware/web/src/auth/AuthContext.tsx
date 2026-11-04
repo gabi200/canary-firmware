@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 
 import { UNAUTHORIZED_EVENT, api } from "../api/client";
-import type { Token } from "../api/types";
+import type { HubMode, Token } from "../api/types";
 import { config } from "../config";
 import { useT } from "../i18n";
 
@@ -12,14 +12,18 @@ export interface Session {
   role: string;
   userId: string;
   username: string;
-  buildingId: string;
 }
 
 interface AuthValue {
   session: Session | null;
   token: string | null;
+  /** the building of the hub's current mode (Demo or Real) */
   buildingId: string;
-  login: (username: string, buildingId: string) => Promise<void>;
+  /** the hub's mode answer; null until the first one arrives (or if it failed) */
+  hubMode: HubMode | null;
+  /** false while signed in and waiting for the first mode answer */
+  modeReady: boolean;
+  login: (username: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -44,6 +48,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const token = session?.token ?? null;
   // the public invitation page (/join/…) makes no API calls at all
   const publicPage = useLocation().pathname.startsWith("/join/");
+
+  // the hub-wide demo/real mode picks the building every screen shows
+  const modeQuery = useQuery({
+    queryKey: ["mode"],
+    queryFn: () => api.get<HubMode>("/api/v1/mode", token),
+    enabled: !!token && !publicPage,
+    refetchInterval: 5_000,
+    retry: false,
+  });
+  const hubMode = modeQuery.data ?? null;
+  // on a failed first request, fall back to the default building instead of blocking forever
+  const modeReady = !token || publicPage || modeQuery.isSuccess || modeQuery.isError;
 
   // the server sends managers' notifications in their language: tell it after login and on
   // every switch (best effort: an older backend without PATCH /me just ignores it)
@@ -71,15 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       token: session?.token ?? null,
-      buildingId: session?.buildingId ?? config.defaultBuildingId,
-      async login(username, buildingId) {
+      buildingId: hubMode?.building_id ?? config.defaultBuildingId,
+      hubMode,
+      modeReady,
+      async login(username) {
         const tok = await api.post<Token>("/api/v1/auth/token", null, { username });
         const next: Session = {
           token: tok.access_token,
           role: tok.role,
           userId: tok.user_id,
           username,
-          buildingId,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         setSession(next);
@@ -91,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryClient.clear();
       },
     }),
-    [session, queryClient],
+    [session, queryClient, hubMode, modeReady],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

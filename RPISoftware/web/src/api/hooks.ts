@@ -13,6 +13,7 @@ import type {
   ClusterStatus,
   Device,
   Evacuation,
+  HubMode,
   Incident,
   IncidentAction,
   IncidentBrief,
@@ -34,6 +35,24 @@ import type {
   WaterImpact,
   Zone,
 } from "./types";
+
+/** The hub's demo/real mode, polled every 5 s by AuthContext (query key ["mode"]). */
+export function useHubMode(): HubMode | null {
+  return useAuth().hubMode;
+}
+
+/** Switch the hub's mode (system_admin, hoa_manager); every screen refetches afterwards. */
+export function useSetHubMode() {
+  const { token } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (mode: HubMode["mode"]) => api.put<HubMode>("/api/v1/mode", token, { mode }),
+    onSuccess: (data) => {
+      qc.setQueryData(["mode"], data);
+      void qc.invalidateQueries();
+    },
+  });
+}
 
 function useCtx() {
   const { token, buildingId } = useAuth();
