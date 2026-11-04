@@ -146,11 +146,12 @@ water-kitchen/status {"device":{"name":"water-sensor","firmware":"1.0.0"},"uptim
 
 Then open the dashboard at **`http://<pi-ip>/`** and sign in as `mihai` (manager). The
 **Sensors** page (`/sensors`) shows every device's raw status and the hub's analysis.
-New sensors land in the seeded demo building `bld_007`, zone `zone_hallway`, and wait under
+New sensors land in `bld_live` ("Canary Live"), zone `zone_live`, or in the Demo building `bld_007`
+if their MQTT base starts with `demo-`, and wait under
 **New sensors** on **Administration → Devices** (sign in as `tehnician`, `mihai` or `admin`):
 press **Beep** to find an air sensor, then choose its room (or select a room on
 **Administration → Rooms** and press **Put in this room**). Or through the API (any
-`admin`/`mihai`/`tehnician` token; zone ids are listed by `GET /api/v1/buildings/bld_007/zones`):
+`admin`/`mihai`/`tehnician` token; zone ids are listed by `GET /api/v1/buildings/bld_live/zones`):
 
 ```bash
 HUB=http://<pi-ip>
@@ -274,6 +275,22 @@ An escalation, evacuation or resolution then shows up in the `arc-sim` log, and 
 lists the deliveries (`GET /api/v1/incidents/{id}/escalations`). To watch retries, start it as
 `docker compose --profile sim run --rm --service-ports arc-sim --fail-first 2`. Remove
 `CANARY_ESCALATION_URL` from `.env` to switch the webhook off again (notification rows only).
+
+### 1.8a Demo and Real mode
+
+The hub is in one mode, **Real** (fresh install) or **Demo**. `GET /api/v1/mode` reads it,
+`PUT /api/v1/mode` (`{"mode":"demo"}`) sets it. Only `system_admin` (`admin`) and `hoa_manager`
+(`mihai`) can switch, with the **Demo / Real** switch in the dashboard's top bar. Every web and
+phone screen follows within 5 s. Details for presenting: [`docs/DEMO.md`](./docs/DEMO.md).
+
+- Real shows `bld_live` ("Canary Live", room "Presentation"): every new sensor registers there,
+  except sensors whose MQTT base starts with `demo-`, which register in Demo (`bld_007`).
+- The demo simulator is the compose service `demo-sim` (profile `demo`). On **one Pi only**, set
+  `COMPOSE_PROFILES=cluster,demo` in `.env` and run `docker compose up -d --build`. It reports
+  normal readings and never starts an incident itself. Do not run it with `building-sim`.
+- Real alarms always go off, in either mode (see `docs/DEMO.md`).
+- Phones need a rebuilt app to follow the mode (`cd mobile && flutter pub get && flutter test &&
+  flutter analyze` first; not yet compiled or tested on a device).
 
 ### 1.9 Operations
 
@@ -477,8 +494,8 @@ npm install
 echo "VITE_API_BASE=http://localhost:8000" > .env
 npm run dev            # http://localhost:5173
 ```
-Sign in as **`mihai`** (manager) or **`dispecer`** (dispatcher), building **`bld_007`**.
-Trigger a hazard (section 2.3) → the incident appears live. Build/typecheck only:
+Sign in as **`mihai`** (manager) or **`dispecer`** (dispatcher). The seeded `bld_007` is shown
+in Demo mode: flip the top-bar switch to Demo first. Trigger a hazard (section 2.3) → the incident appears live. Build/typecheck only:
 `npm run build`. The Docker image (`web/Dockerfile`) builds with an empty
 `VITE_API_BASE` (same origin), because nginx proxies `/api` there. Views and
 configuration: [`web/README.md`](./web/README.md).
@@ -518,7 +535,7 @@ flutter run --dart-define=CANARY_API=http://10.0.2.2:8000   # 10.0.2.2 = host fr
 # Against the Raspberry Pi hub:
 flutter run --dart-define=CANARY_API=http://<pi-ip>
 ```
-Log in as **`ana`** (resident), building **`bld_007`**. Trigger a hazard (section 2.3) →
+Log in as **`ana`** (resident; the hub is in Demo mode for `bld_007`). Trigger a hazard (section 2.3) →
 the app receives the WebSocket event → full-screen alarm → evacuation guidance → check-in
 (drops the unaccounted count on the dashboard).
 

@@ -62,8 +62,8 @@ flutter run --dart-define=CANARY_API=http://<your-host-ip>:8000
 
 Installing Flutter and the other laptop flows: [`../RUNME.md`](../RUNME.md) §2.5.
 
-Log in as **`ana`** (seeded resident), building **`bld_007`**. Then trigger a hazard
-(from `RPISoftware/`):
+Log in as **`ana`** (seeded resident); the app takes the building from the hub. Then trigger a
+hazard (from `RPISoftware/`; in Demo mode, or use "Simulate gas leak" on the dashboard):
 
 ```bash
 docker compose --profile sim run --rm simulator --scenario gas_leak   # legacy demo sensors
@@ -90,7 +90,8 @@ flutter build apk --release --dart-define=CANARY_API=http://<pi-ip>
 flutter build ios --release --dart-define=CANARY_API=http://<pi-ip>
 ```
 
-Add `--dart-define=CANARY_BUILDING=<id>` if the hub's building is not `bld_007`.
+`CANARY_BUILDING` (default `bld_live`) is only the fallback building when the hub does not name
+one. The app follows the hub's Demo / Real mode (see [`../docs/DEMO.md`](../docs/DEMO.md)).
 The server URL is shown on the sign-in and settings screens.
 
 - **Android:** the main manifest declares `INTERNET` (release builds need it; the

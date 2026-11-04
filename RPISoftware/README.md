@@ -248,7 +248,8 @@ cross-sensor corroboration are never held by it. A shadow model's opinion is sto
 - Username-only dashboard/app login and plaintext MQTT/HTTP: trusted LAN/VLAN only
   (RUNME §1.10).
 - The demo building `bld_007` (zones, demo devices, users) is always seeded, and new
-  sensors land in its `zone_hallway` until moved (`PATCH /api/v1/nodes/{id}`).
+  sensors with a `demo-` MQTT base land in its `zone_hallway`; every other new sensor lands in
+  `bld_live` / `zone_live`, until moved (`PATCH /api/v1/nodes/{id}`).
 - One open incident per hazard type per building.
 - The hub sends no commands to the devices yet (the firmware's valve/buzzer topics exist).
 - No schema migrations: a Postgres database created by an earlier version needs one
