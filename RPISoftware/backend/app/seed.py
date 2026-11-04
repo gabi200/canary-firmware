@@ -183,7 +183,8 @@ async def ensure_live_building(session: AsyncSession) -> None:
         zone = Zone(id=settings.live_zone_id, building_id=live_id, floor_id="flr_live", unit_id="unit_live",
                     label="Presentation", kind="hallway", pos_x=0.0, pos_y=0.0)
         session.add(zone)
-        session.add(StaffBuilding(user_id="usr_mihai", building_id=live_id))
+        if await session.get(User, "usr_mihai") is not None:
+            session.add(StaffBuilding(user_id="usr_mihai", building_id=live_id))
         for user_id in ("usr_ana", "usr_ioana", "usr_radu", "usr_elena"):
             if await session.get(User, user_id) is not None:
                 session.add(ResidentUnit(user_id=user_id, unit_id="unit_live", building_id=live_id))

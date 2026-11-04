@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import delete, func, select
 
 from app.db import SessionLocal
-from app.models import Building, Device, Floor, Node, ResidentUnit, StaffBuilding, Unit, Zone
+from app.models import Building, Device, Floor, Node, ResidentUnit, StaffBuilding, Unit, User, Zone
 from app.seed import ensure_live_building
 from tests.conftest import auth_token
 
@@ -81,3 +81,17 @@ async def test_ensure_live_building_idempotent(client):
 async def test_resident_sees_live_building(client):
     resp = await client.get("/api/v1/buildings/bld_live/summary", headers=await _hdr(client, "ana"))
     assert resp.status_code == 200, resp.text
+
+
+async def test_missing_users_do_not_break_live_building(client):
+    async with SessionLocal() as session:
+        await _drop_live(session)
+        await session.execute(delete(StaffBuilding).where(StaffBuilding.user_id == "usr_mihai"))
+        await session.execute(delete(ResidentUnit))
+        await session.execute(delete(User).where(User.id.in_(["usr_mihai", "usr_ana"])))
+        await session.commit()
+        await ensure_live_building(session)
+        assert await session.get(Building, "bld_live") is not None
+        n = await session.scalar(select(func.count()).select_from(StaffBuilding).where(
+            StaffBuilding.building_id == "bld_live"))
+        assert n == 0
