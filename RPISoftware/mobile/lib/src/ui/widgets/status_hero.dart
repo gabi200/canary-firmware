@@ -4,6 +4,7 @@ import '../../i18n.dart';
 import '../../state/building_status.dart';
 import '../../theme.dart';
 import 'status_pill.dart';
+import 'classification_text.dart';
 
 /// App-bar pill matching [status] (never "all clear" while something is open).
 class BuildingStatusPill extends StatelessWidget {
@@ -110,6 +111,8 @@ class StatusHeroCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(body),
                   ],
+                  if (status.incident case final incident?)
+                    ClassificationText(incident: incident),
                 ],
               ),
             ),

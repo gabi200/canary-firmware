@@ -16,6 +16,7 @@ import 'alarm_screen.dart';
 import 'room_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/care_hint_card.dart';
+import 'widgets/classification_text.dart';
 import 'widgets/home_banner.dart';
 import 'widgets/mode_strip.dart';
 import 'widgets/room_tiles.dart';
@@ -248,7 +249,10 @@ class _BuildingStrip extends StatelessWidget {
             child: ListTile(
               leading: SafetySignImage(hazardSign(inc.hazardType), size: 36),
               title: Text(l10n.buildingIncident(l10n.hazardName(inc.hazardType))),
-              subtitle: Text(whereOf(inc)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [Text(whereOf(inc)), ClassificationText(incident: inc)],
+              ),
               trailing: StatusPill(state: inc.state),
               onTap: inc.isAlarming ? () => onOpen(inc) : null,
             ),

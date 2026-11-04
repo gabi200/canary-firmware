@@ -4,6 +4,7 @@ import '../../i18n.dart';
 import '../../models/incident.dart';
 import '../../theme.dart';
 import 'safety_sign.dart';
+import 'classification_text.dart';
 
 class HazardBanner extends StatelessWidget {
   const HazardBanner({super.key, required this.incident, this.zoneLabel, this.onTap});
@@ -44,6 +45,7 @@ class HazardBanner extends StatelessWidget {
                           .join(' · '),
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
+                    ClassificationText(incident: incident, color: Colors.white),
                   ],
                 ),
               ),

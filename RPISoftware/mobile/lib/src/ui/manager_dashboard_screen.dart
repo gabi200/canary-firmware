@@ -12,6 +12,7 @@ import '../theme.dart';
 import 'sensor_test_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/mode_strip.dart';
+import 'widgets/classification_text.dart';
 import 'widgets/flashing_evacuate_banner.dart';
 import 'widgets/home_status_section.dart';
 import 'widgets/node_commands.dart';
@@ -174,7 +175,13 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
                         child: ListTile(
                           leading: SafetySignImage(hazardSign(inc.hazardType), size: 36),
                           title: Text(l10n.hazardName(inc.hazardType)),
-                          subtitle: Text('${l10n.statusLabel(inc.state)} · ${zoneName(inc.primaryZoneId)}'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${l10n.statusLabel(inc.state)} · ${zoneName(inc.primaryZoneId)}'),
+                              ClassificationText(incident: inc),
+                            ],
+                          ),
                           trailing: StatusPill(state: inc.state),
                         ),
                       ),

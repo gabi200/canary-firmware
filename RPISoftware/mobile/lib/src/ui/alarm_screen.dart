@@ -19,6 +19,7 @@ import '../state/location_providers.dart';
 import '../state/providers.dart';
 import '../theme.dart';
 import 'widgets/floor_plan_sketch.dart';
+import 'widgets/classification_text.dart';
 import 'widgets/household_checkin.dart';
 import 'widgets/one_line_label.dart';
 import 'widgets/route_line.dart';
@@ -171,7 +172,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                         fontSize: 14, fontWeight: FontWeight.bold)),
                   ),
                 )),
-                TextButton.icon(
+                Flexible(child: TextButton.icon(
                   onPressed: () => Navigator.of(context).maybePop(),
                   icon: const Icon(Icons.expand_more),
                   label: Text(l10n.minimize),
@@ -179,7 +180,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                     foregroundColor: HazardColors.onHazard,
                     minimumSize: const Size(48, 48),
                     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
+                )),
               ]),
               const SizedBox(height: 8),
               // Signs beside the title, so the question below stays in view.
@@ -199,6 +200,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
               Text(whereText,
                 style: const TextStyle(color: HazardColors.onHazard,
                   fontSize: 19, fontWeight: FontWeight.w700)),
+              ClassificationText(incident: incident, color: HazardColors.onHazard),
               if (home.title case final String mine) ...[
                 const SizedBox(height: 6),
                 Row(children: [

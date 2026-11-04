@@ -9,6 +9,7 @@ import '../../theme.dart';
 import 'one_line_label.dart';
 import 'safety_sign.dart';
 import 'status_hero.dart';
+import 'classification_text.dart';
 
 /// The one big status at the top of the resident's home. Calm: a shield,
 /// "Totul e în regulă" and "Locuința ta e monitorizată". An alarm: the danger
@@ -115,6 +116,7 @@ class _DangerBanner extends StatelessWidget {
                   style: const TextStyle(color: HazardColors.onHazard, fontSize: 18, fontWeight: FontWeight.w700)),
             ],
             const SizedBox(height: 6),
+            ClassificationText(incident: incident, color: HazardColors.onHazard),
             Text(
               incident.isEvacuation ? l10n.homeEvacuateLine : hazardDont(l10n, incident.hazardType),
               style: const TextStyle(color: HazardColors.onHazard, fontSize: 16),

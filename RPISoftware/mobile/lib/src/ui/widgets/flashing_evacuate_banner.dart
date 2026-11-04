@@ -4,6 +4,7 @@ import '../../i18n.dart';
 import '../../models/incident.dart';
 import '../../theme.dart';
 import 'safety_sign.dart';
+import 'classification_text.dart';
 
 /// High-urgency EVACUATE NOW banner that flashes (~1 Hz) to grab attention on the
 /// phone. Falls back to a static red banner when the OS requests reduced motion.
@@ -77,6 +78,7 @@ class _FlashingEvacuateBannerState extends State<FlashingEvacuateBanner>
                           '${l10n.hazardName(widget.incident.hazardType)} · ${widget.zoneLabel ?? widget.incident.primaryZoneId ?? ''}',
                           style: const TextStyle(color: Colors.white, fontSize: 14),
                         ),
+                        ClassificationText(incident: widget.incident, color: Colors.white),
                       ],
                     ),
                   ),
