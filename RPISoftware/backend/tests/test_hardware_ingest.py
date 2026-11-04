@@ -21,6 +21,7 @@ from app.models import (
     Floor,
     Incident,
     Node,
+    NodeInbox,
     NodeStatus,
     Notification,
     OccupancyEstimate,
@@ -799,3 +800,30 @@ def test_websocket_tokens_are_redacted_from_server_logs():
                                ("1.2.3.4:5", "/api/v1/ws/incidents?building_id=bld_007&token=eyJ.abc.def"), None)
     RedactTokens().filter(record)
     assert record.getMessage() == '1.2.3.4:5 - "WebSocket /api/v1/ws/incidents?building_id=bld_007&token=***" [accepted]'
+
+
+async def _live_building(monkeypatch) -> None:
+    from app.seed import ensure_live_building  # noqa: PLC0415
+    monkeypatch.setattr(hardware.settings, "default_building_id", "bld_live")
+    monkeypatch.setattr(hardware.settings, "default_zone_id", "zone_live")
+    async with SessionLocal() as s:
+        await ensure_live_building(s)
+        await s.commit()
+
+
+async def test_demo_prefixed_node_lands_in_demo_building(client, monkeypatch):
+    await _live_building(monkeypatch)
+    await publish("demo-air-kitchen", air_doc())
+
+    node = await _node("demo-air-kitchen")
+    assert node.building_id == "bld_007"
+    assert await _count(NodeInbox, NodeInbox.node_id == node.id) == 0
+
+
+async def test_plain_node_lands_in_live_building(client, monkeypatch):
+    await _live_building(monkeypatch)
+    await publish("canary", air_doc())
+
+    node = await _node("canary")
+    assert (node.building_id, node.zone_id) == ("bld_live", "zone_live")
+    assert await _count(NodeInbox, NodeInbox.node_id == "canary") == 1
