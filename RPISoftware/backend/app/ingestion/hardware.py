@@ -170,7 +170,7 @@ def _presence(obj: object) -> float | None:
 
 def _gas_detector(obj: object) -> float | None:
     """Firmware 1.1.0+: the external detector's contact. Older firmware sends no object."""
-    if not isinstance(obj, dict):
+    if not isinstance(obj, dict) or obj.get("enabled") is False:
         return None
     alarm = obj.get("alarm")
     if not isinstance(alarm, bool):

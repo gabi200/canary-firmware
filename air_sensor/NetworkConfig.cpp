@@ -84,6 +84,8 @@ NetworkConfig::NetworkConfig()
     : deviceNameParam_("device_name", "Device name", "", 32),
       mqttEnabledParam_(
           "mqtt_enabled", "MQTT enabled (0 or 1)", "0", 1, BOOLEAN_ATTRIBUTES),
+      gasDetectorEnabledParam_(
+          "gas_detector_enabled", "External gas detector connected (0 or 1)", "0", 1, BOOLEAN_ATTRIBUTES),
       mqttHostParam_("mqtt_host", "MQTT host", "", 64),
       mqttPortParam_("mqtt_port", "MQTT port", "1883", 5, PORT_ATTRIBUTES),
       mqttUserParam_("mqtt_user", "MQTT user", "", 32),
@@ -221,6 +223,7 @@ void NetworkConfig::networkTask() {
 
   wifiManager_.addParameter(&deviceNameParam_);
   wifiManager_.addParameter(&mqttEnabledParam_);
+  wifiManager_.addParameter(&gasDetectorEnabledParam_);
   wifiManager_.addParameter(&mqttHostParam_);
   wifiManager_.addParameter(&mqttPortParam_);
   wifiManager_.addParameter(&mqttUserParam_);
@@ -422,6 +425,7 @@ void NetworkConfig::restoreStoredWiFiCredentials() {
 void NetworkConfig::copyConfigToBuffers(const DeviceConfig& config) {
   deviceNameParam_.setValue(config.deviceName, sizeof(config.deviceName) - 1);
   mqttEnabledParam_.setValue(config.mqttEnabled ? "1" : "0", 1);
+  gasDetectorEnabledParam_.setValue(config.gasDetectorEnabled ? "1" : "0", 1);
   mqttHostParam_.setValue(config.mqttHost, sizeof(config.mqttHost) - 1);
   setUnsignedValue(mqttPortParam_, config.mqttPort, 5);
   mqttUserParam_.setValue(config.mqttUser, sizeof(config.mqttUser) - 1);
@@ -463,6 +467,7 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
   }
 
   uint32_t mqttEnabled = 0;
+  uint32_t gasDetectorEnabled = 0;
   uint32_t mqttPort = 0;
   uint32_t coWarn = 0;
   uint32_t coDanger = 0;
@@ -474,7 +479,8 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
   uint32_t pm10Warn = 0;
   uint32_t pm10Danger = 0;
   uint32_t silenceSeconds = 0;
-  if (!parseUnsigned(mqttEnabledParam_.getValue(), 1, mqttEnabled) ||
+  if (!parseUnsigned(gasDetectorEnabledParam_.getValue(), 1, gasDetectorEnabled) ||
+      !parseUnsigned(mqttEnabledParam_.getValue(), 1, mqttEnabled) ||
       !parseUnsigned(mqttPortParam_.getValue(), UINT16_MAX, mqttPort) ||
       !parseUnsigned(coWarnParam_.getValue(), UINT16_MAX, coWarn) ||
       !parseUnsigned(coDangerParam_.getValue(), UINT16_MAX, coDanger) ||
@@ -490,6 +496,7 @@ bool NetworkConfig::copyBuffersToConfig(DeviceConfig& output) const {
   }
 
   candidate.mqttEnabled = mqttEnabled != 0;
+  candidate.gasDetectorEnabled = gasDetectorEnabled != 0;
   candidate.mqttPort = static_cast<uint16_t>(mqttPort);
   candidate.coWarnPpm = static_cast<uint16_t>(coWarn);
   candidate.coDangerPpm = static_cast<uint16_t>(coDanger);

@@ -68,16 +68,19 @@ MqttService* MqttService::callbackOwner_ = nullptr;
 
 MqttService::MqttService(const DeviceConfig& config, AirController& controller,
                          RuntimeStatusProvider statusProvider,
-                         MeshLink& mesh)
+                         MeshLink& mesh,
+                         std::function<bool(bool)> setGasDetectorEnabled)
     : config_(config),
       networkConfig_(config),
       controller_(controller),
       statusProvider_(statusProvider),
+      setGasDetectorEnabled_(setGasDetectorEnabled),
       mesh_(mesh),
       mqttClient_(wifiClient_),
       availabilityTopic_{},
       statusTopic_{},
       buzzerCommandTopic_{},
+      detectorCommandTopic_{},
       resultTopic_{},
       nextConnectMs_(0),
       reconnectDelayMs_(1000),
@@ -113,6 +116,7 @@ void MqttService::begin() {
       formatTopic(availabilityTopic_, sizeof(availabilityTopic_), "availability") &&
       formatTopic(statusTopic_, sizeof(statusTopic_), "status") &&
       formatTopic(buzzerCommandTopic_, sizeof(buzzerCommandTopic_), "buzzer/set") &&
+      formatTopic(detectorCommandTopic_, sizeof(detectorCommandTopic_), "gas-detector/set") &&
       formatTopic(resultTopic_, sizeof(resultTopic_), "command/result");
   if (!topicsValid_ || !config_.mqttEnabled) {
     if (!topicsValid_) {
@@ -184,6 +188,11 @@ void MqttService::processCommand(uint32_t nowMs) {
     const CommandResult result = controller_.startSelfTest(nowMs);
     accepted = result == CommandResult::Accepted;
     detail = accepted ? "self_test" : rejectionDetail(result);
+  }
+  if (command == QueuedCommand::DetectorOn || command == QueuedCommand::DetectorOff) {
+    const bool enabled = command == QueuedCommand::DetectorOn;
+    accepted = setGasDetectorEnabled_ && setGasDetectorEnabled_(enabled);
+    detail = accepted ? (enabled ? "enabled" : "disabled") : "persistence_failed";
   }
   if (!queueCommandResult(name, accepted, detail)) {
     deferredCommandResult_ = true;
@@ -290,10 +299,11 @@ void MqttService::handleMessage(char* topic, uint8_t* payload,
   if (topic == nullptr || payload == nullptr) {
     return;
   }
-  if (std::strcmp(topic, buzzerCommandTopic_) != 0) {
+  const bool detectorTopic = std::strcmp(topic, detectorCommandTopic_) == 0;
+  if (!detectorTopic && std::strcmp(topic, buzzerCommandTopic_) != 0) {
     return;
   }
-  if (length >= COMMAND_BYTES) {
+  if (length >= COMMAND_BYTES || std::memchr(payload, '\0', length) != nullptr) {
     publishResult("UNKNOWN", false, "invalid_command");
     statusSnapshotRequested_.store(true, std::memory_order_release);
     return;
@@ -305,9 +315,13 @@ void MqttService::handleMessage(char* topic, uint8_t* payload,
   trimAndUppercase(command);
 
   QueuedCommand queued = QueuedCommand::None;
-  if (std::strcmp(command, "SILENCE") == 0) {
+  if (detectorTopic && std::strcmp(command, "DETECTOR_ON") == 0) {
+    queued = QueuedCommand::DetectorOn;
+  } else if (detectorTopic && std::strcmp(command, "DETECTOR_OFF") == 0) {
+    queued = QueuedCommand::DetectorOff;
+  } else if (!detectorTopic && std::strcmp(command, "SILENCE") == 0) {
     queued = QueuedCommand::Silence;
-  } else if (std::strcmp(command, "TEST") == 0) {
+  } else if (!detectorTopic && std::strcmp(command, "TEST") == 0) {
     queued = QueuedCommand::Test;
   }
   if (queued == QueuedCommand::None) {
@@ -457,6 +471,7 @@ bool MqttService::connect(uint32_t nowMs) {
                 static_cast<unsigned>(networkConfig_.mqttPort), clientId);
   mqttClient_.publish(availabilityTopic_, "online", true);
   mqttClient_.subscribe(buzzerCommandTopic_, 1);
+  mqttClient_.subscribe(detectorCommandTopic_, 1);
   connected_.store(true, std::memory_order_release);
   reconnectDelayMs_ = 1000;
   nextConnectMs_ = nowMs;
@@ -601,6 +616,10 @@ const char* MqttService::commandName(QueuedCommand command) {
       return "SILENCE";
     case QueuedCommand::Test:
       return "TEST";
+    case QueuedCommand::DetectorOn:
+      return "DETECTOR_ON";
+    case QueuedCommand::DetectorOff:
+      return "DETECTOR_OFF";
     case QueuedCommand::None:
     default:
       return "UNKNOWN";

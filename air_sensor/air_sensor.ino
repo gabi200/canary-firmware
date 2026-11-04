@@ -120,7 +120,7 @@ RuntimeStatus runtimeStatus() {
       mqttService && mqttService->connected(),
       httpApi && httpApi->otaInProgress(),
       wifiConnected ? static_cast<uint32_t>(WiFi.localIP()) : 0,
-      gasDetector.alarmActive(),
+      deviceConfig.gasDetectorEnabled && gasDetector.alarmActive(),
   };
 }
 
@@ -287,7 +287,7 @@ bool gasDetectorContactOpen() {
 // Polled every pass through loop(), like the config button. The status
 // document carries the state; a change is logged and pushed over MQTT at once.
 void pollGasDetector(uint32_t nowMs) {
-  switch (gasDetector.update(gasDetectorContactOpen(), nowMs)) {
+  switch (gasDetector.update(gasDetectorContactOpen(), nowMs, deviceConfig.gasDetectorEnabled)) {
     case GasDetectorEvent::AlarmRaised:
       Serial.println("[gas-detector] alarm raised (contact open: gas alarm or wiring cut)");
       notifyStateChanged();
@@ -501,7 +501,7 @@ void setup() {
 
   // Normally long settled by now; the delay only guards a very fast boot.
   delay(Hardware::GAS_DETECTOR_SETTLE_MS);
-  gasDetector.begin(gasDetectorContactOpen(), millis());
+  gasDetector.begin(gasDetectorContactOpen(), millis(), deviceConfig.gasDetectorEnabled);
   Serial.printf("[gas-detector] GPIO%u at boot: %s\n",
                 static_cast<unsigned>(Hardware::GAS_DETECTOR_PIN),
                 gasDetector.alarmActive()
@@ -520,7 +520,16 @@ void setup() {
   meshLink = std::make_unique<MeshLink>();
   meshLink->begin();
   mqttService = std::make_unique<MqttService>(deviceConfig, *controller,
-                                              runtimeStatus, *meshLink);
+                                              runtimeStatus, *meshLink,
+      [](bool enabled) {
+        if (configSavePending || rebootScheduled || (httpApi && httpApi->otaInProgress())) {
+          return false;
+        }
+        if (!configStore->saveGasDetectorEnabled(enabled)) return false;
+        deviceConfig.gasDetectorEnabled = enabled;
+        gasDetector.begin(gasDetectorContactOpen(), millis(), enabled);
+        return true;
+      });
   networkConfig->begin(deviceConfig, forcePortal);
 }
 

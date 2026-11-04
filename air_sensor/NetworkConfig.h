@@ -42,6 +42,7 @@ class NetworkConfig {
   WiFiManager wifiManager_;
   WiFiManagerParameter deviceNameParam_;
   WiFiManagerParameter mqttEnabledParam_;
+  WiFiManagerParameter gasDetectorEnabledParam_;
   WiFiManagerParameter mqttHostParam_;
   WiFiManagerParameter mqttPortParam_;
   WiFiManagerParameter mqttUserParam_;

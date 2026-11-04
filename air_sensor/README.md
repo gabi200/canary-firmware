@@ -134,12 +134,27 @@ isolated dry relay contact, read as an extra input: COM to GND, NC through a
 pull-up is enabled; an external 10 kOhm to 3.3 V may be added. LOW means
 normal (NC closed). HIGH means the detector is alarming **or the wiring is cut
 or unplugged**; the two are indistinguishable by design, so an open circuit
-always reads as an alarm. A level change is accepted once it has held for
+reads as an alarm while monitoring is enabled. A level change is accepted once it has held for
 200 ms (`GAS_DETECTOR_DEBOUNCE_MS`); the boot state is reported as read. The
-state appears as `gas_detector.alarm` in the status document, transitions are
+status includes `gas_detector.enabled` and `gas_detector.alarm`. Fresh setups
+leave the detector disabled, reporting `{"enabled":false,"alarm":false}` even
+with GPIO11 unplugged. Enable it only after connecting the detector, using the
+portal's "External gas detector connected (0 or 1)" setting or MQTT below.
+Existing schema-1 configurations without this setting remain enabled after an
+upgrade, preserving installed detectors. MQ5, CO and particulate monitoring are
+unaffected. When enabled, detector transitions are
 logged as `[gas-detector] …` and pushed over MQTT straight away. It is
 monitoring only: it does not sound this device's buzzer or change its LED, and
 nothing in the firmware drives the detector or its gas valve.
+
+Firmware 1.2.1 accepts `DETECTOR_ON` and `DETECTOR_OFF` on
+`<base>/gas-detector/set` (QoS 1 subscription). They are rejected on the buzzer
+command topic. The safety loop saves the `gasDetEnabled` NVS key before changing
+the runtime setting, preserving other settings. `<base>/command/result` reports
+`{"command":"DETECTOR_OFF","accepted":true,"state":"disabled"}` (or `enabled`
+for `DETECTOR_ON`); failure reports `accepted:false,error:"persistence_failed"`.
+A failed save leaves the prior setting active; configuration saves/reboots and
+OTA also reject changes until complete. The next status reports confirmed state.
 
 **LD2410 (UART1).** Sensor TX to GPIO15, sensor RX to GPIO16, 256000 baud.
 LD2410, LD2410B, and LD2410C share this framing exactly, and all three leave

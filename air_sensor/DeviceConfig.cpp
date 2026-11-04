@@ -24,6 +24,7 @@ DeviceConfig defaultDeviceConfig() {
   DeviceConfig config{};
   std::strcpy(config.deviceName, "canary");
   config.mqttEnabled = false;
+  config.gasDetectorEnabled = false;
   config.mqttPort = 1883;
   std::strcpy(config.mqttBaseTopic, "canary");
   config.coWarnPpm = 50;

@@ -586,8 +586,8 @@ void testMqttConnectUsesBoundedSettingsTopicsAndHeartbeat() {
   CHECK(fakeMqttWillTopic == "canary/availability");
   CHECK(fakeMqttWillMessage == "offline");
   CHECK(fakeMqttWillRetained);
-  // Only the buzzer topic is subscribed: this device has no actuator.
-  CHECK(fakeMqttSubscriptions.size() == 1);
+  CHECK(fakeMqttSubscriptions.size() == 2);
+  CHECK(fakeMqttSubscriptions[1] == "canary/gas-detector/set");
   CHECK(fakeMqttSubscriptions[0] == "canary/buzzer/set");
   CHECK(fakeMqttPublishes.size() == 2);
   CHECK(fakeMqttPublishes[0].topic == "canary/availability");
@@ -722,6 +722,85 @@ void testMqttReportsRejectedAndUnknownCommands() {
   CHECK(!fakeMqttPublishes.back().retained);
 }
 
+void testMqttDetectorCommandHasDedicatedTopic() {
+  resetFakeMqtt();
+  AirController controller(config());
+  DeviceConfig cfg = mqttConfig();
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink);
+  mqtt.begin();
+  runFakeMqttTaskAt(0);
+  mqtt.process(0);
+  runFakeMqttTaskAt(1);
+  const size_t before = fakeMqttPublishes.size();
+  fakeMqttDeliver("canary/gas-detector/set", "DETECTOR_ON");
+  mqtt.process(2);
+  runFakeMqttTaskAt(2);
+  CHECK(fakeMqttPublishes.size() > before);
+  if (fakeMqttPublishes.size() <= before) return;
+  CHECK(fakeMqttPublishes[before].payload ==
+        "{\"command\":\"DETECTOR_ON\",\"accepted\":false,\"error\":\"persistence_failed\"}");
+}
+
+void testMqttDetectorSettingRunsOnSafetyLoopAndRejectsFailedPersistence() {
+  resetFakeMqtt();
+  AirController controller(config());
+  DeviceConfig cfg = mqttConfig();
+  bool failSave = false;
+  int saves = 0;
+  MqttService mqtt(cfg, controller, mqttRuntimeStatus, fakeMeshLink,
+                   [&](bool enabled) {
+                     ++saves;
+                     if (failSave) return false;
+                     cfg.gasDetectorEnabled = enabled;
+                     return true;
+                   });
+  mqtt.begin();
+  runFakeMqttTaskAt(0);
+  mqtt.process(0);
+  runFakeMqttTaskAt(1);
+  fakeMqttDeliver("canary/gas-detector/set", " detector_on ");
+  CHECK(saves == 0);
+  CHECK(!cfg.gasDetectorEnabled);
+  fakeMqttDeliver("canary/gas-detector/set", "DETECTOR_OFF");
+  CHECK(fakeMqttPublishes.back().payload ==
+        "{\"command\":\"DETECTOR_OFF\",\"accepted\":false,\"error\":\"busy\"}");
+  mqtt.process(2);
+  CHECK(saves == 1);
+  CHECK(cfg.gasDetectorEnabled);
+  size_t before = fakeMqttPublishes.size();
+  runFakeMqttTaskAt(2);
+  CHECK(fakeMqttPublishes[before].payload ==
+        "{\"command\":\"DETECTOR_ON\",\"accepted\":true,\"state\":\"enabled\"}");
+  failSave = true;
+  fakeMqttDeliver("canary/gas-detector/set", "DETECTOR_OFF");
+  mqtt.process(3);
+  CHECK(cfg.gasDetectorEnabled);
+  before = fakeMqttPublishes.size();
+  runFakeMqttTaskAt(3);
+  CHECK(fakeMqttPublishes[before].payload ==
+        "{\"command\":\"DETECTOR_OFF\",\"accepted\":false,\"error\":\"persistence_failed\"}");
+  failSave = false;
+  fakeMqttDeliver("canary/gas-detector/set", "DETECTOR_OFF");
+  mqtt.process(4);
+  CHECK(!cfg.gasDetectorEnabled);
+  before = fakeMqttPublishes.size();
+  runFakeMqttTaskAt(4);
+  CHECK(fakeMqttPublishes[before].payload ==
+        "{\"command\":\"DETECTOR_OFF\",\"accepted\":true,\"state\":\"disabled\"}");
+  const int previousSaves = saves;
+  for (const char* topic : {"canary/buzzer/set", "other/gas-detector/set"}) {
+    fakeMqttDeliver(topic, "DETECTOR_ON");
+    mqtt.process(5);
+    runFakeMqttTaskAt(5);
+  }
+  fakeMqttDeliver("canary/gas-detector/set", "TEST");
+  CHECK(fakeMqttPublishes.back().payload ==
+        "{\"command\":\"UNKNOWN\",\"accepted\":false,\"error\":\"invalid_command\"}");
+  mqtt.process(6);
+  CHECK(saves == previousSaves);
+  CHECK(!controller.selfTestActive(6));
+}
+
 void testMqttStatusSerializationRetriesWithoutErrorFlooding() {
   resetFakeMqtt();
   fakeStatusSerializationResult = false;
@@ -848,6 +927,8 @@ int main() {
   testMqttUnresolvedMdnsNameSkipsTheConnectAndRetries();
   testMqttSilenceIsAppliedOnTheSafetyLoop();
   testMqttReportsRejectedAndUnknownCommands();
+  testMqttDetectorCommandHasDedicatedTopic();
+  testMqttDetectorSettingRunsOnSafetyLoopAndRejectsFailedPersistence();
   testMqttStatusSerializationRetriesWithoutErrorFlooding();
   testMqttFallsBackToMeshWhileWifiIsDown();
   testMqttRelaysMeshStatusToItsOriginTopic();

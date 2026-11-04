@@ -122,3 +122,13 @@ def test_hostile_input_is_rejected_without_raising():
     assert "canary:co" not in _payloads(NodeKind.air, air_doc(co={"ppm": 10**400}))  # overflows float
     assert "canary:co" not in _payloads(NodeKind.air, air_doc(co={"ppm": True}))
     assert _payloads(NodeKind.water, water_doc(sensor={"initialized": 1, "state": "wet"}), node_id="w") == {}
+
+
+def test_only_explicitly_disabled_external_detector_is_skipped():
+    doc = air_doc(gas_detector={"enabled": False, "alarm": True}, gas={"adc": 2300, "state": "danger"})
+    payloads = _payloads(NodeKind.air, doc)
+    assert "canary:gas_detector" not in payloads
+    assert payloads["canary:gas"].edge_state == EdgeState.alarm
+    for enabled in (True, None, 0, "false", [], {}):
+        payload = _payloads(NodeKind.air, air_doc(gas_detector={"enabled": enabled, "alarm": True}))
+        assert payload["canary:gas_detector"].edge_state == EdgeState.alarm

@@ -141,7 +141,8 @@ class ZoneKind(str, Enum):
 
 # Device commands per node kind -> MQTT topic suffix (firmware: air_sensor / water_sensor README).
 NODE_COMMANDS: dict[str, dict[str, str]] = {
-    "air": {"TEST": "buzzer/set", "SILENCE": "buzzer/set"},
+    "air": {"TEST": "buzzer/set", "SILENCE": "buzzer/set",
+            "DETECTOR_ON": "gas-detector/set", "DETECTOR_OFF": "gas-detector/set"},
     "water": {"OPEN": "valve/set", "CLOSE": "valve/set", "SILENCE": "buzzer/set"},
 }
 

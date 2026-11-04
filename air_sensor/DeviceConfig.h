@@ -5,6 +5,7 @@
 struct DeviceConfig {
   char deviceName[33];
   bool mqttEnabled;
+  bool gasDetectorEnabled;
   char mqttHost[65];
   uint16_t mqttPort;
   char mqttUser[33];

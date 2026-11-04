@@ -70,6 +70,15 @@ void testMillisWraparound() {
 }  // namespace
 
 int main() {
+  GasDetectorInput disabled(DEBOUNCE_MS);
+  disabled.begin(OPEN, 0, false);
+  CHECK(!disabled.alarmActive());
+  CHECK(disabled.update(OPEN, 1000, false) == GasDetectorEvent::None);
+  CHECK(!disabled.alarmActive());
+  CHECK(disabled.update(OPEN, 1100, true) == GasDetectorEvent::None);
+  CHECK(disabled.update(OPEN, 1300, true) == GasDetectorEvent::AlarmRaised);
+  CHECK(disabled.update(OPEN, 1301, false) == GasDetectorEvent::AlarmCleared);
+  CHECK(!disabled.alarmActive());
   testBootStateIsTakenImmediately();
   testOpenContactRaisesAfterDebounce();
   testBounceRestartsTheDebounce();

@@ -6,6 +6,7 @@ import { connectivity, pick, pickNum } from "../lib/nodes";
 import { fmtAgo, fmtDateTime, fmtDuration } from "../lib/time";
 import { NodeAnalysisView } from "./Analysis";
 import { NodeCommands } from "./NodeCommands";
+import { ExternalDetectorSetting } from "./ExternalDetectorSetting";
 import { NodeMonitor } from "./NodeMonitor";
 import { RawStatus } from "./RawStatus";
 import { StatusPill } from "./StatusPill";
@@ -103,6 +104,7 @@ export function NodeCard({ node, zones, zoneNames, canEdit, showPresence = true,
 
       {/* hardware test (managers / admins; renders nothing for other roles) */}
       <NodeCommands node={node} variant="compact" />
+      <ExternalDetectorSetting node={node} />
 
       <NodeMonitor node={node} showPresence={showPresence} />
 

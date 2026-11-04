@@ -544,7 +544,7 @@ export interface NodeHistory {
 // --------------------------------------------------------------------------- //
 
 /** Air: TEST (4 s self-test, buzzer + LED), SILENCE. Water: OPEN / CLOSE the valve, SILENCE. */
-export type NodeCommandName = "TEST" | "SILENCE" | "OPEN" | "CLOSE";
+export type NodeCommandName = "TEST" | "SILENCE" | "OPEN" | "CLOSE" | "DETECTOR_ON" | "DETECTOR_OFF";
 
 /** `timeout`: no answer from the device within 15 s (the backend computes it on read). */
 export type CommandStatus = "sent" | "accepted" | "rejected" | "timeout";

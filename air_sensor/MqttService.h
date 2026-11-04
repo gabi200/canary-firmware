@@ -20,7 +20,8 @@
 class MqttService {
  public:
   MqttService(const DeviceConfig& config, AirController& controller,
-              RuntimeStatusProvider statusProvider, MeshLink& mesh);
+              RuntimeStatusProvider statusProvider, MeshLink& mesh,
+              std::function<bool(bool)> setGasDetectorEnabled = {});
   void begin();
   // Safety-loop entrypoint: never calls WiFiClient or PubSubClient.
   void process(uint32_t nowMs);
@@ -28,11 +29,11 @@ class MqttService {
   void requestStatusPublish();
 
  private:
-  enum class QueuedCommand : uint8_t { None, Silence, Test };
+  enum class QueuedCommand : uint8_t { None, Silence, Test, DetectorOn, DetectorOff };
 
   struct ResultHandoff {
     bool accepted;
-    char command[8];
+    char command[16];
     char detail[32];
   };
 
@@ -66,12 +67,14 @@ class MqttService {
   DeviceConfig networkConfig_;
   AirController& controller_;
   RuntimeStatusProvider statusProvider_;
+  std::function<bool(bool)> setGasDetectorEnabled_;
   MeshLink& mesh_;
   WiFiClient wifiClient_;
   PubSubClient mqttClient_;
   char availabilityTopic_[96];
   char statusTopic_[96];
   char buzzerCommandTopic_[96];
+  char detectorCommandTopic_[96];
   char resultTopic_[96];
 
   // Worker-task-owned network state.

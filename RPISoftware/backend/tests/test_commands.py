@@ -194,3 +194,47 @@ async def test_last_command_on_nodes_and_summary(client):
     resident = (await client.get("/api/v1/buildings/bld_007/summary", headers=ana)).json()
     canary = next(n for z in resident["zones"] for n in z["nodes"] if n["node_id"] == "canary")
     assert (canary["last_command"]["status"], canary["last_command"]["requested_by_name"]) == ("accepted", None)
+
+
+@pytest.mark.parametrize("user", ["mihai", "admin", "tehnician"])
+async def test_scoped_staff_can_configure_detector_with_exact_wire_commands(client, mqtt, user):
+    await handle_hardware_message("canary/status", json.dumps(air_doc(gas_detector={"enabled": False})).encode())
+    for command in ("DETECTOR_ON", "DETECTOR_OFF"):
+        response = await _send(client, "canary", command, user)
+        assert response.status_code == 202, response.text
+        assert mqtt.published[-1] == ("canary/gas-detector/set", command, 1, False)
+        await dispatch("canary/command/result", json.dumps({"command": command, "accepted": True, "state": "enabled"}).encode())
+        items = (await client.get("/api/v1/nodes/canary/commands", headers=await _hdr(client, user))).json()
+        assert (items[0]["command"], items[0]["status"]) == (command, "accepted")
+        await _age_commands(5)
+
+
+@pytest.mark.parametrize("detector", [None, [], {}, {"alarm": False}, {"enabled": 0}, {"enabled": "false"}, {"enabled": None}])
+async def test_detector_configuration_requires_explicit_boolean_capability(client, mqtt, detector):
+    await handle_hardware_message("canary/status", json.dumps(air_doc(gas_detector=detector)).encode())
+    response = await _send(client, "canary", "DETECTOR_OFF")
+    assert response.status_code == 409, response.text
+    assert "firmware" in response.json()["detail"].lower()
+    assert mqtt.published == []
+    assert (await _send(client, "canary", "TEST")).status_code == 202
+
+
+async def test_detector_configuration_never_allowed_for_residents_and_stays_scoped(client, mqtt):
+    await handle_hardware_message("canary/status", json.dumps(air_doc(gas_detector={"enabled": True})).encode())
+    await handle_hardware_message("water-sensor/status", json.dumps(water_doc()).encode())
+    await client.patch("/api/v1/nodes/canary", json={"zone_id": "zone_kitchen"}, headers=await _hdr(client, "mihai"))
+    for command in ("DETECTOR_ON", "DETECTOR_OFF"):
+        assert (await _send(client, "canary", command, "ana")).status_code == 403
+        assert (await _send(client, "canary", command, "dispecer")).status_code == 403
+        assert (await _send(client, "water-sensor", command)).status_code == 422
+    async with SessionLocal() as s:
+        s.add(Building(id="bld_other", name="Other"))
+        s.add_all([User(id="usr_other_manager", username="other_manager", role="hoa_manager"),
+                   User(id="usr_other_tech", username="other_tech", role="technician")])
+        await s.flush()
+        s.add_all([StaffBuilding(user_id="usr_other_manager", building_id="bld_other"),
+                   StaffBuilding(user_id="usr_other_tech", building_id="bld_other")])
+        await s.commit()
+    for user in ("other_manager", "other_tech"):
+        assert (await _send(client, "canary", "DETECTOR_OFF", user)).status_code == 404
+    assert mqtt.published == []

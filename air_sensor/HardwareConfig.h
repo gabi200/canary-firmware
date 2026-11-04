@@ -160,7 +160,7 @@ constexpr char FALLBACK_NTP_SERVER[] = "pool.ntp.org";
 constexpr uint32_t CONFIG_SAVE_RETRY_MS = 1000;
 constexpr uint32_t CONFIG_REBOOT_DELAY_MS = 500;
 
-constexpr char FIRMWARE_VERSION[] = "1.2.0";
+constexpr char FIRMWARE_VERSION[] = "1.2.1";
 
 inline uint8_t outputLevel(bool active, bool activeHigh) {
   return activeLevelFor(active, activeHigh) ? HIGH : LOW;

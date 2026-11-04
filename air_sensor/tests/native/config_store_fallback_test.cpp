@@ -3,6 +3,7 @@
 #include <Preferences.h>
 
 #include <cstdlib>
+#include <cassert>
 #include <cstring>
 #include <iostream>
 
@@ -34,6 +35,26 @@ int main() {
     std::cerr << "ConfigStore setup failed\n";
     return EXIT_FAILURE;
   }
+
+  assert(!store.loadConfig().gasDetectorEnabled);
+  DeviceConfig enabled = validDeviceConfig();
+  enabled.gasDetectorEnabled = true;
+  assert(store.saveConfig(enabled));
+  assert(store.loadConfig().gasDetectorEnabled);
+  assert(store.saveGasDetectorEnabled(false));
+  assert(!store.loadConfig().gasDetectorEnabled);
+  assert(std::strcmp(store.loadConfig().deviceName, "hallway") == 0);
+  Preferences legacy;
+  legacy.begin("canarycfg", false);
+  legacy.remove("gasDetEnabled");
+  legacy.end();
+  assert(store.loadConfig().gasDetectorEnabled);
+  Preferences::failNextBoolWriteForTest();
+  assert(!store.saveGasDetectorEnabled(false));
+  assert(store.loadConfig().gasDetectorEnabled);
+  assert(store.saveGasDetectorEnabled(false));
+  assert(!store.loadConfig().gasDetectorEnabled);
+  Preferences::resetForTest();
 
   // No saved record at all: the defaults have no API token, so the sketch is
   // pushed into the provisioning portal rather than onto an open API.

@@ -12,6 +12,7 @@ class ConfigStore {
   bool begin();
   DeviceConfig loadConfig() const;
   bool saveConfig(const DeviceConfig& config);
+  bool saveGasDetectorEnabled(bool enabled);
 
  private:
   mutable Preferences preferences_;

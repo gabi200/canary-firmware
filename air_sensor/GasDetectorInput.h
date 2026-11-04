@@ -22,10 +22,10 @@ class GasDetectorInput {
 
   // Takes the boot reading as-is: the contact may already be open, and a
   // detector that is alarming must not wait out a debounce to be reported.
-  void begin(bool contactOpen, uint32_t nowMs);
+  void begin(bool contactOpen, uint32_t nowMs, bool enabled = true);
 
   // A new level is accepted only after it has held for the debounce time.
-  GasDetectorEvent update(bool contactOpen, uint32_t nowMs);
+  GasDetectorEvent update(bool contactOpen, uint32_t nowMs, bool enabled = true);
 
   bool alarmActive() const { return alarmActive_; }
 

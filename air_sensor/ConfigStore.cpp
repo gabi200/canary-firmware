@@ -38,6 +38,8 @@ DeviceConfig ConfigStore::loadConfig() const {
   preferences_.getString("deviceName", config.deviceName).toCharArray(
       config.deviceName, sizeof(config.deviceName));
   config.mqttEnabled = preferences_.getBool("mqttEnabled", config.mqttEnabled);
+  // Schema 1 deployments monitored the detector before this setting existed.
+  config.gasDetectorEnabled = preferences_.getBool("gasDetEnabled", true);
   preferences_.getString("mqttHost", config.mqttHost).toCharArray(
       config.mqttHost, sizeof(config.mqttHost));
   config.mqttPort = preferences_.getUShort("mqttPort", config.mqttPort);
@@ -82,7 +84,7 @@ bool ConfigStore::saveConfig(const DeviceConfig& config) {
     preferences_.end();
     return false;
   }
-  bool success = true;
+  bool success = stored(preferences_.putBool("gasDetEnabled", config.gasDetectorEnabled));
   success = storeString(preferences_, "deviceName", config.deviceName) && success;
   success = stored(preferences_.putBool("mqttEnabled", config.mqttEnabled)) && success;
   success = storeString(preferences_, "mqttHost", config.mqttHost) && success;
@@ -104,6 +106,18 @@ bool ConfigStore::saveConfig(const DeviceConfig& config) {
   if (success) {
     success = stored(preferences_.putUChar(VERSION_KEY, SCHEMA_VERSION));
   }
+  preferences_.end();
+  return success;
+}
+
+bool ConfigStore::saveGasDetectorEnabled(bool enabled) {
+  if (!preferences_.begin(CONFIG_NAMESPACE, false)) return false;
+  if (preferences_.getUChar(VERSION_KEY, 0) != SCHEMA_VERSION) {
+    preferences_.end();
+    return false;
+  }
+  // One NVS key is atomic; do not rewrite the provisioning record for a toggle.
+  const bool success = stored(preferences_.putBool("gasDetEnabled", enabled));
   preferences_.end();
   return success;
 }

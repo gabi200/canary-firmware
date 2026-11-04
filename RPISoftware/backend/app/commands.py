@@ -2,7 +2,8 @@
 `<base>/command/result` answer (docs/HARDWARE.md section 4).
 
 Topics and payloads follow the firmware (air_sensor / water_sensor README): air `buzzer/set`
-TEST | SILENCE; water `valve/set` OPEN | CLOSE and `buzzer/set` SILENCE; QoS 1, never retained.
+TEST | SILENCE and `gas-detector/set` DETECTOR_ON | DETECTOR_OFF; water `valve/set` OPEN | CLOSE
+and `buzzer/set` SILENCE; QoS 1, never retained.
 Results are `{"command","accepted":true,"state"}` or `{"command","accepted":false,"error"}`;
 the latest `sent` command with that name for the node within 30 s takes the result. A command
 without an answer for 15 s reads as `timeout` (computed on read, so a late answer within 30 s

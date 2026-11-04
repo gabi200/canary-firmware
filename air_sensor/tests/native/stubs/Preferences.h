@@ -63,6 +63,7 @@ class Preferences {
   }
 
   size_t putBool(const char* key, bool value) {
+    if (failBoolWrite_) { failBoolWrite_ = false; return 0; }
     Value& entry = values_[namespace_][key == nullptr ? "" : key];
     entry.type = Value::Type::U8;
     entry.ucharValue = value ? 1 : 0;
@@ -90,7 +91,8 @@ class Preferences {
     return entry.stringValue.size();
   }
 
-  static void resetForTest() { values_.clear(); }
+  static void failNextBoolWriteForTest() { failBoolWrite_ = true; }
+  static void resetForTest() { values_.clear(); failBoolWrite_ = false; }
 
  private:
   struct Value {
@@ -112,6 +114,7 @@ class Preferences {
     return valueIt == namespaceIt->second.end() ? nullptr : &valueIt->second;
   }
 
+  inline static bool failBoolWrite_ = false;
   std::string namespace_;
   inline static std::map<std::string, std::map<std::string, Value>> values_;
 };

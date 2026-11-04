@@ -827,7 +827,7 @@ class NodeAnalysisOut(BaseModel):
 # Device commands (docs/HARDWARE.md section 4)
 # --------------------------------------------------------------------------- #
 class CommandIn(BaseModel):
-    command: Literal["TEST", "SILENCE", "OPEN", "CLOSE"]
+    command: Literal["TEST", "SILENCE", "OPEN", "CLOSE", "DETECTOR_ON", "DETECTOR_OFF"]
 
 
 class CommandSentOut(BaseModel):

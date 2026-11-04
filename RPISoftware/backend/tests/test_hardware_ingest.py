@@ -827,3 +827,11 @@ async def test_plain_node_lands_in_live_building(client, monkeypatch):
     node = await _node("canary")
     assert (node.building_id, node.zone_id) == ("bld_live", "zone_live")
     assert await _count(NodeInbox, NodeInbox.node_id == "canary") == 1
+
+
+async def test_disabled_external_detector_does_not_alarm_but_mq5_still_does(client):
+    await publish("canary", air_doc(uptime_ms=1000, gas_detector={"enabled": False, "alarm": True}))
+    assert await _active(client) == []
+    await publish("canary", air_doc(uptime_ms=2000, gas_detector={"enabled": False, "alarm": True},
+                                    gas={"adc": 2300, "state": "danger"}))
+    assert [(i["hazard_type"], i["state"]) for i in await _active(client)] == [("combustible_gas", "evacuation")]

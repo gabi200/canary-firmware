@@ -28,7 +28,7 @@ broker needs a unique base topic.**
 | `<base>/availability` | device → hub | yes | `online`; last will `offline` |
 | `<base>/status` | device → hub | yes | status JSON (below); on change + heartbeat (air 15 s, water 60 s) |
 | `<base>/command/result` | device → hub | no | `{"command","accepted":true,"state"}` or `{"command","accepted":false,"error"}`; matched to the hub's command (§4) |
-| `<base>/valve/set`, `<base>/buzzer/set` | hub → device | never retain | sent by `POST /nodes/{id}/commands` (QoS 1): air `buzzer/set` `TEST`\|`SILENCE`; water `valve/set` `OPEN`\|`CLOSE`, `buzzer/set` `SILENCE` |
+| `<base>/valve/set`, `<base>/buzzer/set`, `<base>/gas-detector/set` | hub → device | never retain | sent by `POST /nodes/{id}/commands` (QoS 1): air `buzzer/set` `TEST`\|`SILENCE`, `gas-detector/set` `DETECTOR_ON`\|`DETECTOR_OFF`; water `valve/set` `OPEN`\|`CLOSE`, `buzzer/set` `SILENCE` |
 
 The hub subscribes to `#` (setting `CANARY_MQTT_SUBSCRIBE`, default `#`) and
 dispatches by topic suffix. Legacy `canary/v1/.../telemetry|event` messages
@@ -90,8 +90,10 @@ Vocabularies: channel `state` (`co`, `gas`, `particulate`) = `warmup|ok|warning|
 `gas.adc` is a raw, uncalibrated MQ5 ADC count (0–4095), **not ppm**.
 `gas_detector.alarm` is the external household gas detector's relay contact:
 `true` when it is alarming **or its wiring is open** (fail-safe, the two are
-not distinguished). It is independent of `alarm.*`, which covers the device's
-own sensors only. Documents carry no wall-clock time: the hub timestamps on
+not distinguished). Firmware 1.2.1 adds boolean `gas_detector.enabled`; disabled
+inputs report effective `alarm:false`. This setting is persisted per node; fresh configurations
+default disabled, while stored configurations without it keep enabled behavior. It is independent
+of `alarm.*`, which covers the device's own sensors only. Documents carry no wall-clock time: the hub timestamps on
 receipt. The air node syncs SNTP (from the MQTT host first) only to shorten
 warm-up after a power cut under 30 s; see `air_sensor/README.md`.
 
@@ -151,6 +153,8 @@ label **"Smoke / particulates"**, not auto-evacuating) and
   critical 1 / clear 0.5. An open contact is therefore critical combustible gas and goes
   to `evacuation` like an MQ5 `danger`, even though it also reads open when the wiring
   is cut. Older firmware sends no `gas_detector` object and produces no reading.
+  Explicit `gas_detector.enabled:false` skips this channel entirely; absent or malformed
+  `enabled` retains the alarm behavior above. MQ5, CO and particulate channels remain active.
   Nodes registered before this channel existed get its Device row on their next status
   document after a hub start.
 - Presence readings only when the value changed or ≥ 5 min since the last one.
@@ -229,7 +233,7 @@ and time remaining in `health.detail`.
 | GET | `/buildings/{id}/nodes` | hoa_manager, dispatcher_external, system_admin | `NodeOut[]` — raw + analysis (dashboard); each with `last_command` (command item or `null`; also on summary `zones[].nodes[]`, where residents see `requested_by_name` only for their own commands) |
 | GET | `/nodes/{node_id}/history?minutes=60&fields=a,b` | hoa_manager, dispatcher_external, system_admin; resident (own unit + common areas, environmental fields) | `NodeHistory` (dashboard charts, mobile sparklines) |
 | PATCH | `/nodes/{node_id}` body `{"zone_id"?: str, "name"?: str}` | hoa_manager, system_admin | `NodeOut`; 404 unknown node, 400 unknown zone |
-| POST | `/nodes/{node_id}/commands` body `{"command": "TEST"\|"SILENCE"\|"OPEN"\|"CLOSE"}` | system_admin; hoa_manager (their buildings); resident (nodes in zones of their own units, not common areas; else 404); dispatcher 403 | 202 `{"command_id", "node_id", "command", "status": "sent", "sent_ts"}`; 422 not a command of that node kind (air TEST/SILENCE, water OPEN/CLOSE/SILENCE), 409 node offline, 429 < 3 s after the node's last command, 503 broker not connected |
+| POST | `/nodes/{node_id}/commands` body `{"command": "TEST"\|"SILENCE"\|"OPEN"\|"CLOSE"\|"DETECTOR_ON"\|"DETECTOR_OFF"}` | system_admin; hoa_manager/technician (their buildings); DETECTOR_ON/OFF staff only (residents 403); resident (other commands, nodes in zones of their own units, not common areas; else 404); dispatcher 403 | 202 `{"command_id", "node_id", "command", "status": "sent", "sent_ts"}`; 422 not a command of that node kind (air TEST/SILENCE/DETECTOR_ON/DETECTOR_OFF, water OPEN/CLOSE/SILENCE), 409 node offline or detector configuration unsupported (latest status lacks boolean gas_detector.enabled; update firmware), 429 < 3 s after the node's last command, 503 broker not connected |
 | GET | `/nodes/{node_id}/commands?limit=20` | as POST | newest first `[{"command_id", "command", "status": "sent"\|"accepted"\|"rejected"\|"timeout", "detail", "requested_by_name", "sent_ts", "result_ts"}]`; `detail` = the firmware's `state` (accepted) or `error` (rejected); `timeout` = no answer after 15 s (computed on read; a late answer within 30 s still lands) |
 | GET | `/me` | any authenticated | `{"user_id", "username", "display_name", "role", "phone", "email", "language", "units": [{"unit_id", "unit_label", "building_id", "floor_label", "kind"}]}`; `units` from resident units, `[]` for staff; `language` `ro`\|`en` (notifications), `ro` until chosen |
 | PATCH | `/me` body any of `{"display_name": str (1–60, trimmed), "phone": str, "email": str, "language": "ro"\|"en"}` | any authenticated | same shape. Phone → E.164 (`0722 123 456`, `0040…`, `+40…` → `+40722123456`; other `+…` E.164 kept), `""` clears; email needs one `@` and a dotted domain (≤ 254), `""` clears; `null`, `username`, `role` or other fields → 422. Audited `account_updated` with the changed field names only |

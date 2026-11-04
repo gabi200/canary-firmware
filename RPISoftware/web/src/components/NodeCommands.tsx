@@ -49,6 +49,8 @@ const ICON: Record<NodeCommandName, typeof BellIcon> = {
   SILENCE: BellOffIcon,
   CLOSE: ValveIcon,
   OPEN: ValveIcon,
+  DETECTOR_ON: BellIcon,
+  DETECTOR_OFF: BellOffIcon,
 };
 
 /** a settled live chip stays up this long, then the "last command" line takes over */
