@@ -1,6 +1,7 @@
 """Demo incidents sound the real nodes: the first time an incident in the Demo building reaches an
-alarmed state, every online node of the Real building gets a buzzer TEST (air) or a valve CLOSE
-(water), so a presentation feels real.
+alarmed state while the hub is in Demo mode, every online node of the Real building gets a buzzer
+TEST (air) or a valve CLOSE (water), so a presentation feels real. In Real mode a stray Demo
+building incident must not close the real valve, so nothing is sent.
 
 `commands.send` publishes and commits, so it cannot run in the incident's transaction. The decision
 is taken inside the transition (`queue`) and the commands go out after that transaction commits
@@ -20,6 +21,7 @@ from app import commands
 from app.config import settings
 from app.db import SessionLocal
 from app.enums import ALARMED_STATES, IncidentState
+from app.mode import get_mode
 from app.models import DeviceCommand, Incident, Node
 
 log = logging.getLogger("canary.demo_bridge")
@@ -52,11 +54,15 @@ async def _online_live_node_ids(session: AsyncSession) -> list[str]:
 async def mirror(
     session: AsyncSession, incident: Incident, from_state: IncidentState, to_state: IncidentState
 ) -> list[DeviceCommand]:
-    """Command the real nodes and return the commands sent. Commits `session`, so never pass the
-    incident's own. A failing node is logged and the next one still gets its command. Never raises."""
+    """Command the real nodes and return the commands sent, only in Demo mode (read here, at send
+    time; a failed read sends nothing). Commits `session`, so never pass the incident's own. A
+    failing node is logged and the next one still gets its command. Never raises."""
     sent: list[DeviceCommand] = []
     try:
         if not should_mirror(incident, from_state, to_state):
+            return sent
+        if await get_mode(session) != "demo":
+            log.info("demo mirror skipped for incident %s: hub is not in demo mode", incident.id)
             return sent
         for node_id in await _online_live_node_ids(session):
             try:

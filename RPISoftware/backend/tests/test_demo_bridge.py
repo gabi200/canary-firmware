@@ -11,7 +11,7 @@ from app import commands, demo_bridge
 from app.db import SessionLocal
 from app.enums import ALARMED_STATES, IncidentState
 from app.ingestion import broker
-from app.mode import set_mode
+from app.mode import get_mode, set_mode
 from app.models import AuditLogEntry, DeviceCommand, Incident, Node, Notification, ResidentUnit
 from tests.conftest import auth_token, telemetry
 
@@ -47,6 +47,12 @@ def no_rate_limit(monkeypatch):
     monkeypatch.setattr(commands, "too_soon", never)
 
 
+@pytest.fixture
+async def demo_mode(client) -> None:
+    async with SessionLocal() as s:
+        await set_mode(s, "demo", "usr_mihai")
+
+
 async def _real_nodes(*, air_online: bool = True, water_online: bool = True) -> None:
     async with SessionLocal() as s:
         for node_id, kind, online in (("real-air", "air", air_online), ("real-water", "water", water_online)):
@@ -74,7 +80,7 @@ async def _command_rows() -> int:
         return await s.scalar(select(func.count()).select_from(DeviceCommand))
 
 
-async def test_demo_gas_leak_beeps_real_nodes(client, mqtt):
+async def test_demo_gas_leak_beeps_real_nodes(client, demo_mode, mqtt):
     await _real_nodes()
     body = await _gas_leak(client)
     assert body["incident_state"] == "evacuation"
@@ -88,7 +94,7 @@ async def test_demo_gas_leak_beeps_real_nodes(client, mqtt):
         assert set(actors.all()) == {"system:demo"}
 
 
-async def test_demo_mirror_once_per_incident(client, mqtt, no_rate_limit):
+async def test_demo_mirror_once_per_incident(client, demo_mode, mqtt, no_rate_limit):
     """Critical reading: detection -> alarm -> escalation -> evacuation fires one mirror; so do
     the readings and manual actions that follow."""
     await _real_nodes()
@@ -102,7 +108,7 @@ async def test_demo_mirror_once_per_incident(client, mqtt, no_rate_limit):
     assert len(mqtt.published) == 2
 
 
-async def test_demo_mirror_silent_moving_between_alarmed_states(client, mqtt, no_rate_limit):
+async def test_demo_mirror_silent_moving_between_alarmed_states(client, demo_mode, mqtt, no_rate_limit):
     """A corroborated alarm fires; the later alarm -> evacuation by a manager does not."""
     await _real_nodes()
     for seq, (device, zone) in enumerate((("dev_gas_a", "zone_kitchen"), ("dev_gas_b", "zone_hallway")), 1):
@@ -122,7 +128,7 @@ async def test_demo_mirror_silent_moving_between_alarmed_states(client, mqtt, no
     assert len(mqtt.published) == 2
 
 
-async def test_demo_incident_below_alarm_stays_silent(client, mqtt):
+async def test_demo_incident_below_alarm_stays_silent(client, demo_mode, mqtt):
     await _real_nodes()
     resp = await client.post("/api/v1/telemetry", json=telemetry(
         "dev_gas_kitchen", "combustible_gas", 1500, zone_id="zone_kitchen", unit_id="unit_0312", seq=1))
@@ -131,7 +137,7 @@ async def test_demo_incident_below_alarm_stays_silent(client, mqtt):
     assert mqtt.published == []
 
 
-async def test_new_incident_after_resolve_mirrors_again(client, mqtt, no_rate_limit):
+async def test_new_incident_after_resolve_mirrors_again(client, demo_mode, mqtt, no_rate_limit):
     """A closed incident is never reopened: the next leak is a new incident with its own mirror."""
     await _real_nodes()
     first = await _gas_leak(client, seq=1)
@@ -177,7 +183,52 @@ async def test_real_incident_unaffected_by_demo_mode(client, mqtt):
     assert residents and residents <= notified
 
 
-async def test_offline_real_node_skipped(client, mqtt):
+async def test_real_mode_demo_incident_opens_and_publishes_nothing(client, mqtt):
+    """A stray bld_007 incident in Real mode must not close the real valve."""
+    await _real_nodes()
+    async with SessionLocal() as s:
+        assert await get_mode(s) == "real"
+    body = await _gas_leak(client)
+    assert body["incident_state"] == "evacuation"
+    assert mqtt.published == []
+    assert await _command_rows() == 0
+    async with SessionLocal() as s:
+        notified = await s.scalar(select(func.count()).select_from(Notification)
+                                  .where(Notification.incident_id == body["incident_id"]))
+    assert notified > 0
+
+
+async def test_mode_is_read_at_send_time(client, demo_mode, mqtt):
+    """Demo when the incident alarmed, Real by the time its transaction commits: nothing goes out."""
+    await _real_nodes()
+    async with SessionLocal() as s:
+        incident = Incident(building_id="bld_007", hazard_type="combustible_gas", primary_zone_id="zone_kitchen",
+                            state="alarm", severity="critical", distinct_device_ids=[], affected_zone_ids=[])
+        s.add(incident)
+        await s.commit()
+        demo_bridge.queue(s, incident, IncidentState.detection, IncidentState.alarm)
+        async with SessionLocal() as other:
+            await set_mode(other, "real", "usr_mihai")
+        await s.commit()
+    await demo_bridge.drain()
+    assert mqtt.published == []
+
+
+async def test_failing_mode_read_sends_nothing(client, demo_mode, mqtt, monkeypatch, caplog):
+    async def boom(session):
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(demo_bridge, "get_mode", boom)
+    await _real_nodes()
+    with caplog.at_level(logging.ERROR, logger="canary.demo_bridge"):
+        body = await _gas_leak(client)
+    assert body["incident_state"] == "evacuation"
+    assert mqtt.published == []
+    assert await _command_rows() == 0
+    assert "database down" in caplog.text
+
+
+async def test_offline_real_node_skipped(client, demo_mode, mqtt):
     await _real_nodes(air_online=False)
     body = await _gas_leak(client)
     assert body["incident_state"] == "evacuation"
@@ -185,7 +236,7 @@ async def test_offline_real_node_skipped(client, mqtt):
     assert await _command_rows() == 1
 
 
-async def test_node_commanded_a_moment_ago_is_skipped(client, mqtt):
+async def test_node_commanded_a_moment_ago_is_skipped(client, demo_mode, mqtt):
     await _real_nodes()
     resp = await client.post("/api/v1/nodes/real-air/commands", json={"command": "SILENCE"},
                              headers=await _hdr(client, "mihai"))
@@ -195,7 +246,7 @@ async def test_node_commanded_a_moment_ago_is_skipped(client, mqtt):
     assert mqtt.published == [WATER]
 
 
-async def test_commands_go_out_after_the_incident_committed(client, mqtt):
+async def test_commands_go_out_after_the_incident_committed(client, demo_mode, mqtt):
     """When the first publish happens, another connection already reads the finished incident."""
     await _real_nodes()
     seen: list[str] = []
@@ -209,7 +260,7 @@ async def test_commands_go_out_after_the_incident_committed(client, mqtt):
     assert seen and set(seen) == {"evacuation"}
 
 
-async def test_rolled_back_transition_sends_nothing(client, mqtt):
+async def test_rolled_back_transition_sends_nothing(client, demo_mode, mqtt):
     await _real_nodes()
     async with SessionLocal() as s:
         incident = Incident(building_id="bld_007", hazard_type="combustible_gas", primary_zone_id="zone_kitchen",
@@ -222,7 +273,7 @@ async def test_rolled_back_transition_sends_nothing(client, mqtt):
     assert mqtt.published == []
 
 
-async def test_savepoint_commit_does_not_fire_the_mirror(client, mqtt):
+async def test_savepoint_commit_does_not_fire_the_mirror(client, demo_mode, mqtt):
     """SQLAlchemy runs after_commit on a savepoint release too; only the real commit may fire."""
     await _real_nodes()
     async with SessionLocal() as s:
@@ -244,7 +295,7 @@ async def test_savepoint_commit_does_not_fire_the_mirror(client, mqtt):
     assert sorted(mqtt.published) == sorted([AIR, WATER])
 
 
-async def test_broker_down_never_reaches_the_incident(client, monkeypatch, caplog):
+async def test_broker_down_never_reaches_the_incident(client, demo_mode, monkeypatch, caplog):
     await _real_nodes()
     monkeypatch.setattr(broker, "client", None)
     with caplog.at_level(logging.ERROR, logger="canary.demo_bridge"):
@@ -256,7 +307,7 @@ async def test_broker_down_never_reaches_the_incident(client, monkeypatch, caplo
         assert (await s.get(Incident, body["incident_id"])).state == "evacuation"
 
 
-async def test_failure_on_one_node_still_commands_the_next(client, mqtt, monkeypatch):
+async def test_failure_on_one_node_still_commands_the_next(client, demo_mode, mqtt, monkeypatch):
     await _real_nodes()
     real_send = commands.send
     calls: list[str] = []
@@ -277,7 +328,7 @@ async def test_failure_on_one_node_still_commands_the_next(client, mqtt, monkeyp
                               .where(AuditLogEntry.action == "half_done")) == 0
 
 
-async def test_failing_decision_never_breaks_the_incident(client, mqtt, monkeypatch):
+async def test_failing_decision_never_breaks_the_incident(client, demo_mode, mqtt, monkeypatch):
     def boom(*args):
         raise RuntimeError("bridge bug")
 
@@ -288,7 +339,7 @@ async def test_failing_decision_never_breaks_the_incident(client, mqtt, monkeypa
     assert mqtt.published == []
 
 
-async def test_mirror_itself_never_raises(client, mqtt, monkeypatch):
+async def test_mirror_itself_never_raises(client, demo_mode, mqtt, monkeypatch):
     async def boom(*args, **kwargs):
         raise RuntimeError("database down")
 
@@ -299,7 +350,7 @@ async def test_mirror_itself_never_raises(client, mqtt, monkeypatch):
     assert sent == []
 
 
-async def test_system_actor_is_readable_in_the_apis(client):
+async def test_system_actor_is_readable_in_the_apis(client, demo_mode):
     """`system:demo` has no user row: command lists show no requester name instead of failing."""
     await _real_nodes()
     await _gas_leak(client)
