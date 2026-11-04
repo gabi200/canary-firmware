@@ -55,6 +55,40 @@ void main() {
     expect(r.liveAlarm, isFalse);
   });
 
+  group('real alarm notification decision', () {
+    HubMode m(String mode, bool live) => HubMode(mode: mode, buildingId: 'b', liveAlarm: live);
+
+    test('false to true in demo fires', () => expect(shouldAlertRealAlarm(m('demo', false), m('demo', true)), isTrue));
+    test('true to true does not', () => expect(shouldAlertRealAlarm(m('demo', true), m('demo', true)), isFalse));
+    test('true on the first poll fires', () => expect(shouldAlertRealAlarm(null, m('demo', true)), isTrue));
+    test('false on the first poll does not', () => expect(shouldAlertRealAlarm(null, m('demo', false)), isFalse));
+    test('real mode never fires', () {
+      expect(shouldAlertRealAlarm(m('real', false), m('real', true)), isFalse);
+      expect(shouldAlertRealAlarm(null, m('real', true)), isFalse);
+    });
+  });
+
+  test('the controller notifies once per change and keeps polling if notifying fails', () async {
+    final storage = await _storage(building: 'bld_007');
+    final hub = FakeHub()..reply(_modePath, 200, {'mode': 'demo', 'building_id': 'bld_007', 'live_alarm': false});
+    final c = _container(storage, hub);
+    var fired = 0;
+    final controller = ModeController(c.read(apiClientProvider), c.read(sessionProvider.notifier),
+        enabled: false, onRealAlarm: (_) async {
+      fired++;
+      throw StateError('no plugin');
+    });
+    addTearDown(controller.dispose);
+
+    await controller.poll();
+    expect(fired, 0);
+    hub.reply(_modePath, 200, {'mode': 'demo', 'building_id': 'bld_007', 'live_alarm': true});
+    await controller.poll();
+    await controller.poll();
+    expect(fired, 1);
+    expect(controller.state!.liveAlarm, isTrue);
+  });
+
   test('a session on bld_live follows a demo mode to bld_007 and saves it', () async {
     final storage = await _storage(building: 'bld_live');
     final hub = FakeHub()..reply(_modePath, 200, {'mode': 'demo', 'building_id': 'bld_007', 'live_alarm': true});

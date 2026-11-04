@@ -17,8 +17,9 @@ class CareProfilesController extends AsyncNotifier<List<CareProfile>> {
   Future<List<CareProfile>> build() async {
     final session = ref.watch(sessionProvider);
     if (session == null || !session.isResident) return const [];
+    final api = ref.watch(apiClientProvider);
     final other = await otherBuildingUnitIds(ref);
-    return _inThisBuilding(await ref.watch(apiClientProvider).careProfiles(), other);
+    return _inThisBuilding(await api.careProfiles(), other);
   }
 
   /// Profiles on a home of another building belong to the other mode's screens.
