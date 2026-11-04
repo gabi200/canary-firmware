@@ -595,5 +595,20 @@
   "planExit": "Exit",
   "affectedRoomsTitle": "Affected rooms",
   "roomTagSource": "where it started",
-  "roomTagYours": "your home"
+  "roomTagYours": "your home",
+  "classificationTitle": "Sensor classification",
+  "classificationRule": "Rule assessment",
+  "classificationModel": "Evaluation only · model",
+  "classificationEvidence": "Evidence",
+  "classificationEstimate": "Estimates only. Follow active alarm instructions.",
+  "classificationUnavailable": "Unavailable",
+  "classificationNormal": "Normal pattern",
+  "classificationUnknown": "Unknown pattern",
+  "classificationSmouldering": "Smouldering fire",
+  "classificationFlaming": "Flaming fire",
+  "classificationGas": "Gas leak",
+  "classificationSteam": "Steam",
+  "classificationCooking": "Cooking",
+  "classificationAerosol": "Aerosol",
+  "classificationUpdated": "Assessed"
 }

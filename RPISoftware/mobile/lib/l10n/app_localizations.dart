@@ -3044,6 +3044,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'your home'**
   String get roomTagYours;
+
+  /// No description provided for @classificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor classification'**
+  String get classificationTitle;
+
+  /// No description provided for @classificationRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule assessment'**
+  String get classificationRule;
+
+  /// No description provided for @classificationModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Evaluation only · model'**
+  String get classificationModel;
+
+  /// No description provided for @classificationEvidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Evidence'**
+  String get classificationEvidence;
+
+  /// No description provided for @classificationEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimates only. Follow active alarm instructions.'**
+  String get classificationEstimate;
+
+  /// No description provided for @classificationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get classificationUnavailable;
+
+  /// No description provided for @classificationNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal pattern'**
+  String get classificationNormal;
+
+  /// No description provided for @classificationUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown pattern'**
+  String get classificationUnknown;
+
+  /// No description provided for @classificationSmouldering.
+  ///
+  /// In en, this message translates to:
+  /// **'Smouldering fire'**
+  String get classificationSmouldering;
+
+  /// No description provided for @classificationFlaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Flaming fire'**
+  String get classificationFlaming;
+
+  /// No description provided for @classificationGas.
+  ///
+  /// In en, this message translates to:
+  /// **'Gas leak'**
+  String get classificationGas;
+
+  /// No description provided for @classificationSteam.
+  ///
+  /// In en, this message translates to:
+  /// **'Steam'**
+  String get classificationSteam;
+
+  /// No description provided for @classificationCooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooking'**
+  String get classificationCooking;
+
+  /// No description provided for @classificationAerosol.
+  ///
+  /// In en, this message translates to:
+  /// **'Aerosol'**
+  String get classificationAerosol;
+
+  /// No description provided for @classificationUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Assessed'**
+  String get classificationUpdated;
 }
 
 class _AppLocalizationsDelegate

@@ -40,7 +40,11 @@ class IncidentsState {
     return null;
   }
 
-  IncidentsState copyWith({List<Incident>? incidents, bool? connected, int? pending, int? eventSeq}) =>
+  IncidentsState copyWith(
+          {List<Incident>? incidents,
+          bool? connected,
+          int? pending,
+          int? eventSeq}) =>
       IncidentsState(
         incidents: incidents ?? this.incidents,
         connected: connected ?? this.connected,
@@ -55,9 +59,14 @@ class IncidentsState {
 class IncidentController extends StateNotifier<IncidentsState> {
   IncidentController(this._api, this._storage, this._session,
       {AppLocalizations Function()? localizations})
-      : _l10n = localizations ?? (() => lookupAppLocalizations(const Locale('en'))),
+      : _l10n =
+            localizations ?? (() => lookupAppLocalizations(const Locale('en'))),
         super(IncidentsState(pending: _storage.pendingCheckIns().length)) {
-    if (_session != null) _init();
+    if (_session != null) {
+      _refreshTimer =
+          Timer.periodic(const Duration(seconds: 10), (_) => refresh());
+      _init();
+    }
   }
 
   final ApiClient _api;
@@ -67,6 +76,9 @@ class IncidentController extends StateNotifier<IncidentsState> {
   /// Strings in the current app language, read when a notification is raised.
   final AppLocalizations Function() _l10n;
   WsClient? _ws;
+  Timer? _refreshTimer;
+  Future<void>? _refreshing;
+  int _incidentRevision = 0;
   final Set<String> _alarmed = {};
   final _live = StreamController<Map<String, dynamic>>.broadcast();
 
@@ -82,11 +94,20 @@ class IncidentController extends StateNotifier<IncidentsState> {
     _connectWs();
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh() {
+    if (!mounted || _session == null) return Future.value();
+    return _refreshing ??=
+        _loadSnapshot().whenComplete(() => _refreshing = null);
+  }
+
+  Future<void> _loadSnapshot() async {
     final session = _session;
     if (session == null) return;
+    final revision = _incidentRevision;
     try {
       final list = await _api.activeIncidents(session.buildingId);
+      // A REST request started before a live transition cannot resurrect a closed alarm.
+      if (!mounted || revision != _incidentRevision) return;
       state = state.copyWith(incidents: list);
     } catch (e) {
       debugPrint('Canary: incident refresh failed: $e');
@@ -133,10 +154,16 @@ class IncidentController extends StateNotifier<IncidentsState> {
       flushQueue();
       return;
     }
-    final incident = Incident.fromWsEvent(ev);
+    _incidentRevision++;
+    Incident? previous;
+    for (final incident in state.incidents) {
+      if (incident.id == ev['incident_id']) previous = incident;
+    }
+    final incident = Incident.fromWsEvent(ev, previous: previous);
     _upsert(incident);
 
-    if (incident.isAlarming && !_alarmed.contains(incident.id + incident.state)) {
+    if (incident.isAlarming &&
+        !_alarmed.contains(incident.id + incident.state)) {
       _alarmed.add(incident.id + incident.state);
       // Text is built locally in the app language: the frame's title/body are
       // English and shared by every client of the building.
@@ -164,13 +191,17 @@ class IncidentController extends StateNotifier<IncidentsState> {
     state = state.copyWith(incidents: list);
   }
 
-  Future<CheckInResult> submitCheckIn(String incidentId, CheckInStatus status) async {
+  Future<CheckInResult> submitCheckIn(
+      String incidentId, CheckInStatus status) async {
     try {
       await _api.checkIn(incidentId, status);
       return CheckInResult.sent;
     } catch (_) {
       await _storage.enqueueCheckIn(
-        PendingCheckIn(incidentId: incidentId, status: status.token, queuedAt: DateTime.now()),
+        PendingCheckIn(
+            incidentId: incidentId,
+            status: status.token,
+            queuedAt: DateTime.now()),
       );
       state = state.copyWith(pending: _storage.pendingCheckIns().length);
       return CheckInResult.queued;
@@ -198,6 +229,7 @@ class IncidentController extends StateNotifier<IncidentsState> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _ws?.dispose();
     _live.close();
     super.dispose();

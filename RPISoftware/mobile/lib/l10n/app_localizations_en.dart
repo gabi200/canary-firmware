@@ -1768,4 +1768,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roomTagYours => 'your home';
+
+  @override
+  String get classificationTitle => 'Sensor classification';
+
+  @override
+  String get classificationRule => 'Rule assessment';
+
+  @override
+  String get classificationModel => 'Evaluation only · model';
+
+  @override
+  String get classificationEvidence => 'Evidence';
+
+  @override
+  String get classificationEstimate =>
+      'Estimates only. Follow active alarm instructions.';
+
+  @override
+  String get classificationUnavailable => 'Unavailable';
+
+  @override
+  String get classificationNormal => 'Normal pattern';
+
+  @override
+  String get classificationUnknown => 'Unknown pattern';
+
+  @override
+  String get classificationSmouldering => 'Smouldering fire';
+
+  @override
+  String get classificationFlaming => 'Flaming fire';
+
+  @override
+  String get classificationGas => 'Gas leak';
+
+  @override
+  String get classificationSteam => 'Steam';
+
+  @override
+  String get classificationCooking => 'Cooking';
+
+  @override
+  String get classificationAerosol => 'Aerosol';
+
+  @override
+  String get classificationUpdated => 'Assessed';
 }

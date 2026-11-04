@@ -42,6 +42,13 @@ button { font-family: inherit; cursor: pointer; }
 .live.off .led { background: var(--muted); box-shadow: none; }
 
 .content { padding: 20px; max-width: 1400px; width: 100%; margin: 0 auto; }
+.classification-alerts { display: grid; gap: 8px; max-height: 35vh; overflow-y: auto; overflow-wrap: anywhere; }
+.classification-alert { border-left: 4px solid var(--amber); }
+.classification-alert.hazard { border-left-color: var(--red); }
+.classification-alert h2 { font-size: 16px; margin: 0; }
+.classification-alert .row { flex-wrap: wrap; }
+.classification-alert summary { cursor: pointer; margin-top: 6px; }
+.classification-alert ul { margin: 6px 0 0; padding-left: 20px; }
 .grid { display: grid; gap: 16px; }
 .grid.cols-2 { grid-template-columns: 1.4fr 1fr; }
 .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }

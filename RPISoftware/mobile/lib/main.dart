@@ -15,6 +15,7 @@ import 'src/ui/care_profiles_screen.dart';
 import 'src/ui/find_hub_screen.dart';
 import 'src/ui/invite_accept_screen.dart';
 import 'src/ui/home_screen.dart';
+import 'src/ui/widgets/classification_alerts.dart';
 import 'src/ui/manager_dashboard_screen.dart';
 import 'src/ui/onboarding_screen.dart';
 
@@ -92,6 +93,7 @@ class CanaryApp extends ConsumerWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: home,
+      builder: (context, child) => ClassificationAlerts(child: child ?? const SizedBox.shrink()),
       // Deep links: /join/<code> (https / web) and /<code> (canary://join/<code>)
       // open the household invite, signing in first if needed.
       onGenerateRoute: (settings) {

@@ -25,6 +25,18 @@ extension BuildContextL10n on BuildContext {
 /// a newer backend never renders as blank. Building data (zone labels, waypoint
 /// text, names) is shown as-is and never passes through here.
 extension AppLocalizationsLabels on AppLocalizations {
+  String classificationName(String? label) => switch (label) {
+        'smouldering_fire' => classificationSmouldering,
+        'flaming_fire' => classificationFlaming,
+        'gas_leak' => classificationGas,
+        'steam' => classificationSteam,
+        'cooking' => classificationCooking,
+        'aerosol' => classificationAerosol,
+        'normal' => classificationNormal,
+        'unknown' => classificationUnknown,
+        _ => classificationUnavailable,
+      };
+
   String hazardName(String hazardType) => switch (hazardType) {
         'combustible_gas' => hazardGasLeak,
         'co' => hazardCarbonMonoxide,

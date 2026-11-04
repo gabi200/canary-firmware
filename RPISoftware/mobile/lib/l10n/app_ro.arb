@@ -509,5 +509,20 @@
   "planExit": "Ieșire",
   "affectedRoomsTitle": "Camere afectate",
   "roomTagSource": "sursa",
-  "roomTagYours": "locuința ta"
+  "roomTagYours": "locuința ta",
+  "classificationTitle": "Clasificarea senzorilor",
+  "classificationRule": "Evaluare prin reguli",
+  "classificationModel": "Doar pentru evaluare · model",
+  "classificationEvidence": "Dovezi",
+  "classificationEstimate": "Doar estimări. Urmează instrucțiunile alarmei active.",
+  "classificationUnavailable": "Indisponibil",
+  "classificationNormal": "Tipar normal",
+  "classificationUnknown": "Tipar necunoscut",
+  "classificationSmouldering": "Foc mocnit",
+  "classificationFlaming": "Foc cu flacără",
+  "classificationGas": "Scurgere de gaz",
+  "classificationSteam": "Abur",
+  "classificationCooking": "Gătit",
+  "classificationAerosol": "Aerosoli",
+  "classificationUpdated": "Evaluat"
 }

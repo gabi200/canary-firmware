@@ -6,6 +6,7 @@ import { LoginPage } from "./auth/LoginPage";
 import { useT } from "./i18n";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RealAlarmBanner } from "./components/RealAlarmBanner";
+import { ClassificationAlerts } from "./components/ClassificationAlerts";
 import { Topbar } from "./components/Topbar";
 import { useIncidentSocket } from "./realtime/useIncidentSocket";
 import { AdminView } from "./views/AdminView";
@@ -26,6 +27,7 @@ function AuthedLayout() {
     <div className="app">
       <Topbar connected={connected} />
       <RealAlarmBanner />
+      <ClassificationAlerts />
       <Outlet />
     </div>
   );

@@ -1782,4 +1782,50 @@ class AppLocalizationsRo extends AppLocalizations {
 
   @override
   String get roomTagYours => 'locuința ta';
+
+  @override
+  String get classificationTitle => 'Clasificarea senzorilor';
+
+  @override
+  String get classificationRule => 'Evaluare prin reguli';
+
+  @override
+  String get classificationModel => 'Doar pentru evaluare · model';
+
+  @override
+  String get classificationEvidence => 'Dovezi';
+
+  @override
+  String get classificationEstimate =>
+      'Doar estimări. Urmează instrucțiunile alarmei active.';
+
+  @override
+  String get classificationUnavailable => 'Indisponibil';
+
+  @override
+  String get classificationNormal => 'Tipar normal';
+
+  @override
+  String get classificationUnknown => 'Tipar necunoscut';
+
+  @override
+  String get classificationSmouldering => 'Foc mocnit';
+
+  @override
+  String get classificationFlaming => 'Foc cu flacără';
+
+  @override
+  String get classificationGas => 'Scurgere de gaz';
+
+  @override
+  String get classificationSteam => 'Abur';
+
+  @override
+  String get classificationCooking => 'Gătit';
+
+  @override
+  String get classificationAerosol => 'Aerosoli';
+
+  @override
+  String get classificationUpdated => 'Evaluat';
 }
