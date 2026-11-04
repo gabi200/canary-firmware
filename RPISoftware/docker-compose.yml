@@ -263,6 +263,26 @@ services:
     entrypoint: ["python", "building_sim.py"]
     command: ["--config", "rooms.demo.json"]
 
+  # Always-on demo nodes for the hub's demo mode: every base is prefixed "demo-" (the backend files
+  # those nodes under the Demo building), every room plays "normal" and no console is read.
+  # Add "demo" to COMPOSE_PROFILES on one Pi only; never together with building-sim (same rooms).
+  demo-sim:
+    build: ./simulator
+    profiles: ["demo"]
+    restart: unless-stopped
+    init: true
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      <<: *sim-env
+      HUB_URL: http://backend:8000
+      BASE_PREFIX: demo-
+    entrypoint: ["python", "building_sim.py"]
+    command: ["--config", "rooms.demo.json", "--no-console", "--scenario", "normal"]
+
   # Legacy canary.telemetry.v1 simulator (sensors of the seeded demo building).
   #   docker compose --profile sim run --rm simulator --scenario gas_leak
   simulator:
