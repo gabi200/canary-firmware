@@ -31,8 +31,10 @@ class CareProfilesController extends AsyncNotifier<List<CareProfile>> {
   /// Refetch, keeping the current list on screen meanwhile.
   Future<void> refresh() async {
     state = const AsyncLoading<List<CareProfile>>().copyWithPrevious(state);
-    final other = ref.read(meProvider).valueOrNull?.otherUnitIds ?? const <String>{};
-    state = await AsyncValue.guard(() async => _inThisBuilding(await _api.careProfiles(), other));
+    state = await AsyncValue.guard(() async {
+      final other = (await ref.read(meProvider.future))?.otherUnitIds ?? const <String>{};
+      return _inThisBuilding(await _api.careProfiles(), other);
+    });
   }
 
   /// Create ([id] null) or update; throws [ApiException] (422 / 404 / 409 / 503).

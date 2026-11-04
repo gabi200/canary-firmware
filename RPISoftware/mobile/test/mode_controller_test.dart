@@ -89,6 +89,52 @@ void main() {
     expect(controller.state!.liveAlarm, isTrue);
   });
 
+  test('HubMode compares by value, so an unchanged poll does not notify', () async {
+    HubMode m() => const HubMode(mode: 'demo', buildingId: 'bld_007');
+    expect(m(), m());
+    expect(m().hashCode, m().hashCode);
+    expect(m(), isNot(const HubMode(mode: 'demo', buildingId: 'bld_007', liveAlarm: true)));
+
+    final storage = await _storage(building: 'bld_007');
+    final hub = FakeHub()..reply(_modePath, 200, {'mode': 'demo', 'building_id': 'bld_007', 'live_alarm': false});
+    final c = _container(storage, hub);
+    final controller = ModeController(c.read(apiClientProvider), c.read(sessionProvider.notifier), enabled: false);
+    addTearDown(controller.dispose);
+    var notified = 0;
+    controller.addListener((_) => notified++, fireImmediately: false);
+    await controller.poll();
+    await controller.poll();
+    expect(notified, 1);
+  });
+
+  test('a failing /me is an error, never both buildings', () async {
+    final hub = FakeHub()
+      ..reply('GET /api/v1/me', 503, {'detail': 'down'})
+      ..reply('GET /api/v1/me/care-profiles', 200, [
+        {'id': 'cp_demo', 'unit_id': 'unit_demo', 'display_name': 'a', 'is_self': false, 'needs': ['pet']},
+        {'id': 'cp_live', 'unit_id': 'unit_live', 'display_name': 'b', 'is_self': false, 'needs': ['pet']},
+      ])
+      ..reply('GET /api/v1/me/household', 200, [
+        {'unit_id': 'unit_demo', 'members': []},
+        {'unit_id': 'unit_live', 'members': []},
+      ]);
+    final c = _container(await _storage(building: 'bld_007'), hub);
+    c.listen(careProfilesProvider, (_, __) {});
+    c.listen(householdProvider, (_, __) {});
+    await expectLater(c.read(careProfilesProvider.future), throwsA(anything));
+    await expectLater(c.read(householdProvider.future), throwsA(anything));
+
+    // /me is back: refresh() lists this building only
+    hub.reply('GET /api/v1/me', 200, {
+      'user_id': 'u', 'username': 'ana', 'role': 'resident',
+      'units': [_unit('unit_demo', 'bld_007'), _unit('unit_live', 'bld_live')],
+    });
+    c.invalidate(meProvider);
+    await c.read(meProvider.future);
+    await c.read(careProfilesProvider.notifier).refresh();
+    expect(c.read(careProfilesProvider).value!.map((p) => p.id), ['cp_demo']);
+  });
+
   test('a session on bld_live follows a demo mode to bld_007 and saves it', () async {
     final storage = await _storage(building: 'bld_live');
     final hub = FakeHub()..reply(_modePath, 200, {'mode': 'demo', 'building_id': 'bld_007', 'live_alarm': true});

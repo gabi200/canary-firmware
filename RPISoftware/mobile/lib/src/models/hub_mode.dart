@@ -13,6 +13,13 @@ class HubMode {
 
   bool get isDemo => mode == 'demo';
 
+  @override
+  bool operator ==(Object other) =>
+      other is HubMode && other.mode == mode && other.buildingId == buildingId && other.liveAlarm == liveAlarm;
+
+  @override
+  int get hashCode => Object.hash(mode, buildingId, liveAlarm);
+
   factory HubMode.fromJson(Map<String, dynamic> j) => HubMode(
         mode: j['mode'] as String,
         buildingId: j['building_id'] as String,

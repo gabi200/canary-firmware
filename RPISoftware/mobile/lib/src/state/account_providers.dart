@@ -36,12 +36,8 @@ final languageSyncProvider = Provider<void>((ref) {
 });
 
 /// Units of the resident's other buildings (from `/me`), to keep their care
-/// profiles and household out of this building's screens. Empty when `/me`
-/// can't be read (older hub): nothing to filter by.
-Future<Set<String>> otherBuildingUnitIds(Ref ref) async {
-  try {
-    return (await ref.watch(meProvider.future))?.otherUnitIds ?? const {};
-  } catch (_) {
-    return const {};
-  }
-}
+/// profiles and household out of this building's screens. Empty on a hub
+/// without `/me` (it answers null). A failing `/me` throws, so the caller's
+/// provider shows its error and retry instead of listing both buildings.
+Future<Set<String>> otherBuildingUnitIds(Ref ref) async =>
+    (await ref.watch(meProvider.future))?.otherUnitIds ?? const {};

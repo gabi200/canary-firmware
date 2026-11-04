@@ -48,7 +48,7 @@ class ModeController extends StateNotifier<HubMode?> {
       final mode = await _api.hubMode();
       if (!mounted) return;
       final alert = shouldAlertRealAlarm(state, mode);
-      state = mode;
+      if (state != mode) state = mode; // an unchanged answer wakes nobody
       if (alert) {
         try {
           await onRealAlarm?.call(mode);

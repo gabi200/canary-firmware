@@ -56,7 +56,9 @@ class CanaryApp extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final locale = ref.watch(localeProvider);
     ref.watch(languageSyncProvider); // keep the hub's notification language in step
-    ref.watch(hubModeProvider); // follow the hub's demo / real mode (5 s poll while signed in)
+    // Follow the hub's demo / real mode (5 s poll while signed in); listen, so
+    // an answer never rebuilds the app root.
+    ref.listen(hubModeProvider, (_, __) {});
     ref.listen<AppLocalizations>(
       l10nProvider,
       (_, l10n) => Notifications.instance.setLocalizations(l10n),
