@@ -246,6 +246,25 @@ services:
       - cluster_state:/run/canary:ro
     logging: *logging
 
+  # Three Pis: copies live device messages from this Pi's broker to the one behind the floating IP,
+  # and commands back, so a sensor left on another Pi's broker still reaches the hub. Idle on the Pi
+  # holding the floating IP. The backend's image has what it needs (the Pis cannot reach PyPI on
+  # the hotspot); host network, to see whether this Pi holds the address.
+  relay:
+    image: canary-backend:latest
+    pull_policy: never
+    profiles: ["cluster"]
+    network_mode: host
+    restart: unless-stopped
+    command: ["python", "-u", "/relay/relay.py"]
+    environment:
+      CANARY_VIP: ${CANARY_VIP:-}
+      CANARY_NODE_NAME: ${CANARY_NODE_NAME:-}
+      CANARY_MQTT_PASSWORD: ${CANARY_MQTT_PASSWORD:?run scripts/pi_setup.sh first}
+    volumes:
+      - ./cluster/relay:/relay:ro
+    logging: *logging
+
   # --- Simulators: profile "sim", never started by a plain `docker compose up` ---
 
   # Firmware-accurate ESP32 air + water nodes (status documents of docs/HARDWARE.md).

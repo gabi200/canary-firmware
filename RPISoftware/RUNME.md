@@ -685,6 +685,14 @@ been up 30 s. The Postgres primary stays wherever it is now: that is normal. Whe
 some sensors can show **offline** for up to a minute: the broker they left still holds their old
 "offline" message, until each one's next status (air 15 s, water 60 s) shows it online again.
 
+A sensor keeps its broker for as long as the connection lasts, so after a hotspot drop it may stay on
+a Pi that no longer holds the VIP. The `relay` service (`cluster/relay`, on all three Pis, idle on the
+VIP's) copies live messages from that Pi's broker to the VIP's and commands back, so the sensor still
+reaches the hub. `docker compose logs relay` lists each topic it forwards. It deliberately is not a
+Mosquitto bridge: a bridge replays old retained messages as live ones on every reconnect, which could
+raise a false incident. After changing it, run `cluster/relay/e2e_relay.sh` on a Pi: real brokers in a
+private network, safe beside a running hub.
+
 ### 3.6 Failover drill
 
 1. Open `http://<VIP>/admin/hub` and, on one Pi, `docker compose exec postgres patronictl list`:

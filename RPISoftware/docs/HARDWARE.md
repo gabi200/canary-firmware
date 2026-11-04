@@ -504,6 +504,7 @@ added to `.env`. In triple mode `scripts/pi_setup.sh --cluster` writes the clust
 | Work | Runs on | When that Pi is down |
 | --- | --- | --- |
 | Hub address (VIP, and `canary-hub.local` + `_canary-hub._tcp` from the `announcer`): broker for the sensors, dashboard, API for the app | the `web` Pi (keepalived) | moves to `processing`, then `ai` (a few seconds) |
+| Relay: live device messages from a Pi's broker to the VIP's, commands back (`cluster/relay`) | every Pi without the VIP | sensors on that Pi's broker reconnect to the VIP |
 | Processing: MQTT subscription, detection, incidents, notifications, retention | holder of the `processing` lease (`cluster_leases`, 15 s, renewed every 2 s) | `web`, then `ai`, after the lease expires; back home 30 s after the Pi returns |
 | AI: triangulation, signature shadow model, incident brief (`POST /internal/ai/{task}`) | the `ai` Pi (AI HAT+ 2 for the brief) | computed by the caller itself (CPU; briefs fall back to the template) |
 | Database | Patroni Postgres primary (synchronous replica on another Pi) | a replica is promoted |
