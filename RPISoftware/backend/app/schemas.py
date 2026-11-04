@@ -1111,3 +1111,13 @@ class ScenarioOut(BaseModel):
     rooms: list[ScenarioRoomOut]
     loads: list[ScenarioLoadOut]
     stranded_people: int
+
+
+class ModeIn(BaseModel):
+    mode: Literal["demo", "real"]
+
+
+class ModeOut(BaseModel):
+    mode: Literal["demo", "real"]
+    building_id: str
+    live_alarm: bool

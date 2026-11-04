@@ -667,3 +667,13 @@ class ClusterLease(Base):
     holder: Mapped[str | None] = mapped_column(String, nullable=True)
     expires_ts: Mapped[datetime] = mapped_column(UTCDateTime)
     acquired_ts: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class HubSetting(Base):
+    """Hub-wide key/value settings (currently only `mode`: demo or real)."""
+
+    __tablename__ = "hub_settings"
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(String)
+    updated_ts: Mapped[datetime] = _ts_col()
+    updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
