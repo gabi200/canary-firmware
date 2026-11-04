@@ -7,6 +7,7 @@ import 'src/services/notifications.dart';
 import 'src/services/storage.dart';
 import 'src/state/account_providers.dart';
 import 'src/state/locale_controller.dart';
+import 'src/state/mode_controller.dart';
 import 'src/state/providers.dart';
 import 'src/theme.dart';
 import 'src/models/household.dart';
@@ -55,6 +56,7 @@ class CanaryApp extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final locale = ref.watch(localeProvider);
     ref.watch(languageSyncProvider); // keep the hub's notification language in step
+    ref.watch(hubModeProvider); // follow the hub's demo / real mode (5 s poll while signed in)
     ref.listen<AppLocalizations>(
       l10nProvider,
       (_, l10n) => Notifications.instance.setLocalizations(l10n),

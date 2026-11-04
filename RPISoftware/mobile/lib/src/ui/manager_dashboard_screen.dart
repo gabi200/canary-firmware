@@ -11,6 +11,7 @@ import '../state/scope_providers.dart';
 import '../theme.dart';
 import 'sensor_test_screen.dart';
 import 'settings_screen.dart';
+import 'widgets/mode_strip.dart';
 import 'widgets/flashing_evacuate_banner.dart';
 import 'widgets/home_status_section.dart';
 import 'widgets/node_commands.dart';
@@ -100,6 +101,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
       appBar: AppBar(
         title: Text(session?.buildingId ?? 'Canary'),
         actions: [
+          const DemoChip(),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Center(
@@ -124,6 +126,7 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
               padding: const EdgeInsets.all(16),
               sliver: SliverList.list(
                 children: [
+                  const RealAlarmBanner(),
                   _ConnectivityRow(connected: state.connected),
                   const SizedBox(height: 12),
                   if (primary != null && primary.isEvacuation) ...[

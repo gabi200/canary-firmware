@@ -7,6 +7,7 @@ import '../models/check_in.dart';
 import '../models/dashboard.dart';
 import '../models/evacuation.dart';
 import '../models/history.dart';
+import '../models/hub_mode.dart';
 import '../models/household.dart';
 import '../models/incident.dart';
 import '../models/me.dart';
@@ -267,6 +268,20 @@ class ApiClient {
       };
     } on DioException catch (e) {
       throw _wrap(e, 'Could not load zones');
+    }
+  }
+
+  /// The hub's demo / real mode and the building it shows (any signed-in user).
+  Future<HubMode> hubMode() async {
+    try {
+      final res = await _dio.get('/api/v1/mode');
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException('Unexpected mode response', statusCode: res.statusCode);
+      }
+      return HubMode.fromJson(data);
+    } on DioException catch (e) {
+      throw _wrap(e, 'Could not load the hub mode');
     }
   }
 

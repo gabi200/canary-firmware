@@ -21,6 +21,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get modeBadge => 'DEMO';
+
+  @override
+  String get modeRealAlarm => 'Real alarm in Canary Live';
+
+  @override
   String get live => 'Live';
 
   @override

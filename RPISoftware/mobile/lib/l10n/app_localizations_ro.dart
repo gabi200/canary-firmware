@@ -22,6 +22,12 @@ class AppLocalizationsRo extends AppLocalizations {
   String get settings => 'Setări';
 
   @override
+  String get modeBadge => 'DEMO';
+
+  @override
+  String get modeRealAlarm => 'Alarmă reală în Canary Live';
+
+  @override
   String get live => 'Live';
 
   @override

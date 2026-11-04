@@ -77,8 +77,7 @@ class _InviteAcceptScreenState extends ConsumerState<InviteAcceptScreen> {
       final result = await ref
           .read(apiClientProvider)
           .acceptInvite(widget.code, takeOverCareProfile: takeOver, consent: takeOver && _consent);
-      final buildingId = result.buildingId;
-      if (buildingId != null) await ref.read(sessionProvider.notifier).switchBuilding(buildingId);
+      // The session building follows the hub's mode, not the invite's building.
       ref.invalidate(meProvider);
       ref.invalidate(careProfilesProvider);
       ref.invalidate(householdProvider);

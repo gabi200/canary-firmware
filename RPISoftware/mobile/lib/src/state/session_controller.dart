@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config.dart';
 import '../models/auth.dart';
 import '../services/api_client.dart';
 import '../services/storage.dart';
@@ -22,14 +23,22 @@ class SessionController extends StateNotifier<AuthSession?> {
   final Storage _storage;
   final ApiClient _api;
 
-  Future<void> login(String username, String buildingId) async {
-    final session = await _api.login(username, buildingId);
+  /// Signs in on the building the hub's mode shows (the default building when
+  /// the hub can't say); the mode poll keeps it in step afterwards.
+  Future<void> login(String username) async {
+    var session = await _api.login(username, Config.defaultBuildingId);
     _api.setToken(session.token);
+    try {
+      session = session.copyWith(buildingId: (await _api.hubMode()).buildingId);
+    } catch (_) {
+      // keep the default; the next mode poll corrects it
+    }
     await _storage.saveSession(session);
     state = session;
   }
 
-  /// After joining an apartment in another building (household invite).
+  /// The hub's mode moved to another building: every per-building provider,
+  /// the poll and the WebSocket rebuild from the new session, and it is saved.
   Future<void> switchBuilding(String buildingId) async {
     final current = state;
     if (current == null || current.buildingId == buildingId) return;
