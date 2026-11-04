@@ -27,6 +27,7 @@ projector) and the phone app.
 - Shows only the **Real building**: real, connected ESP32 nodes and their readings.
 - No seeded sensors, no "simulated seed data" history, no simulate buttons.
 - Starts simple: one building with one room; every real sensor lands there and is shown.
+- A real sensor that stops reporting stays visible, marked lost, so a silent failure never looks healthy.
 
 ### Safety rule (both modes)
 Real alarms always go off, whatever the mode. In Demo mode a real alarm fires in full (buzzer,
@@ -62,7 +63,7 @@ mistaken for part of the show.
    simulators, `baseline_seed` and the evacuation what-if working unchanged). A new building
    `bld_live` "Canary Live" with one floor, one unit and one room "Presentation" is the Real building.
 2. **Migration.** `canary` and `water-sensor` move to `bld_live`. The `ops-drill-*` / `ops-e2e-*` test nodes
-   and the stale `air-sensor` / `water-sensor-890b15` nodes are deleted once the user confirms. Newly
+   and the stale `air-sensor` / `water-sensor-890b15` nodes are deleted (the user confirmed). Newly
    auto-registered nodes land in `bld_live` (`default_building_id`). Simulator nodes (hw_sim,
    building_sim) are configured to register in the Demo building.
 3. **Where the mode lives.** One row in Postgres (replicated across the three Pis), read and set via
