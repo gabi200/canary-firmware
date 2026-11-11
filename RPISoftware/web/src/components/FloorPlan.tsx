@@ -35,24 +35,24 @@ interface Props {
   onOpenUnit?: (unitId: string) => void;
 }
 
-const PRIORITY_COLOR = "#8957e5";
+const PRIORITY_COLOR = "var(--purple)";
 /** Wi-Fi motion chip: blue for movement (never green: motion is not "safe"), muted otherwise. */
-const MOTION_COLOR = { motion: "#79c0ff", no_recent_motion: "#a5b3c2", calibrating: "#e3b341", unavailable: "#8b98a8" } as const;
-const SOURCE_COLOR = "#f85149";
-const SELECT_COLOR = "#58a6ff";
-const TEXT = "#e6edf3";
-const SOFT = "#c9d1d9";
-const MUTED = "#8b98a8";
-const TILE_FILL = "#1d2530";
-const BLOCK_FILL = "#131a22";
-const BLOCK_STROKE = "#35424f";
-/** Status words on the dark plan (brighter than the fills). */
+const MOTION_COLOR = { motion: "var(--sky)", no_recent_motion: "var(--text-2)", calibrating: "var(--amber-fg)", unavailable: "var(--muted)" } as const;
+const SOURCE_COLOR = "var(--red)";
+const SELECT_COLOR = "var(--sky)";
+const TEXT = "var(--text)";
+const SOFT = "var(--text-2)";
+const MUTED = "var(--muted)";
+const TILE_FILL = "var(--fp-tile)";
+const BLOCK_FILL = "var(--fp-block)";
+const BLOCK_STROKE = "var(--fp-block-stroke)";
+/** Status words: the text step of each state colour, readable on a tile and on its tint. */
 const LEVEL_TEXT: Record<Level, string> = {
-  ok: "#56d364",
-  attention: "#e3b341",
-  danger: "#ff7b72",
+  ok: "var(--green-fg)",
+  attention: "var(--amber-fg)",
+  danger: "var(--red-fg)",
   unknown: MUTED,
-  none: "#79c0ff",
+  none: "var(--accent-fg)",
 };
 /** The key reading's metric, short ("Gaz 31% din prag"). */
 const METRIC_SHORT: Record<string, MsgKey> = {
@@ -67,8 +67,8 @@ const METRIC_SHORT: Record<string, MsgKey> = {
  *  danger threshold (no threshold known: a fixed mid value for warn / alarm edge states). */
 function fillOpacity(level: Level, ratio: number | null): number {
   if (level === "unknown" || level === "none") return 0;
-  const base = { ok: 0.05, attention: 0.16, danger: 0.26 }[level];
-  return base + 0.32 * (ratio ?? (level === "ok" ? 0 : 0.35));
+  const base = { ok: 0, attention: 0.07, danger: 0.1 }[level];
+  return base + (level === "ok" ? 0 : 0.1 * (ratio ?? 0.35));
 }
 
 const LABEL_FS = 12;
@@ -182,7 +182,7 @@ function sensorState(s: MapSensor, t: TFn): string | null {
 }
 
 const SensorGlyph = ({ s, x, y }: { s: MapSensor; x: number; y: number }) => {
-  const props = { x: x - 5.5, y: y - 5.5, width: 11, height: 11, style: { color: "#0f1419" } };
+  const props = { x: x - 5.5, y: y - 5.5, width: 11, height: 11, style: { color: "var(--fp-ink)" } };
   if (s.type === "water") return <DropletIcon {...props} />;
   if (s.type === "air") return <WindIcon {...props} />;
   return <SensorIcon {...props} />;
@@ -294,7 +294,6 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
 
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const maskId = `halo-${uid}`;
-  const hatchId = `hatch-${uid}`;
   const byId = useMemo(() => new Map(zones.map((z) => [z.placed.zone.id, z])), [zones]);
   const unitOf = useMemo(() => {
     const m = new Map<string, UnitBlock>();
@@ -326,13 +325,13 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
     let right = x + w - 10;
     if (z.occupancy > 0) {
       const n = fmtNumber(Math.round(z.occupancy), lang, 0);
-      const cw = 26 + textWidth(n, 12, 700);
+      const cw = 26 + textWidth(n, 12, 600);
       right -= cw;
       chips.push(
         <g key="occ">
-          <rect x={right} y={y + 8} width={cw} height={22} rx={11} fill="#0f1419" stroke="#2c3846" />
+          <rect x={right} y={y + 8} width={cw} height={22} rx={6} fill="var(--fp-chip)" stroke="var(--border-strong)" />
           <PersonIcon x={right + 5} y={y + 11} width={15} height={15} style={{ color: TEXT }} />
-          <text x={right + 21} y={y + 23.5} fill={TEXT} fontSize={12} fontWeight={700}>
+          <text x={right + 21} y={y + 23.5} fill={TEXT} fontSize={12} fontWeight={600}>
             {n}
           </text>
         </g>,
@@ -341,13 +340,13 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
     }
     if (z.priority > 0) {
       const n = String(z.priority);
-      const cw = 28 + textWidth(n, 12, 800);
+      const cw = 28 + textWidth(n, 12, 600);
       right -= cw;
       chips.push(
         <g key="prio">
-          <rect x={right} y={y + 8} width={cw} height={22} rx={11} fill={PRIORITY_COLOR} stroke="#ffffff" strokeWidth={1.2} />
+          <rect x={right} y={y + 8} width={cw} height={22} rx={6} fill={PRIORITY_COLOR} stroke="#ffffff" strokeWidth={1.2} />
           <WarningIcon x={right + 6} y={y + 11} width={15} height={15} style={{ color: "#ffffff" }} />
-          <text x={right + 23} y={y + 23.5} fill="#ffffff" fontSize={12} fontWeight={800}>
+          <text x={right + 23} y={y + 23.5} fill="#ffffff" fontSize={12} fontWeight={600}>
             {n}
           </text>
         </g>,
@@ -356,16 +355,16 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
     }
     if (z.motion && z.motion !== "no_presence_sensor") {
       const label = t(`motion.chip.${z.motion}`);
-      const cw = 20 + textWidth(label, 12, 700);
+      const cw = 20 + textWidth(label, 12, 600);
       const color = MOTION_COLOR[z.motion];
       right -= cw;
       chips.push(
         <g key="motion">
           <title>{t(`motion.state.${z.motion}`)}</title>
-          <rect x={right} y={y + 8} width={cw} height={22} rx={11} fill="#0f1419" stroke={color}
+          <rect x={right} y={y + 8} width={cw} height={22} rx={6} fill="var(--fp-chip)" stroke={color}
             strokeDasharray={z.motion === "unavailable" ? "3 3" : undefined} />
           <circle cx={right + 10} cy={y + 19} r={4} fill={z.motion === "motion" ? color : "none"} stroke={color} strokeWidth={1.5} />
-          <text x={right + 18} y={y + 23.5} fill={color} fontSize={12} fontWeight={700}>
+          <text x={right + 18} y={y + 23.5} fill={color} fontSize={12} fontWeight={600}>
             {label}
           </text>
         </g>,
@@ -373,14 +372,14 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
       right -= 6;
     }
     const nameX = x + (KindIcon ? 38 : 16);
-    const shownName = ellipsize(name, right - nameX - 4, 16, 700);
+    const shownName = ellipsize(name, right - nameX - 4, 14, 600);
     const note = zoneKindNote(name, zone.kind, t);
-    const noteX = nameX + textWidth(shownName, 16, 700) + 7;
+    const noteX = nameX + textWidth(shownName, 14, 600) + 7;
     const showNote = note && shownName === name && noteX + textWidth(note, 12, 500) <= right - 4;
 
     // header row 2: status word, then the key reading as far as it fits
-    const status = ellipsize(zoneStatusText(z, t), w - 30, 13, 700);
-    const afterStatus = x + 16 + textWidth(status, 13, 700);
+    const status = ellipsize(zoneStatusText(z, t), w - 30, 13, 600);
+    const afterStatus = x + 16 + textWidth(status, 13, 600);
     const reading = readingTexts(z, t, lang).find((r) => afterStatus + textWidth(` · ${r}`, 12.5, 600) <= x + w - 10);
 
     // footer: one chip per sensor (state word dropped when the row is short, then "+N")
@@ -390,7 +389,7 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
       const label = shortLabel(s, t);
       const state = sensorState(s, t);
       const base = 23 + textWidth(label, 12, 600) + 9;
-      return { s, label, state, base, full: base + (state ? 5 + textWidth(state, 12, 700) : 0) };
+      return { s, label, state, base, full: base + (state ? 5 + textWidth(state, 12, 600) : 0) };
     });
     const start = x + 12;
     const fits = (ws: number[]) => ws.reduce((sum, v) => sum + v + 5, -5) <= limit - start;
@@ -408,10 +407,10 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
       const { s } = it;
       const cx = cursor + 11;
       const lines = sensorTip(s, t, lang);
-      const color = s.level === "none" ? "#58a6ff" : LEVEL_COLOR[s.level];
+      const color = s.level === "none" ? "var(--sky)" : LEVEL_COLOR[s.level];
       chipsRow.push(
         <g key={s.id} className="fp-btn" {...button(lines.join(", "), lines, () => onSelect(s.zoneId, s.id))}>
-          <rect x={cursor} y={footY - 11} width={cw} height={22} rx={11} fill="#0f1419" stroke="#2c3846" />
+          <rect x={cursor} y={footY - 11} width={cw} height={22} rx={6} fill="var(--fp-chip)" stroke="var(--border-strong)" />
           <circle cx={cx} cy={footY} r={8} fill={color} opacity={s.online ? 1 : 0.45} />
           <SensorGlyph s={s} x={cx} y={footY} />
           <text x={cursor + 23} y={footY + 4} fill={TEXT} fontSize={12} fontWeight={600}>
@@ -422,7 +421,7 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
               </tspan>
             )}
           </text>
-          <rect className="fp-ring" x={cursor - 2} y={footY - 13} width={cw + 4} height={26} rx={13} />
+          <rect className="fp-ring" x={cursor - 2} y={footY - 13} width={cw + 4} height={26} rx={8} />
         </g>,
       );
       cursor += cw + 5;
@@ -430,20 +429,20 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
 
     const lines = zoneTip(z, unitOf.get(zone.id)?.label, source, t, lang);
     const badgeFull = source ? t("plan.sourceBadge", { pct: `${fmtNumber(Math.round(source.confidence * 100), lang, 0)}%` }) : "";
-    const badge = textWidth(badgeFull, 12, 800) + 20 <= w - 24 ? badgeFull : t("map.sourceBadge");
+    const badge = textWidth(badgeFull, 12, 600) + 20 <= w - 24 ? badgeFull : t("map.sourceBadge");
     return (
       <g key={`t-${zone.id}`}>
         <g aria-hidden="true">
           {KindIcon && <KindIcon x={x + 14} y={y + 9} width={18} height={18} style={{ color: SOFT }} />}
-          <text className="fp-text" x={nameX} y={y + 24} fill={TEXT} fontSize={16} fontWeight={700}>
+          <text className="fp-text" x={nameX} y={y + 24} fill={TEXT} fontSize={14} fontWeight={600}>
             {shownName}
           </text>
           {showNote && (
-            <text className="fp-text" x={noteX} y={y + 24} fill={MUTED} fontSize={12} fontWeight={500}>
+            <text className="fp-text" x={noteX} y={y + 24} fill={z.level === "danger" || z.level === "attention" ? SOFT : MUTED} fontSize={12} fontWeight={500}>
               {note}
             </text>
           )}
-          <text className="fp-text" x={x + 16} y={y + 43} fontSize={13} fontWeight={700} fill={LEVEL_TEXT[z.level]}>
+          <text className="fp-text" x={x + 16} y={y + 43} fontSize={13} fontWeight={600} fill={LEVEL_TEXT[z.level]}>
             {status}
             {reading && (
               <tspan fill={SOFT} fontSize={12.5} fontWeight={600}>
@@ -454,20 +453,20 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           {chips}
         </g>
         <g className="fp-btn" {...button(lines.join(", "), lines, () => onSelect(zone.id))}>
-          <rect x={x} y={y} width={w} height={h} rx={10} fill="transparent" />
+          <rect x={x} y={y} width={w} height={h} rx={6} fill="transparent" />
           {z.isSource && source && (
             <g>
-              <rect x={x + 12} y={y - 10} width={textWidth(badge, 12, 800) + 20} height={20} rx={10} fill={SOURCE_COLOR} stroke="#0b0f14" strokeWidth={2} />
-              <text x={x + 22} y={y + 4} fill="#ffffff" fontSize={12} fontWeight={800}>
+              <rect x={x + 12} y={y - 13} width={textWidth(badge, 12, 600) + 20} height={18} rx={6} fill={SOURCE_COLOR} stroke="var(--fp-bg)" strokeWidth={2} />
+              <text x={x + 22} y={y} fill="#ffffff" fontSize={12} fontWeight={600}>
                 {badge}
               </text>
             </g>
           )}
-          <rect className="fp-ring" x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={12} />
+          <rect className="fp-ring" x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={8} />
         </g>
         {chipsRow}
         {hidden > 0 && (
-          <text x={limit} y={footY + 4} textAnchor="end" fill={MUTED} fontSize={12} fontWeight={700}>
+          <text x={limit} y={footY + 4} textAnchor="end" fill={MUTED} fontSize={12} fontWeight={600}>
             +{hidden}
           </text>
         )}
@@ -484,16 +483,16 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
     // status line right of the label: with the sensor count when it fits, else the word only
     // (a long label on a phone), the label cut last
     const room = w - 42 - 14;
-    const labelW = textWidth(u.label, 20, 800);
-    const wordW = textWidth(statusText, 13, 700);
+    const labelW = textWidth(u.label, 16, 600);
+    const wordW = textWidth(statusText, 13, 600);
     const fullCount = ` · ${sensorCount(st.sensors)}`;
     const countText = labelW + 16 + wordW + textWidth(fullCount, 13, 600) <= room ? fullCount : "";
     const statusW = wordW + (countText ? textWidth(countText, 13, 600) : 0);
     const showStatus = room - statusW - 16 >= Math.min(labelW, 60);
     const labelMax = room - (showStatus ? statusW + 16 : 0);
-    const label = ellipsize(u.label, labelMax, 20, 800);
+    const label = ellipsize(u.label, labelMax, 16, 600);
     const tag = t("plan.common");
-    const tagX = x + 42 + textWidth(label, 20, 800) + 8;
+    const tagX = x + 42 + textWidth(label, 16, 600) + 8;
     const showTag = u.common && label === u.label && !redundant(u.label, tag) && tagX + textWidth(tag, 12, 600) <= x + w - 14 - (showStatus ? statusW + 16 : 0);
     const lines = [
       u.common && !redundant(u.label, tag) ? `${u.label} (${tag})` : u.label,
@@ -504,7 +503,7 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
     const head = (
       <g aria-hidden="true">
         <Icon x={x + 14} y={y + 12} width={20} height={20} style={{ color: SOFT }} />
-        <text className="fp-text" x={x + 42} y={y + 29} fill={TEXT} fontSize={20} fontWeight={800}>
+        <text className="fp-text" x={x + 42} y={y + 29} fill={TEXT} fontSize={16} fontWeight={600}>
           {label}
         </text>
         {showTag && (
@@ -513,7 +512,7 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           </text>
         )}
         {showStatus && (
-          <text className="fp-text" x={x + w - 14} y={y + 29} textAnchor="end" fontSize={13} fontWeight={700} fill={LEVEL_TEXT[st.level]}>
+          <text className="fp-text" x={x + w - 14} y={y + 29} textAnchor="end" fontSize={13} fontWeight={600} fill={LEVEL_TEXT[st.level]}>
             {statusText}
             {countText && (
               <tspan fill={MUTED} fontWeight={600}>
@@ -529,8 +528,8 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
         {head}
         {onOpenUnit && (
           <g className="fp-btn" {...button(lines.join(", "), lines, () => onOpenUnit(u.id))}>
-            <rect x={x} y={y} width={w} height={40} rx={12} fill="transparent" />
-            <rect className="fp-ring" x={x + 4} y={y + 4} width={w - 8} height={36} rx={10} />
+            <rect x={x} y={y} width={w} height={40} rx={8} fill="transparent" />
+            <rect className="fp-ring" x={x + 4} y={y + 4} width={w - 8} height={36} rx={6} />
           </g>
         )}
         {u.zoneIds.map((id) => {
@@ -550,23 +549,16 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
         role="group"
         aria-label={t("floor.aria")}
       >
-        <defs>
-          <pattern id={hatchId} width={12} height={12} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width={12} height={12} fill="#11171e" />
-            <line x1={0} y1={0} x2={0} y2={12} stroke="#1b232c" strokeWidth={5} />
-          </pattern>
-        </defs>
-
         {/* 1. floors, blocks and room fills */}
         {layout.floors.map((f) => {
           const label = floorText(f.id, f.label);
-          const lw = textWidth(label, 14, 800);
+          const lw = textWidth(label, 13, 600);
           return (
             <g key={`fl-${f.id}`} aria-hidden="true">
-              <text className="fp-text" x={f.x + 2} y={f.y + 19} fill={SOFT} fontSize={14} fontWeight={800}>
+              <text className="fp-text" x={f.x + 2} y={f.y + 19} fill={MUTED} fontSize={13} fontWeight={600}>
                 {label}
               </text>
-              <line x1={f.x + lw + 14} x2={f.x + f.w} y1={f.y + 14} y2={f.y + 14} stroke="#2c3846" />
+              <line x1={f.x + lw + 14} x2={f.x + f.w} y1={f.y + 14} y2={f.y + 14} stroke="var(--border-strong)" />
             </g>
           );
         })}
@@ -574,19 +566,16 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           const st = blockState(u, byId);
           return (
             <g key={`ub-${u.id}`}>
-              {st.affected && (
-                <rect x={u.x} y={u.y} width={u.w} height={u.h} rx={14} fill="none" stroke={st.hazard} strokeOpacity={0.28} strokeWidth={9} />
-              )}
               <rect
                 x={u.x}
                 y={u.y}
                 width={u.w}
                 height={u.h}
-                rx={14}
-                fill={u.common ? `url(#${hatchId})` : BLOCK_FILL}
+                rx={8}
+                fill={u.common ? "var(--fp-block-2)" : BLOCK_FILL}
                 stroke={st.affected ? st.hazard : BLOCK_STROKE}
-                strokeWidth={st.affected ? 3 : 1.5}
-                strokeDasharray={u.common && !st.affected ? "7 5" : undefined}
+                strokeWidth={st.affected ? 1.5 : 1}
+                strokeDasharray={u.common && !st.affected ? "4 4" : undefined}
               />
             </g>
           );
@@ -596,21 +585,19 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           const sel = z.placed.zone.id === selectedZoneId;
           return (
             <g key={`f-${z.placed.zone.id}`}>
-              <rect x={x} y={y} width={w} height={h} rx={10} fill={TILE_FILL} />
+              <rect x={x} y={y} width={w} height={h} rx={6} fill={TILE_FILL} />
               <rect
                 x={x}
                 y={y}
                 width={w}
                 height={h}
-                rx={10}
+                rx={6}
                 fill={LEVEL_COLOR[z.level]}
                 fillOpacity={fillOpacity(z.level, z.ratio)}
-                stroke={sel ? SELECT_COLOR : z.isSource ? SOURCE_COLOR : z.isAffected ? LEVEL_COLOR.attention : "#2f3b49"}
-                strokeWidth={sel ? 3 : z.isSource ? 3.5 : z.isAffected ? 2 : 1}
+                stroke={sel ? SELECT_COLOR : z.isSource ? SOURCE_COLOR : z.isAffected ? LEVEL_COLOR.attention : z.level === "danger" || z.level === "attention" ? LEVEL_COLOR[z.level] : "var(--border)"}
+                strokeWidth={sel ? 2 : z.isSource ? 2 : z.isAffected ? 1.5 : 1}
                 strokeDasharray={z.isAffected && !z.isSource && !sel ? "6 4" : undefined}
               />
-              {/* status bar: the room's colour at a glance */}
-              <rect x={x + 5} y={y + 9} width={4} height={h - 18} rx={2} fill={LEVEL_COLOR[z.level]} opacity={z.level === "unknown" ? 0.5 : 1} />
             </g>
           );
         })}
@@ -618,28 +605,39 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
         {/* 2. overlays (under every room's text and chips) */}
         {source && (
           <>
-            {/* halo mask: clipped to the plan, full strength over the source tile and the gaps,
-                faint over the other tiles so their contents stay readable */}
+            {/* uncertainty halo: one radial falloff from the estimate outwards (no ruled edges).
+                With a source tile it is clipped to that room's rounded rectangle and stays light
+                enough for the room's name / status rows and sensor chips drawn over it. Between
+                rooms it stays unclipped, faint over the room tiles so their contents read. */}
             <defs>
-              <mask id={maskId} maskUnits="userSpaceOnUse" x={0} y={0} width={layout.width} height={layout.height}>
-                <rect x={0} y={0} width={layout.width} height={layout.height} fill="#ffffff" />
-                {zones
-                  .filter((z) => !z.isSource)
-                  .map((z) => (
-                    <rect key={z.placed.zone.id} x={z.placed.x} y={z.placed.y} width={z.placed.w} height={z.placed.h} rx={10} fill="#303030" />
+              <radialGradient id={`${maskId}-fall`} gradientUnits="userSpaceOnUse" cx={source.x} cy={source.y} r={source.r}>
+                <stop offset="0" stopColor={SOURCE_COLOR} stopOpacity={0.26} />
+                <stop offset="0.55" stopColor={SOURCE_COLOR} stopOpacity={0.12} />
+                <stop offset="1" stopColor={SOURCE_COLOR} stopOpacity={0} />
+              </radialGradient>
+              {sourceZone ? (
+                <clipPath id={maskId}>
+                  <rect x={sourceZone.placed.x} y={sourceZone.placed.y} width={sourceZone.placed.w} height={sourceZone.placed.h} rx={6} />
+                </clipPath>
+              ) : (
+                <mask id={maskId} maskUnits="userSpaceOnUse" x={0} y={0} width={layout.width} height={layout.height}>
+                  <rect x={0} y={0} width={layout.width} height={layout.height} fill="#ffffff" />
+                  {zones.map((z) => (
+                    <rect key={z.placed.zone.id} x={z.placed.x} y={z.placed.y} width={z.placed.w} height={z.placed.h} rx={6} fill="#4d4d4d" />
                   ))}
-              </mask>
+                </mask>
+              )}
             </defs>
             <circle
               cx={source.x}
               cy={source.y}
               r={source.r}
-              fill={SOURCE_COLOR}
-              fillOpacity={0.14}
-              stroke={SOURCE_COLOR}
-              strokeOpacity={0.55}
+              fill={`url(#${maskId}-fall)`}
+              clipPath={sourceZone ? `url(#${maskId})` : undefined}
+              mask={sourceZone ? undefined : `url(#${maskId})`}
+              stroke={sourceZone ? undefined : SOURCE_COLOR}
+              strokeOpacity={0.45}
               strokeDasharray="4 4"
-              mask={`url(#${maskId})`}
               pointerEvents="none"
             />
           </>
@@ -652,7 +650,7 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
               y1={c.y}
               x2={source.x}
               y2={source.y}
-              stroke="#ffffff"
+              stroke="var(--fp-contrast)"
               strokeOpacity={0.3 + 0.6 * c.weight}
               strokeWidth={1 + 5 * c.weight}
               strokeLinecap="round"
@@ -660,7 +658,7 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           ))}
         {source && (
           <g pointerEvents="none">
-            <circle className="fp-pulse" cx={source.x} cy={source.y} r={13} fill="none" stroke="#ffffff" strokeWidth={2} />
+            <circle className="fp-pulse" cx={source.x} cy={source.y} r={13} fill="none" stroke="var(--fp-contrast)" strokeWidth={2} />
             <circle cx={source.x} cy={source.y} r={6.5} fill="#ffffff" stroke={SOURCE_COLOR} strokeWidth={2.5} />
           </g>
         )}
@@ -674,9 +672,9 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
             className="fp-btn"
             {...button(t("map.airflowHint"), [t("map.airflowHint")], () => sourceZone && onSelect(sourceZone.placed.zone.id))}
           >
-            <rect x={plan.badge.x} y={plan.badge.y} width={24} height={18} rx={9} fill="#1a212b" stroke={SELECT_COLOR} />
+            <rect x={plan.badge.x} y={plan.badge.y} width={24} height={18} rx={6} fill="var(--panel)" stroke={SELECT_COLOR} />
             <WindIcon x={plan.badge.x + 6} y={plan.badge.y + 3} width={12} height={12} style={{ color: SELECT_COLOR }} />
-            <rect className="fp-ring" x={plan.badge.x - 2} y={plan.badge.y - 2} width={28} height={22} rx={11} />
+            <rect className="fp-ring" x={plan.badge.x - 2} y={plan.badge.y - 2} width={28} height={22} rx={6} />
           </g>
         )}
 
@@ -701,10 +699,10 @@ export function FloorPlan({ layout, zones, contributors, source, selectedZoneId,
           return l ? (
             <text
               key={`cl-${c.deviceId}`}
-              className="fp-text"
+              className="fp-text fp-halo"
               x={l.box.x + LABEL_PAD}
               y={l.box.y + LABEL_H - 3}
-              fill="#ffffff"
+              fill="var(--fp-contrast)"
               fontSize={LABEL_FS}
               fontWeight={700}
               pointerEvents="none"

@@ -19,6 +19,9 @@ interface Field {
   refs?: [MsgKey, string][];
   /** Colours the value (attention / danger) against the device's own thresholds. */
   grade?: Grade;
+  /** A sensor reading judged against thresholds: an OK grade shows green. Other graded
+   *  fields (flags, states) colour only their unwanted value and stay neutral otherwise. */
+  reading?: boolean;
 }
 
 interface Group {
@@ -32,8 +35,9 @@ interface Group {
 const UG = "µg/m³";
 
 /** Air channels: the firmware grades value >= danger as danger, >= warn as warning. */
-function limits(warn: string, danger: string): Pick<Field, "refs" | "grade"> {
+function limits(warn: string, danger: string): Pick<Field, "refs" | "grade" | "reading"> {
   return {
+    reading: true,
     refs: [
       ["ref.warn", warn],
       ["ref.danger", danger],
@@ -173,6 +177,7 @@ const WATER: Group[] = [
         path: "sensor.adc",
         label: "metric.sensor",
         unit: "ADC",
+        reading: true,
         refs: [
           ["ref.wet", "sensor.wet_threshold"],
           ["ref.dry", "sensor.dry_threshold"],
@@ -214,13 +219,13 @@ const WATER: Group[] = [
 const GROUPS: Record<NodeKind, Group[]> = { air: AIR, water: WATER };
 
 const LED_CSS: Record<string, string> = {
-  green: "#2ea043",
-  blue: "#2f81f7",
-  cyan: "#39c5cf",
-  magenta: "#db61a2",
-  orange: "#f0883e",
-  red: "#f85149",
-  white: "#e6edf3",
+  green: "var(--led-green)",
+  blue: "var(--led-blue)",
+  cyan: "var(--led-cyan)",
+  magenta: "var(--led-magenta)",
+  orange: "var(--led-orange)",
+  red: "var(--led-red)",
+  white: "var(--led-white)",
 };
 
 function fmtValue(v: unknown, fmt: Field["fmt"], t: TFn, lang: Lang): string {
@@ -239,7 +244,9 @@ function fmtValue(v: unknown, fmt: Field["fmt"], t: TFn, lang: Lang): string {
 function FieldRow({ field, doc }: { field: Field; doc: unknown }) {
   const { t, lang } = useT();
   const v = pick(doc, field.path);
-  const level = v === undefined ? "ok" : (field.grade?.(v, doc) ?? "ok");
+  // ungraded fields (name, firmware, uptime ...) and the wanted value of a flag keep the text colour
+  const level = v === undefined || !field.grade ? null : field.grade(v, doc);
+  const tone = level == null || (level === "ok" && !field.reading) ? "" : ` t-${level}`;
   const refs = (field.refs ?? []).flatMap(([caption, path]) => {
     const r = pickNum(doc, path);
     return r == null ? [] : [`${t(caption)} ${fmtNumber(r, lang, 1)}`];
@@ -247,7 +254,7 @@ function FieldRow({ field, doc }: { field: Field; doc: unknown }) {
   return (
     <div className="kv">
       <span className="k">{field.label ? t(field.label) : field.path}</span>
-      <span className={`v t-${level}`}>
+      <span className={`v${tone}`}>
         {field.fmt === "led" && typeof v === "string" && (
           <span className="led-swatch" style={{ background: LED_CSS[v] ?? "transparent" }} />
         )}

@@ -143,8 +143,46 @@ export interface LayoutOptions {
   units?: Map<string, UnitInfo>;
   /** reserve the overlay band in every tile (an incident is open) */
   overlays?: boolean;
+  /** with `overlays` on a narrow plan (<= NARROW_PLAN px): zones that hold a source marker or
+   *  contributor dot; a tile row with none of them drops the empty overlay band */
+  bodyZones?: Set<string>;
   /** small schematic for the command view's mini-map */
   compact?: boolean;
+}
+
+/** Plans at most this wide (CSS px) compact the tile rows that hold no overlay. */
+const NARROW_PLAN = 560;
+
+/** Zones that can hold the source marker or a contributor dot, over the given estimates (the live
+ *  one and the replay snapshots, so the layout does not move while scrubbing). */
+export function overlayZoneIds(
+  tris: (Pick<Triangulation, "contributors" | "source_zone_id" | "source_x" | "source_y"> | null | undefined)[],
+  incident: Incident | null,
+  zones: Zone[],
+): Set<string> {
+  const ids = new Set<string>();
+  const nearest = (sx: number | null | undefined, sy: number | null | undefined) => {
+    if (sx == null || sy == null) return;
+    let best = Infinity;
+    let hit: string | null = null;
+    for (const z of zones) {
+      if (typeof z.pos_x !== "number" || typeof z.pos_y !== "number") continue;
+      const d = Math.hypot(z.pos_x - sx, z.pos_y - sy);
+      if (d < best) [best, hit] = [d, z.id];
+    }
+    if (hit) ids.add(hit);
+  };
+  const add = (zoneId: string | null | undefined, sx?: number | null, sy?: number | null) => {
+    if (zoneId && zones.some((z) => z.id === zoneId)) ids.add(zoneId);
+    else nearest(sx, sy);
+  };
+  for (const tri of tris) {
+    if (!tri) continue;
+    for (const c of tri.contributors ?? []) ids.add(c.zone_id);
+    add(tri.source_zone_id, tri.source_x, tri.source_y);
+  }
+  add(incident?.est_source_zone_id, incident?.est_source_x, incident?.est_source_y);
+  return ids;
 }
 
 const posX = (z: Zone) => (typeof z.pos_x === "number" ? z.pos_x : Infinity);
@@ -209,9 +247,18 @@ export function layoutZones(zones: Zone[], opts: LayoutOptions): Layout {
   const blockW = blockFor(tcols, tileW);
   const bandW = cols * blockW + (cols - 1) * g.blockGap;
   const tileH = g.tileHead + (opts.overlays ? g.tileBody : 0) + g.tileFoot;
-  const heightFor = (n: number, c: number) => {
-    const rows = Math.max(1, Math.ceil(n / c));
-    return g.blockHead + rows * tileH + (rows - 1) * g.tileGapY + g.blockPad;
+  const compactRows = !!opts.overlays && !!opts.bodyZones && width <= NARROW_PLAN;
+  /** heights of a unit's tile rows: a row without any overlay holder drops the body band when narrow */
+  const rowHeights = (zs: Zone[], c: number) => {
+    const order = arrange(zs, c);
+    const rows = Math.max(1, Math.ceil(order.length / c));
+    return Array.from({ length: rows }, (_, r) =>
+      compactRows && !order.slice(r * c, (r + 1) * c).some((z) => opts.bodyZones!.has(z.id)) ? g.tileHead + g.tileFoot : tileH,
+    );
+  };
+  const heightFor = (zs: Zone[], c: number) => {
+    const hs = rowHeights(zs, c);
+    return g.blockHead + hs.reduce((a, b) => a + b, 0) + (hs.length - 1) * g.tileGapY + g.blockPad;
   };
 
   const placed: Placed[] = [];
@@ -226,13 +273,17 @@ export function layoutZones(zones: Zone[], opts: LayoutOptions): Layout {
   ) => {
     const { x, y, w, h } = box;
     const order = arrange(unit.zones, c);
+    const hs = rowHeights(unit.zones, c);
+    const rowY = hs.map((_, r) => hs.slice(0, r).reduce((a, b) => a + b + g.tileGapY, 0));
     order.forEach((zone, k) => {
+      const r = Math.floor(k / c);
+      const th = hs[r];
       const tx = x + g.blockPad + (k % c) * (tw + g.tileGapX);
-      const ty = y + g.blockHead + Math.floor(k / c) * (tileH + g.tileGapY);
+      const ty = y + g.blockHead + rowY[r];
       const body = opts.overlays
         ? { y0: ty + g.tileHead + 2, y1: ty + g.tileHead + g.tileBody - 2 }
-        : { y0: ty + 4, y1: ty + tileH - 4 };
-      placed.push({ zone, x: tx, y: ty, w: tw, h: tileH, cx: tx + tw / 2, cy: ty + tileH / 2, body });
+        : { y0: ty + 4, y1: ty + th - 4 };
+      placed.push({ zone, x: tx, y: ty, w: tw, h: th, cx: tx + tw / 2, cy: ty + th / 2, body });
     });
     blocks.push({ id: unit.id, label: unit.label, common: unit.common, floorId, x, y, w, h, zoneIds: order.map((z) => z.id) });
   };
@@ -246,7 +297,7 @@ export function layoutZones(zones: Zone[], opts: LayoutOptions): Layout {
     }
     for (let i = 0; i < floor.homes.length; i += cols) {
       const row = floor.homes.slice(i, i + cols);
-      const h = Math.max(...row.map((u) => heightFor(u.zones.length, tcols)));
+      const h = Math.max(...row.map((u) => heightFor(u.zones, tcols)));
       row.forEach((u, j) => place(u, floor.id, { x: g.pad + j * (blockW + g.blockGap), y, w: blockW, h }, tcols, tileW));
       y += h + g.blockGap;
     }
@@ -256,7 +307,7 @@ export function layoutZones(zones: Zone[], opts: LayoutOptions): Layout {
       const n = Math.max(1, u.zones.length);
       const tw = Math.min(bandInner, Math.max(tileW, Math.min(g.maxTile, (bandInner - (n - 1) * g.tileGapX) / n)));
       const ccols = Math.max(1, Math.floor((bandInner + g.tileGapX) / (tw + g.tileGapX)));
-      const h = heightFor(u.zones.length, ccols);
+      const h = heightFor(u.zones, ccols);
       place(u, floor.id, { x: g.pad, y, w: bandW, h }, ccols, tw);
       y += h + g.blockGap;
     }

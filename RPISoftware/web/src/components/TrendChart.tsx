@@ -17,15 +17,15 @@ import { COLORS } from "../lib/metrics";
 import { useScope } from "../lib/scope";
 import { fmtClock, parseTs } from "../lib/time";
 
-export const LINE_COLORS = ["#2f81f7", "#d29922", "#2ea043", "#f85149", "#a371f7"];
+export const LINE_COLORS = ["var(--c-blue)", "var(--c-teal)", "var(--c-slate)", "var(--c-sky)", "var(--c-cyan)"];
 
-/** Shared dark-theme recharts styling (also used by the sensor history charts). */
+/** Shared recharts styling from the theme tokens (also used by the sensor history charts). */
 export const chartStyle = {
-  grid: "#2c3846",
-  axis: "#8b98a8",
+  grid: "var(--border)",
+  axis: "var(--muted)",
   tooltip: {
-    contentStyle: { background: "#1a212b", border: "1px solid #2c3846", borderRadius: 8 },
-    labelStyle: { color: "#8b98a8" },
+    contentStyle: { background: "var(--panel)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)" },
+    labelStyle: { color: "var(--muted)" },
   },
 };
 
@@ -50,7 +50,7 @@ export interface TrendGroups {
   /** group id of a reading; null leaves it out */
   of: (r: Reading) => string | null;
   /** every group in display order, each with its own stable colour */
-  series: { id: string; label: string; color: string }[];
+  series: { id: string; label: string; color: string; /** SVG dash pattern: the second channel besides colour */ dash?: string }[];
 }
 
 /** Air nodes report every 15 s: a 30 s bucket holds each device's reading at least once. */
@@ -104,13 +104,13 @@ function UnitTrend({
   const unitText = UNIT_TEXT[unit] ?? unit;
 
   let data: ChartRow[];
-  let lines: { key: string; name: string; color: string }[];
+  let lines: { key: string; name: string; color: string; dash?: string }[];
   if (groups) {
     data = bucketRows(readings, groups, lang);
     const present = new Set(data.flatMap((row) => Object.keys(row)));
     lines = groups.series
       .filter((s) => present.has(seriesKey(s.id)))
-      .map((s) => ({ key: seriesKey(s.id), name: s.label, color: s.color }));
+      .map((s) => ({ key: seriesKey(s.id), name: s.label, color: s.color, dash: s.dash }));
   } else {
     const devices = Array.from(new Set(readings.map((r) => r.device_id)));
     const sorted = [...readings].sort((a, b) => a.ts.localeCompare(b.ts));
@@ -141,7 +141,7 @@ function UnitTrend({
           {...chartStyle.tooltip}
           formatter={(v) => (typeof v === "number" ? `${fmtNumber(v, lang, 1)} ${unitText}` : "—")}
         />
-        {groups && <Legend iconType="plainline" wrapperStyle={{ fontSize: 12, color: chartStyle.axis }} />}
+        {groups && <Legend iconType="plainline" iconSize={26} wrapperStyle={{ fontSize: 12, color: chartStyle.axis }} />}
         {lines.map((l) => (
           <Line
             key={l.key}
@@ -151,6 +151,7 @@ function UnitTrend({
             stroke={l.color}
             dot={false}
             strokeWidth={2}
+            strokeDasharray={l.dash}
             connectNulls
             isAnimationActive={false}
           />
@@ -197,8 +198,12 @@ export function TrendChart({
 }
 
 /** Apartment colours by position (apartments in natural order); common areas stay grey. Red,
- *  amber and green are left out: on this dashboard they mean danger, attention and OK. */
-const UNIT_COLORS = [COLORS.blue, COLORS.orange, COLORS.purple, COLORS.cyan, COLORS.magenta, COLORS.teal, COLORS.sky];
+ *  amber and green are left out: on this dashboard they mean danger, attention and OK. Blue and sky
+ *  are close neighbours, so every position also has its own dash pattern (line and legend). The
+ *  rhythms differ from the threshold lines (6 4, amber / red) and the reboot marks (2 3, grey). */
+const UNIT_COLORS = [COLORS.blue, COLORS.teal, COLORS.sky, COLORS.cyan];
+const UNIT_DASHES: (string | undefined)[] = [undefined, "10 5", "2 3", "10 4 2 4"];
+const COMMON_DASH = "3 3 8 3";
 
 /** TrendChart with one line per apartment (the highest reading of its devices), in the scope
  *  bar's order; a reading's room (`zone_id`) gives its apartment. */
@@ -212,7 +217,9 @@ export function ApartmentTrendChart({ readings, height }: { readings: Reading[];
       series: units.map((u) => ({
         id: u.id,
         label: u.label,
-        color: u.common ? COLORS.muted : UNIT_COLORS[apt++ % UNIT_COLORS.length],
+        ...(u.common
+          ? { color: COLORS.muted, dash: COMMON_DASH }
+          : { color: UNIT_COLORS[apt % UNIT_COLORS.length], dash: UNIT_DASHES[apt++ % UNIT_DASHES.length] }),
       })),
     };
   }, [units, rooms]);

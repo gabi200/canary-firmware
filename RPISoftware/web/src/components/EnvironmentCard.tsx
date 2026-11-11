@@ -19,6 +19,7 @@ import { pick, pickNum } from "../lib/nodes";
 import { setScope, useScope } from "../lib/scope";
 import { OTHER_GROUP, groupByUnit, type RoomGroup, type UnitGroup } from "../lib/unitGroups";
 import { Card } from "./Card";
+import { ChevronRightIcon } from "./Icons";
 import { StatusPill } from "./StatusPill";
 
 const RANK: Record<Level, number> = { unknown: 0, none: 0, ok: 1, attention: 2, danger: 3 };
@@ -306,11 +307,12 @@ export function EnvironmentCard() {
         <div className="row">
           <StatusPill state={s.status} label={levelLabel(s.status, t)} />
           <div className="grow">
-            <div>{s.headline}</div>
+            <div className="env-summary-headline">{s.headline}</div>
             <div className="muted small">{t("env.nodesOnline", { online: s.nodes_online, total: s.nodes_total })}</div>
           </div>
-          <Link to="/sensors" className="small">
+          <Link to="/sensors" className="small link-arrow">
             {t("env.sensorsLink")}
+            <ChevronRightIcon />
           </Link>
         </div>
       )}

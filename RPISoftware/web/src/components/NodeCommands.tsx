@@ -222,7 +222,7 @@ export function NodeCommands({ node, variant = "full" }: Props) {
       <div className="ncmd-row" role="group" aria-label={t("nodecmd.aria")}>
         {commands.map((c) => {
           const Icon = ICON[c];
-          const tone = c === "TEST" ? "primary" : c === "CLOSE" ? "valve-close" : "";
+          const tone = c === "TEST" ? "primary" : "";
           return (
             <button
               key={c}

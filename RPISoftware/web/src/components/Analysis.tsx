@@ -1,10 +1,20 @@
+import type { ReactNode } from "react";
 import type { BuildingSummary, Indicator, NodeAnalysis, ZoneSummary } from "../api/types";
 import { useT } from "../i18n";
 import { kindLabel, levelLabel, tokenLabel } from "../lib/labels";
 import { fmtClock } from "../lib/time";
+import { TrendDownIcon, TrendFlatIcon, TrendUpIcon } from "./Icons";
 import { StatusPill } from "./StatusPill";
 
-const TREND_ARROW: Record<string, string> = { rising: "↑", falling: "↓", stable: "→" };
+const TREND_ICON: Record<string, (p: { className?: string }) => ReactNode> = {
+  rising: TrendUpIcon,
+  falling: TrendDownIcon,
+  stable: TrendFlatIcon,
+};
+
+/** Facts rather than graded readings (presence, connection, valve position): their OK value
+ *  keeps the text colour; only an unwanted value takes a state colour. */
+const UNGRADED = new Set(["occupancy", "health", "valve"]);
 
 /** Level-coloured indicator rows: label, value (+ detail) and trend. Labels, values,
  *  headlines and advice are backend text (localized via Accept-Language). */
@@ -13,19 +23,29 @@ export function IndicatorList({ indicators }: { indicators: Indicator[] }) {
   if (indicators.length === 0) return <div className="muted small">{t("analysis.noIndicators")}</div>;
   return (
     <div>
-      {indicators.map((ind) => (
-        <div className="indicator" key={ind.key}>
-          <span className={`lvl ${ind.level}`} title={levelLabel(ind.level, t)} />
-          <span className="ind-label">{ind.label}</span>
-          <span className={`ind-value t-${ind.level}`}>
-            {ind.value}
-            {ind.detail && <span className="muted"> · {ind.detail}</span>}
-          </span>
-          <span className="trend" title={ind.trend ? tokenLabel(t, "trend", ind.trend) : undefined}>
-            {ind.trend ? TREND_ARROW[ind.trend] : ""}
-          </span>
-        </div>
-      ))}
+      {indicators.map((ind) => {
+        const Trend = ind.trend ? TREND_ICON[ind.trend] : undefined;
+        const trendText = ind.trend ? tokenLabel(t, "trend", ind.trend) : undefined;
+        const tone = ind.level === "ok" && UNGRADED.has(ind.key) ? "" : ` t-${ind.level}`;
+        return (
+          <div className="indicator" key={ind.key}>
+            <span className={`lvl ${ind.level}`} title={levelLabel(ind.level, t)} />
+            <span className="ind-label">{ind.label}</span>
+            <span className={`ind-value${tone}`}>
+              {ind.value}
+              {ind.detail && <span className="muted"> · {ind.detail}</span>}
+            </span>
+            <span className="trend" title={trendText}>
+              {Trend && (
+                <>
+                  <Trend />
+                  <span className="sr-only">{trendText}</span>
+                </>
+              )}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -56,8 +76,10 @@ export function BuildingBanner({ summary }: { summary: BuildingSummary }) {
   return (
     <div className={`env-banner ${summary.status}`}>
       <div className="grow">
-        <div className="env-status">{levelLabel(summary.status, t)}</div>
-        <div className="env-headline">{summary.headline}</div>
+        <div className="env-title">
+          <span className="env-status">{levelLabel(summary.status, t)}</span>
+          <div className="env-headline">{summary.headline}</div>
+        </div>
         <div className="muted small">
           {t("analysis.updated", { time: fmtClock(summary.generated_ts, lang) })}
         </div>

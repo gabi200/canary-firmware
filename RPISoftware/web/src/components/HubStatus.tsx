@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { useCluster } from "../api/hooks";
 import { useT } from "../i18n";
 import { worstProblem, type LineTone, type StatusLine } from "../lib/cluster";
-import { CheckIcon, InfoIcon, WarningIcon } from "./Icons";
+import { CheckIcon, ChevronRightIcon, InfoIcon, WarningIcon } from "./Icons";
 
 const ICON: Record<LineTone, typeof CheckIcon> = {
   danger: WarningIcon,
@@ -45,8 +45,9 @@ export function HubBanner() {
         <span className="hub-line-main">
           {t("hub.bannerTitle")} {line.text}
         </span>
-        <Link to="/admin/hub" className="small">
+        <Link to="/admin/hub" className="small link-arrow">
           {t("hub.bannerLink")}
+          <ChevronRightIcon />
         </Link>
       </div>
     </div>

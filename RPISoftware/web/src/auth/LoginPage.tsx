@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { config } from "../config";
 import { Card } from "../components/Card";
 import { LangToggle } from "../components/LangToggle";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useT } from "../i18n";
 import { useAuth } from "./AuthContext";
 
@@ -34,10 +35,13 @@ export function LoginPage() {
       <Card>
         <div className="box">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
-            <div className="brand" style={{ fontSize: 26 }}>
+            <div className="brand">
               Canary<span className="dot">.</span>
             </div>
-            <LangToggle />
+            <div className="btn-row">
+              <LangToggle />
+              <ThemeToggle />
+            </div>
           </div>
           <div className="muted small" style={{ marginBottom: 20 }}>
             {t("login.tagline")}

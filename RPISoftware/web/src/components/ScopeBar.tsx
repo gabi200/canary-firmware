@@ -80,17 +80,52 @@ export function ScopeBar({ rooms = true }: { rooms?: boolean }) {
   const summary = useSummary();
   const bar = useRef<HTMLDivElement>(null);
   const shown = sc.ready && sc.units.length > 0;
-  // phones: the rows scroll sideways; keep the chosen chips in sight (sideways only:
-  // scrollIntoView would also scroll the page back to where the sticky bar sits unstuck)
+  // Keep the chosen chips in sight (sideways only: scrollIntoView would also scroll the page
+  // back to where the sticky bar sits unstuck). "All rooms" is no choice, so it moves nothing.
   useEffect(() => {
-    bar.current?.querySelectorAll<HTMLElement>(".scope-chip.on").forEach((chip) => {
-      const row = chip.parentElement;
-      if (!row) return;
-      const c = chip.getBoundingClientRect();
-      const r = row.getBoundingClientRect();
-      if (c.left < r.left) row.scrollLeft -= r.left - c.left + 20;
-      else if (c.right > r.right) row.scrollLeft += c.right - r.right + 20;
-    });
+    const el = bar.current;
+    if (!el) return;
+    const on = [...el.querySelectorAll<HTMLElement>(".scope-chip.on")];
+    if (el.scrollWidth <= el.clientWidth) {
+      // wrapped rows (wide screens): each row on its own
+      for (const chip of on) {
+        const row = chip.parentElement;
+        if (!row) continue;
+        const c = chip.getBoundingClientRect();
+        const r = row.getBoundingClientRect();
+        if (c.left < r.left) row.scrollLeft -= r.left - c.left + 20;
+        else if (c.right > r.right) row.scrollLeft += c.right - r.right + 20;
+      }
+      return;
+    }
+    // phones: one line that scrolls sideways. Show the chosen floor through the most specific
+    // choice when they fit, else the most specific one; the left edge always falls in the gap
+    // before a chip, never through one.
+    // "Whole floor" and "All rooms" are no choice of their own
+    const chosen = on.slice(0, sc.scope.unit === "all" ? 1 : sc.scope.room === "all" ? 2 : 3);
+    if (!chosen.length) return;
+    const chips = [...el.querySelectorAll<HTMLElement>(".scope-chip")];
+    const css = getComputedStyle(el);
+    const padL = parseFloat(css.paddingLeft) || 0;
+    const padR = parseFloat(css.paddingRight) || 0;
+    const origin = el.getBoundingClientRect().left - el.scrollLeft;
+    const left = (c: HTMLElement) => c.getBoundingClientRect().left - origin;
+    const right = (c: HTMLElement) => c.getBoundingClientRect().right - origin;
+    /** scroll position that puts `c` at the left edge, with the gap before it (or the padding) */
+    const startAt = (c: HTMLElement) => {
+      const i = chips.indexOf(c);
+      const gap = i > 0 ? left(c) - right(chips[i - 1]) : padL;
+      return Math.max(0, left(c) - Math.min(padL, gap));
+    };
+    const last = chosen[chosen.length - 1];
+    const need = right(last) + padR - el.clientWidth;
+    let start = chosen.map(startAt).find((s) => s >= need);
+    if (start === undefined) {
+      // the most specific chip alone: the first chip boundary at or after the needed offset
+      const own = startAt(last);
+      start = chips.map(startAt).find((s) => s >= need && s <= own) ?? own;
+    }
+    el.scrollLeft = Math.min(start, el.scrollWidth - el.clientWidth);
   }, [shown, sc.scope.floor, sc.scope.unit, sc.scope.room, !!nodes.data]);
   if (!shown) return null;
 

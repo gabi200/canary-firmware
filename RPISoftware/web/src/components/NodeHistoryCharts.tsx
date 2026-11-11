@@ -24,6 +24,8 @@ interface Series {
   /** Short legend / tooltip name. */
   name: MsgKey;
   right?: boolean;
+  /** SVG dash pattern: second channel next to colour for series that share a chart */
+  dash?: string;
 }
 
 interface ChartSpec {
@@ -49,7 +51,7 @@ const AIR_CHARTS: ChartSpec[] = [
     id: "fine",
     title: "chart.fineParticles",
     series: [
-      { metric: METRICS.pm1, name: "metric.pm1" },
+      { metric: METRICS.pm1, name: "metric.pm1", dash: "10 5" },
       { metric: METRICS.pm25, name: "metric.pm25" },
     ],
     refs: METRICS.pm25.refs,
@@ -68,7 +70,7 @@ const AIR_CHARTS: ChartSpec[] = [
     note: "chart.climateNote",
     series: [
       { metric: METRICS.temperature, name: "metric.temperature" },
-      { metric: METRICS.humidity, name: "metric.humidity", right: true },
+      { metric: METRICS.humidity, name: "metric.humidity", right: true, dash: "10 5" },
     ],
   },
   { id: "rssi", title: "tile.rssi", series: [{ metric: METRICS.rssi, name: "tile.rssi" }] },
@@ -79,9 +81,9 @@ const AIR_TIMELINE: TimelineSpec = {
   title: "chart.presence",
   note: "chart.presenceNote",
   items: [
-    { field: "presence.detected", label: "timeline.detected", color: COLORS.green },
-    { field: "presence.moving", label: "raw.movingTarget", color: COLORS.cyan },
-    { field: "presence.stationary", label: "raw.stationaryTarget", color: COLORS.purple },
+    { field: "presence.detected", label: "timeline.detected", color: COLORS.blue },
+    { field: "presence.moving", label: "raw.movingTarget", color: COLORS.sky },
+    { field: "presence.stationary", label: "raw.stationaryTarget", color: COLORS.teal },
   ],
 };
 
@@ -100,7 +102,7 @@ const WATER_TIMELINE: TimelineSpec = {
   title: "timeline.water",
   items: [
     { field: "sensor.state", label: "timeline.probeWet", color: COLORS.red },
-    { field: "leak_latched", label: "raw.leakLatched", color: COLORS.orange },
+    { field: "leak_latched", label: "raw.leakLatched", color: COLORS.amber },
     { field: "valve.applied", label: "timeline.valveClosed", color: COLORS.amber },
   ],
 };
@@ -110,7 +112,7 @@ const REF_COLOR = { warn: COLORS.amber, danger: COLORS.red };
 /** 0-based for concentrations / counts, else the data plus the metric's margin. */
 const domainOf = (m: Metric): [number | string, number | string] =>
   m.zeroBased ? [0, "auto"] : [`dataMin - ${m.pad ?? 0}`, `dataMax + ${m.pad ?? 0}`];
-const REBOOT_COLOR = "#a371f7";
+const REBOOT_COLOR = "var(--c-slate)";
 
 interface Window {
   rows: Row[];
@@ -151,7 +153,13 @@ function MetricChart({ spec, doc, win }: { spec: ChartSpec; doc: unknown; win: W
       <div className="chart-stats">
         {summaries.map(({ s, st }) => (
           <span key={s.metric.field}>
-            <span className="sw" style={{ background: s.metric.color }} />
+            {s.dash ? (
+              <svg className="sw-line" width="18" height="6" aria-hidden="true">
+                <line x1="0" y1="3" x2="18" y2="3" stroke={s.metric.color} strokeWidth="2" strokeDasharray={s.dash === "10 5" ? "5 3" : s.dash} />
+              </svg>
+            ) : (
+              <span className="sw" style={{ background: s.metric.color }} />
+            )}
             <b>{t(s.name)}</b>
             {st ? (
               <>
@@ -242,6 +250,7 @@ function MetricChart({ spec, doc, win }: { spec: ChartSpec; doc: unknown; win: W
                 name={t(s.name)}
                 stroke={s.metric.color}
                 strokeWidth={2}
+                strokeDasharray={s.dash}
                 dot={false}
                 connectNulls={false}
                 isAnimationActive={false}

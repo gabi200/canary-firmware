@@ -1,56 +1,111 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
-import { useHubMode, useSetHubMode } from "../api/hooks";
+import { useHubMode, useIncidents, useSetHubMode } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
-import { useT } from "../i18n";
+import { useT, type MsgKey } from "../i18n";
 import { tokenLabel } from "../lib/labels";
+import { BuildingIcon, SensorIcon, SignOutIcon, SirenIcon, SlidersIcon } from "./Icons";
 import { LangToggle } from "./LangToggle";
+import { ThemeToggle } from "./ThemeToggle";
 
-export function Topbar({ connected }: { connected: boolean }) {
-  const { session, buildingId, logout } = useAuth();
-  const hubMode = useHubMode();
-  const setMode = useSetHubMode();
-  const canSwitch = session?.role === "system_admin" || session?.role === "hoa_manager";
+const active = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
+
+/** Open incidents of the building, on the Dispatch destination: visible from every page. */
+function IncidentCount() {
   const { t } = useT();
+  const n = (useIncidents(true).data ?? []).length;
+  if (n === 0) return null;
   return (
-    <div className="topbar">
+    <span className="nav-count" title={t("common.activeIncidents")}>
+      <span className="sr-only">{t("common.activeIncidents")}: </span>
+      {n}
+    </span>
+  );
+}
+
+/** Left rail: brand, destinations, then connection, building, role and sign out. */
+export function Rail({ connected }: { connected: boolean }) {
+  const { session, buildingId, logout } = useAuth();
+  const { t } = useT();
+  const role = session?.role;
+  return (
+    <aside className="rail">
       <div className="brand">
         Canary<span className="dot">.</span>
       </div>
       <nav className="nav">
         {/* a technician installs rooms and sensors: no incident consoles */}
-        {session?.role !== "technician" && (
+        {role !== "technician" && (
           <>
-            <NavLink to="/manager" className={({ isActive }) => (isActive ? "active" : "")}>
+            <NavLink to="/manager" className={active}>
+              <BuildingIcon />
               {t("nav.manager")}
             </NavLink>
-            <NavLink to="/dispatch" className={({ isActive }) => (isActive ? "active" : "")}>
+            <NavLink to="/dispatch" className={active}>
+              <SirenIcon />
               {t("nav.dispatch")}
+              <IncidentCount />
             </NavLink>
           </>
         )}
-        <NavLink to="/sensors" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink to="/sensors" className={active}>
+          <SensorIcon />
           {t("nav.sensors")}
         </NavLink>
-        {(session?.role === "system_admin" || session?.role === "hoa_manager" || session?.role === "technician") && (
-          <NavLink to="/admin" className={({ isActive }) => (isActive ? "active" : "")}>
+        {(role === "system_admin" || role === "hoa_manager" || role === "technician") && (
+          <NavLink to="/admin" className={active}>
+            <SlidersIcon />
             {t("nav.admin")}
           </NavLink>
         )}
       </nav>
+      <div className="rail-foot">
+        <span className={`live ${connected ? "" : "off"}`}>
+          <span className="led" />
+          <span>{connected ? t("topbar.live") : t("topbar.reconnecting")}</span>
+        </span>
+        <div className="rail-id">
+          <b>{buildingId}</b>
+          <span>{session ? tokenLabel(t, "role", session.role) : ""}</span>
+        </div>
+        <button className="btn small-btn rail-signout" onClick={logout} aria-label={t("topbar.signOut")}>
+          <SignOutIcon />
+          <span className="rail-signout-label">{t("topbar.signOut")}</span>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+const TITLES: [string, MsgKey][] = [
+  ["/manager", "nav.manager"],
+  ["/dispatch", "nav.dispatch"],
+  ["/sensors", "nav.sensors"],
+  ["/admin", "nav.admin"],
+];
+
+/** Utility bar over the content: where you are, hub mode, language and theme. */
+export function Topbar() {
+  const { session } = useAuth();
+  const hubMode = useHubMode();
+  const setMode = useSetHubMode();
+  const canSwitch = session?.role === "system_admin" || session?.role === "hoa_manager";
+  const { t } = useT();
+  const { pathname } = useLocation();
+  const title = TITLES.find(([path]) => pathname.startsWith(path))?.[1];
+  return (
+    <header className="topbar">
+      <h1 className="topbar-title">{title ? t(title) : ""}</h1>
       <div className="spacer" />
-      <span className={`live ${connected ? "" : "off"}`}>
-        <span className="led" />
-        {connected ? t("topbar.live") : t("topbar.reconnecting")}
-      </span>
-      {hubMode?.mode === "demo" && <span className="pill detection">{t("mode.badge")}</span>}
+      {setMode.isError && <span className="err">{t("mode.failed")}</span>}
+      {hubMode?.mode === "demo" && <span className="pill mode-badge">{t("mode.badge")}</span>}
       {canSwitch && hubMode && (
-        <div className="mode-switch" role="group" aria-label={t("mode.label")}>
+        <div className="seg mode-switch" role="group" aria-label={t("mode.label")}>
           {(["demo", "real"] as const).map((m) => (
             <button
               key={m}
               type="button"
-              className={`btn ${hubMode.mode === m ? "primary" : ""}`}
+              className={hubMode.mode === m ? "active" : ""}
               aria-pressed={hubMode.mode === m}
               disabled={setMode.isPending}
               onClick={() => hubMode.mode !== m && setMode.mutate(m)}
@@ -60,14 +115,8 @@ export function Topbar({ connected }: { connected: boolean }) {
           ))}
         </div>
       )}
-      {setMode.isError && <span className="err" style={{ margin: 0 }}>{t("mode.failed")}</span>}
-      <span className="meta">
-        {buildingId} · {session ? tokenLabel(t, "role", session.role) : ""}
-      </span>
       <LangToggle />
-      <button className="btn" onClick={logout}>
-        {t("topbar.signOut")}
-      </button>
-    </div>
+      <ThemeToggle />
+    </header>
   );
 }

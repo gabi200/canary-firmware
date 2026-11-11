@@ -14,6 +14,7 @@ import { EscalationLine } from "../components/EscalationLine";
 import { HazardMap } from "../components/HazardMap";
 import { HubBanner } from "../components/HubStatus";
 import { IncidentActions } from "../components/IncidentActions";
+import { IncidentBanner } from "../components/IncidentBanner";
 import { MotionCard } from "../components/MotionCard";
 import { ZoneNormalCard } from "../components/ZoneNormalCard";
 import { WaterImpactCard } from "../components/WaterImpactCard";
@@ -77,19 +78,13 @@ export function ManagerView() {
     <>
       <HubBanner />
       {primary?.state === "evacuation" && (
-        <div className="sitrep evac" style={{ marginBottom: 16 }}>
-          <div className="sitrep-head">
-            <SafetySign code="E002" size={52} className="safety-sign pulse" title={t("evac.nowTitle")} />
-            <SafetySign code={hazardSign(primary.hazard_type)} size={46} className="safety-sign flash" />
-            <div>
-              <h2>{t("evac.now")}</h2>
-              <div className="sub">
-                {hazardLabel(primary.hazard_type, t)} · {zoneLabel(zoneNames, primary.primary_zone_id)}
-              </div>
-            </div>
-          </div>
-          <PriorityAlert count={prioAwaiting} />
-        </div>
+        <IncidentBanner
+          state="evacuation"
+          hazardType={primary.hazard_type}
+          headline={t("evac.now")}
+          sub={`${hazardLabel(primary.hazard_type, t)} · ${zoneLabel(zoneNames, primary.primary_zone_id)}`}
+          status={<PriorityAlert count={prioAwaiting} />}
+        />
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -174,7 +169,7 @@ export function ManagerView() {
       </div>
 
       {demo && (
-      <Card title={t("manager.demo")} className="">
+      <Card title={t("manager.demo")} className="plan-card">
         <div className="row">
           <div className="grow muted small">{t("manager.demoText")}</div>
           <button className="btn danger" disabled={telemetry.isPending} onClick={triggerGasLeak}>

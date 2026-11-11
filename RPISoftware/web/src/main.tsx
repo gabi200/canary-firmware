@@ -6,7 +6,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { I18nProvider } from "./i18n";
+import { installScrollFade } from "./lib/scrollFade";
+import "@fontsource-variable/inter/wght.css";
 import "./styles.css";
+
+installScrollFade();
 
 const queryClient = new QueryClient({
   defaultOptions: {

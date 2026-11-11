@@ -74,7 +74,7 @@ function boundsOf(rooms: PlanRoom[]): Bounds {
   };
 }
 
-const NODE_COLOR: Record<string, string> = { ok: "#2ea043", attention: "#d29922", danger: "#f85149" };
+const NODE_COLOR: Record<string, string> = { ok: "var(--green)", attention: "var(--amber)", danger: "var(--red)" };
 
 interface Props {
   rooms: PlanRoom[];
@@ -278,8 +278,8 @@ export function RoomPlan({ rooms, selectedId, onSelect, onMove, onNudge, onEmpty
                   cx={-W / 2 + 21 + i * 15}
                   cy={H / 2 - 13}
                   r={5}
-                  fill={n.online ? (NODE_COLOR[n.status] ?? "#8b98a8") : "#0f1419"}
-                  stroke={n.online ? "none" : "#8b98a8"}
+                  fill={n.online ? (NODE_COLOR[n.status] ?? "var(--muted)") : "var(--fp-chip)"}
+                  stroke={n.online ? "none" : "var(--muted)"}
                   strokeWidth={1.5}
                 />
               ))}

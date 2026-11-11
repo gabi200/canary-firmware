@@ -103,7 +103,7 @@ export function RoomIndex({ zones, unitLabel, selectedId, onSelect }: Props) {
               <li key={z.placed.zone.id}>
                 <button
                   type="button"
-                  className={`ri-room lvl-${z.isSource ? "danger" : z.level} ${z.placed.zone.id === selectedId ? "sel" : ""}`}
+                  className={`ri-room lvl-${z.isSource ? "danger" : z.level} ${z.isSource ? "src" : ""} ${z.placed.zone.id === selectedId ? "sel" : ""}`}
                   aria-pressed={z.placed.zone.id === selectedId}
                   onClick={() => onSelect(z.placed.zone.id)}
                 >
@@ -111,13 +111,14 @@ export function RoomIndex({ zones, unitLabel, selectedId, onSelect }: Props) {
                   <span className="ri-main">
                     <span className="ri-name">
                       {KindIcon && <KindIcon />}
-                      {name(z)}
+                      <span className="ri-name-text">{name(z)}</span>
+                      {z.isSource && <span className="ri-src">{t("index.source")}</span>}
                     </span>
                     <span className="ri-unit muted">{unit(z)}</span>
                   </span>
                   <span className="ri-side">
                     <span className="ri-status">
-                      {z.isSource ? t("map.sourceBadge") : zoneStatusText(z, t)}
+                      {zoneStatusText(z, t)}
                       {pct && z.level !== "unknown" ? ` · ${pct}%` : ""}
                     </span>
                     {z.occupancy > 0 && (

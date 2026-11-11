@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-11T12:10:32.933Z",
+        "reason": "Claude decided: Operate-mode dashboard where a workhorse UI face fits; owner picked Linear / Vercel as the craft reference, did not confirm the face itself"
+      }
+    ]
+  }
+}

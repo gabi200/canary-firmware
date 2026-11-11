@@ -27,6 +27,7 @@ import {
   historyRows,
   incidentWindowMinutes,
   layoutZones,
+  overlayZoneIds,
   liveSensors,
   sensorsAt,
   sourceView,
@@ -220,9 +221,16 @@ export function HazardMap({ incident }: { incident: Incident | null }) {
     () => (floorShown === "all" ? zoneList : zoneList.filter((z) => z.floor_id === floorShown)),
     [zoneList, floorShown],
   );
+  // zones that can hold the source marker / contributor dots (live estimate and replay snapshots)
+  const triData = triangulation.data;
+  const triSnapshots = triHistory.isError ? undefined : triHistory.data?.snapshots;
+  const bodyZones = useMemo(
+    () => (incident ? overlayZoneIds([triData, ...(triSnapshots ?? [])], incident, planZones) : undefined),
+    [incident, triData, triSnapshots, planZones],
+  );
   const layout = useMemo(
-    () => layoutZones(planZones, { width: mapWidth || 960, units: unitInfo, overlays: hasIncident }),
-    [planZones, mapWidth, unitInfo, hasIncident],
+    () => layoutZones(planZones, { width: mapWidth || 960, units: unitInfo, overlays: hasIncident, bodyZones }),
+    [planZones, mapWidth, unitInfo, hasIncident, bodyZones],
   );
   // the command view's mini-map: same schematic, compact
   const miniLayout = useMemo(() => layoutZones(zoneList, { width: MINI_WIDTH, units: unitInfo, compact: true }), [zoneList, unitInfo]);

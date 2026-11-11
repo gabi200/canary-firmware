@@ -29,6 +29,7 @@ export function ObservedSequence({
           return (
             <li key={d.device_id} className={pending ? "pending" : undefined}>
               <span className="observed-rank">{d.order ?? "–"}</span>
+              <span className="observed-body">
               <span className="grow">
                 <b>{sensorLabel(d.sensor_type, t)}</b> · {zoneNames.get(d.zone_id) ?? prettyId(d.zone_id)}{" "}
                 <span className="muted small">({d.device_id})</span>
@@ -46,6 +47,7 @@ export function ObservedSequence({
               {d.out_of_order > 0 && (
                 <span className="small observed-warn">{t("observed.outOfOrder", { n: d.out_of_order })}</span>
               )}
+              </span>
             </li>
           );
         })}

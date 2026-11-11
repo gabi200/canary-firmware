@@ -7,7 +7,7 @@ import { useT } from "./i18n";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RealAlarmBanner } from "./components/RealAlarmBanner";
 import { ClassificationAlerts } from "./components/ClassificationAlerts";
-import { Topbar } from "./components/Topbar";
+import { Rail, Topbar } from "./components/Topbar";
 import { useIncidentSocket } from "./realtime/useIncidentSocket";
 import { AdminView } from "./views/AdminView";
 import { DispatchView } from "./views/DispatchView";
@@ -22,13 +22,16 @@ function AuthedLayout() {
   const { connected } = useIncidentSocket(buildingId, modeReady ? token : null);
   if (!session) return <Navigate to="/login" replace />;
   // no screen renders before the mode is known: Real data must not flash during Demo
-  if (!modeReady) return <div className="muted" style={{ padding: 24 }}>{t("common.loading")}</div>;
+  if (!modeReady) return <div className="boot">{t("common.loading")}</div>;
   return (
     <div className="app">
-      <Topbar connected={connected} />
-      <RealAlarmBanner />
-      <ClassificationAlerts />
-      <Outlet />
+      <Rail connected={connected} />
+      <div className="main">
+        <Topbar />
+        <RealAlarmBanner />
+        <ClassificationAlerts />
+        <Outlet />
+      </div>
     </div>
   );
 }

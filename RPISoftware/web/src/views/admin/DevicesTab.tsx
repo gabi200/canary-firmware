@@ -209,12 +209,18 @@ export function DevicesTab() {
       <div className="devs-head">
         <div className="devs-counter">
           <b>{plural("rooms.sensorCount", counts.all)}</b>
-          <span className="sep">·</span>
-          <span className="t-ok">{t("devs.online", { n: num(counts.online) })}</span>
-          <span className="sep">·</span>
-          <span className={counts.offline ? "t-danger" : "muted"}>{t("devs.offline", { n: num(counts.offline) })}</span>
-          <span className="sep">·</span>
-          <span className={counts.untested ? "t-attention" : "muted"}>{plural("devs.untested", counts.untested)}</span>
+          <span className="t-ok">
+            <span className="sep">·</span>
+            {t("devs.online", { n: num(counts.online) })}
+          </span>
+          <span className={counts.offline ? "t-danger" : "muted"}>
+            <span className="sep">·</span>
+            {t("devs.offline", { n: num(counts.offline) })}
+          </span>
+          <span className={counts.untested ? "t-attention" : "muted"}>
+            <span className="sep">·</span>
+            {plural("devs.untested", counts.untested)}
+          </span>
         </div>
         <span className="spacer" />
         {canCommand(session?.role) && (

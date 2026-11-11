@@ -47,7 +47,7 @@ export function ResidentRoster({ roster }: { roster: Roster }) {
   }
   return (
     <div>
-      <div className="grid cols-3" style={{ gap: 10, marginBottom: 12 }}>
+      <div className="grid cols-3 metric-row" style={{ gap: 10, marginBottom: 12 }}>
         <div className={`metric ${roster.needs_help > 0 ? "danger" : ""}`}>
           <div className="n">{roster.needs_help}</div>
           <div className="l">{t("roster.metricNeedHelp")}</div>

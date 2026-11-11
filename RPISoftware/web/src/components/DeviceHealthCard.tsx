@@ -3,9 +3,11 @@
  * offline, never tested), one line per apartment (online x/y, weakest Wi-Fi, newest test) and
  * then only the sensors that need attention: offline, no recent data, sensor fault / invalid
  * reading / warming up, weak Wi-Fi, a failed or unanswered test, a closed valve, an alarm
- * sounding. Roles allowed in Administration open the devices of that apartment from here.
+ * sounding. Those are a matrix (one row per apartment, one box per sensor, a legend that groups by
+ * reason) once there are more than a few; a few stay as text rows. Roles allowed in Administration
+ * open the devices of that apartment from here.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { useNodes, useSensorTrust } from "../api/hooks";
@@ -21,8 +23,10 @@ import { setScope, useScope, type Scope } from "../lib/scope";
 import { fmtAgo, parseTs } from "../lib/time";
 import { OTHER_GROUP, groupByUnit, type UnitGroup } from "../lib/unitGroups";
 import { Card } from "./Card";
-import { CheckIcon } from "./Icons";
+import { CheckIcon, ChevronRightIcon, DropletIcon, WindIcon } from "./Icons";
 import { LastCommandLine } from "./NodeCommands";
+import { KIND_ICON } from "./ScopeBar";
+import { StateCell, StateLegend } from "./StateGrid";
 import { WifiBars } from "./WifiBars";
 
 /** Below this the bars drop to one (WifiBars): the link is likely to drop out. */
@@ -37,7 +41,12 @@ const TONE_RANK: Record<Tone, number> = { unknown: 0, attention: 1, danger: 2 };
 interface Problem {
   tone: Tone;
   text: string;
+  /** the reason without per-sensor values ("offline", not "offline, last seen 3 min ago"): what the legend groups by */
+  gist?: string;
 }
+
+/** Up to this many sensors needing attention stay text rows; more become the matrix. */
+const MATRIX_FROM = 5;
 
 interface Item {
   zoneId: string;
@@ -56,6 +65,7 @@ function problemsOf(n: NodeOut, last: { outcome: CommandOutcome; command: string
     out.push({
       tone: "danger",
       text: n.last_seen_ts ? t("health.pOfflineSince", { ago: fmtAgo(n.last_seen_ts, lang) }) : t("health.pOffline"),
+      gist: t("health.pOffline"),
     });
   } else if (!doc) {
     out.push({ tone: "attention", text: t("health.pNoStatus") });
@@ -88,6 +98,7 @@ function problemsOf(n: NodeOut, last: { outcome: CommandOutcome; command: string
         out.push({
           tone: "unknown",
           text: warmS > 0 ? t("health.pWarmupMin", { min: fmtNumber(Math.ceil(warmS / 60), lang, 0) }) : t("health.pWarmup"),
+          gist: t("health.pWarmup"),
         });
       }
     } else {
@@ -95,7 +106,7 @@ function problemsOf(n: NodeOut, last: { outcome: CommandOutcome; command: string
       if (pick(doc, "valve.applied") === "closed") out.push({ tone: "attention", text: t("health.pValve") });
     }
     const rssi = pickNum(doc, "wifi.rssi");
-    if (rssi != null && rssi < WEAK_DBM) out.push({ tone: "attention", text: t("health.pWifi", { dbm: fmtNumber(rssi, lang, 0) }) });
+    if (rssi != null && rssi < WEAK_DBM) out.push({ tone: "attention", text: t("health.pWifi", { dbm: fmtNumber(rssi, lang, 0) }), gist: t("health.gWifi") });
   }
   // a refused SILENCE (nothing was sounding) says nothing about the device
   if ((last.outcome === "rejected" || last.outcome === "timeout") && last.command !== "SILENCE") {
@@ -137,6 +148,17 @@ function DevicesLink({ to, admin, className, children }: { to: Scope; admin: boo
 const scopeOf = (g: UnitGroup<Item>, room = "all"): Scope =>
   g.id === OTHER_GROUP ? { unit: "all", room: "all" } : { unit: g.id, room };
 
+/** One apartment's boxes grouped by room, in the order the rooms first appear. */
+function roomsOf<T extends { room: string; roomLabel: string }>(cells: T[]): { id: string; label: string; items: T[] }[] {
+  const out: { id: string; label: string; items: T[] }[] = [];
+  for (const c of cells) {
+    const hit = out.find((r) => r.id === c.room);
+    if (hit) hit.items.push(c);
+    else out.push({ id: c.room, label: c.roomLabel, items: [c] });
+  }
+  return out;
+}
+
 export function DeviceHealthCard() {
   const { t, lang } = useT();
   const { session } = useAuth();
@@ -146,10 +168,12 @@ export function DeviceHealthCard() {
   const trust = useSensorTrust();
   const live = useLiveCommands();
   const sc = useScope();
+  /** the box whose sentence is printed under the matrix (hovered, focused or tapped last) */
+  const [preview, setPreview] = useState<string | null>(null);
 
   if (!nodes.data || !sc.ready) {
     return (
-      <Card title={t("manager.deviceHealth")}>
+      <Card title={t("manager.deviceHealth")} className="device-health-card">
         <div className="muted small">{nodes.isError ? t("health.unavailable") : t("common.loading")}</div>
       </Card>
     );
@@ -200,22 +224,56 @@ export function DeviceHealthCard() {
           const ps = problems.get(i.node.id) ?? [];
           // the sensor's name usually starts with its room ("Baie · aer"): no need to repeat it
           const where = [i.name, plain(i.name).startsWith(plain(r.label)) ? null : r.label, g.label].filter(Boolean).join(" · ");
-          return { id: i.node.id, group: g, room: r.id, where, tone: ps[0].tone, text: ps.map((p) => p.text).join(", ") };
+          const roomKind = sc.rooms.find((room) => room.id === r.id)?.kind ?? "";
+          return { id: i.node.id, group: g, room: r.id, roomLabel: r.label, where, tone: ps[0].tone, text: ps.map((p) => p.text).join(", "), ps, water: i.node.kind === "water", roomKind };
         }),
     ),
   );
 
+  // one row per apartment for the matrix, in the order of the summary rows above
+  const rows = groups
+    .map((g) => ({ group: g, items: attention.filter((a) => a.group.id === g.id) }))
+    .filter((r) => r.items.length > 0);
+  // the legend: one line per distinct reason with the number of sensors it affects, worst first
+  const reasons = new Map<string, { tone: Tone; gist: string; count: number }>();
+  for (const a of attention) {
+    for (const gist of new Set(a.ps.map((p) => p.gist ?? p.text))) {
+      const tone = a.ps.filter((p) => (p.gist ?? p.text) === gist).reduce<Tone>((w, p) => (TONE_RANK[p.tone] > TONE_RANK[w] ? p.tone : w), "unknown");
+      const key = `${tone}|${gist}`;
+      const hit = reasons.get(key);
+      if (hit) hit.count += 1;
+      else reasons.set(key, { tone, gist, count: 1 });
+    }
+  }
+  const legend = [...reasons.entries()]
+    .sort(([, a], [, b]) => TONE_RANK[b.tone] - TONE_RANK[a.tone] || b.count - a.count)
+    .map(([key, r]) => ({
+      key,
+      mark: <span className={`lvl ${r.tone}`} aria-hidden="true" />,
+      text: (
+        <>
+          <b>{t(`rooms.sensorCount.${pluralCategory(lang, r.count)}`, { n: num(r.count) })}</b>
+          <span className="muted"> · </span>
+          <span className={`t-${r.tone}`}>{r.gist}</span>
+        </>
+      ),
+    }));
+
   return (
-    <Card title={t("manager.deviceHealth")}>
+    <Card title={t("manager.deviceHealth")} className="device-health-card">
       <div className="health-head">
         <div className="devs-counter">
           <b>{t(`rooms.sensorCount.${pluralCategory(lang, all)}`, { n: num(all) })}</b>
-          <span className="sep">·</span>
-          <span className="t-ok">{t("devs.online", { n: num(online) })}</span>
-          <span className="sep">·</span>
-          <span className={all - online ? "t-danger" : "muted"}>{t("devs.offline", { n: num(all - online) })}</span>
-          <span className="sep">·</span>
+          <span className="t-ok">
+            <span className="sep">·</span>
+            {t("devs.online", { n: num(online) })}
+          </span>
+          <span className={all - online ? "t-danger" : "muted"}>
+            <span className="sep">·</span>
+            {t("devs.offline", { n: num(all - online) })}
+          </span>
           <span className={untested ? "t-attention" : "muted"}>
+            <span className="sep">·</span>
             {t(`devs.untested.${pluralCategory(lang, untested)}`, { n: num(untested) })}
           </span>
         </div>
@@ -227,8 +285,9 @@ export function DeviceHealthCard() {
         </div>
         <span className="spacer" />
         {admin && (
-          <Link to="/admin/devices" className="small" onClick={() => setScope({ unit: "all", room: "all" })}>
+          <Link to="/admin/devices" className="small link-arrow" onClick={() => setScope({ unit: "all", room: "all" })}>
             {t("health.devicesLink")}
+            <ChevronRightIcon />
           </Link>
         )}
       </div>
@@ -275,6 +334,54 @@ export function DeviceHealthCard() {
         <div className="health-allgood">
           <CheckIcon /> {t("health.allGood")}
         </div>
+      ) : attention.length >= MATRIX_FROM ? (
+        <>
+          <ul className="hm">
+            {rows.map(({ group, items: cells }) => (
+              <li key={group.id} className="hm-row">
+                <span className="hm-name">
+                  <span className={`lvl ${cells.some((c) => c.tone === "danger") ? "danger" : cells.some((c) => c.tone === "attention") ? "attention" : "unknown"}`} aria-hidden="true" />
+                  {group.label}
+                </span>
+                <div className="hm-cells">
+                  {roomsOf(cells).map((rm) => {
+                    const KindIcon = KIND_ICON[rm.items[0].roomKind] as (typeof KIND_ICON)[string] | undefined;
+                    return (
+                      <div key={rm.id} className="hm-room" role="group" aria-label={rm.label}>
+                        <span className="hm-room-name" title={rm.label} aria-hidden="true">
+                          {KindIcon && <KindIcon />}
+                          <span className="hm-room-text">{rm.label}</span>
+                        </span>
+                        {rm.items.map((c) => {
+                          // the room's name and icon label the group; the box says air (wind) or water (droplet)
+                          const Mark = c.water ? DropletIcon : WindIcon;
+                          const label = `${c.where} — ${c.text}`;
+                          return (
+                            <StateCell
+                              key={c.id}
+                              tone={c.tone}
+                              label={label}
+                              to={admin ? "/admin/devices" : undefined}
+                              onNavigate={() => setScope(scopeOf(c.group, c.room))}
+                              onPreview={setPreview}
+                              previewed={preview === label}
+                            >
+                              <Mark />
+                            </StateCell>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="hm-sentence small" aria-live="polite">
+            {preview ?? <span className="muted">{t("health.previewHint")}</span>}
+          </div>
+          <StateLegend items={legend} stacked />
+        </>
       ) : (
         <ul className="health-problems">
           {attention.map((p) => (

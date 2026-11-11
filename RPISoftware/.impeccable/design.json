@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11T00:00:00Z",
+  "title": "Design System: Canary Operations Console",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Action Blue", "canonical": "#3b7cf0", "light": "#2563eb", "tonalRamp": ["#0f2552", "#17387a", "#1f4ba3", "#2a62cf", "#3b7cf0", "#6b9cf5", "#9dbcf8", "#cfdefc"] },
+      "accent-text": { "role": "primary", "displayName": "Action Blue Text", "canonical": "#7aa9ff", "light": "#1d55cf", "tonalRamp": ["#1d55cf", "#2a62cf", "#3b7cf0", "#5a91f5", "#7aa9ff", "#9dbcf8", "#bdd2fb", "#dde8fd"] },
+      "ground": { "role": "neutral", "displayName": "Ground", "canonical": "#0c0e11", "light": "#f5f6f8", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
+      "panel": { "role": "neutral", "displayName": "Panel", "canonical": "#13161a", "light": "#ffffff", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
+      "raised": { "role": "neutral", "displayName": "Raised", "canonical": "#1a1e24", "light": "#f1f3f5", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
+      "well": { "role": "neutral", "displayName": "Well", "canonical": "#0f1215", "light": "#f7f8fa", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
+      "rail": { "role": "neutral", "displayName": "Rail", "canonical": "#0f1215", "light": "#fbfbfc", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#23282f", "light": "#e2e5ea", "tonalRamp": ["#0f1215", "#181c21", "#1d2228", "#23282f", "#2b313a", "#323943", "#4a525e", "#6a7380"] },
+      "hairline-strong": { "role": "neutral", "displayName": "Hairline Strong", "canonical": "#323943", "light": "#cbd0d8", "tonalRamp": ["#181c21", "#23282f", "#2b313a", "#323943", "#3f4752", "#4a525e", "#6a7380", "#8b94a1"] },
+      "text": { "role": "neutral", "displayName": "Text", "canonical": "#e8eaed", "light": "#14171c", "tonalRamp": ["#323943", "#4a525e", "#6a7380", "#8b94a1", "#b9bfc8", "#cfd3d9", "#e8eaed", "#f5f6f8"] },
+      "text-secondary": { "role": "neutral", "displayName": "Text Secondary", "canonical": "#b9bfc8", "light": "#3c434e", "tonalRamp": ["#323943", "#4a525e", "#6a7380", "#8b94a1", "#a1a9b4", "#b9bfc8", "#cfd3d9", "#e8eaed"] },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#8b94a1", "light": "#5d6673", "tonalRamp": ["#23282f", "#323943", "#4a525e", "#6a7380", "#8b94a1", "#a1a9b4", "#b9bfc8", "#cfd3d9"] },
+      "safe": { "role": "secondary", "displayName": "Safe Green", "canonical": "#2fa84f", "light": "#1f9d45", "tonalRamp": ["#0d2e18", "#134a25", "#1b6a35", "#248c43", "#2fa84f", "#56c878", "#8adca2", "#c2eed0"] },
+      "safe-text": { "role": "secondary", "displayName": "Safe Green Text", "canonical": "#56c878", "light": "#17723a", "tonalRamp": ["#17723a", "#1b6a35", "#2fa84f", "#44bb66", "#56c878", "#78d595", "#9fe2b5", "#c6efd3"] },
+      "attention": { "role": "secondary", "displayName": "Attention Amber", "canonical": "#d4a11e", "light": "#c98a04", "tonalRamp": ["#2e2306", "#4d3b0c", "#745810", "#9b7615", "#d4a11e", "#e3b54a", "#eecb7c", "#f6e2b4"] },
+      "attention-text": { "role": "secondary", "displayName": "Attention Amber Text", "canonical": "#e3b54a", "light": "#875800", "tonalRamp": ["#875800", "#9b7615", "#c49219", "#d4a11e", "#e3b54a", "#eac56e", "#f0d490", "#f6e2b4"] },
+      "on-attention": { "role": "neutral", "displayName": "Ink on Amber", "canonical": "#1c1503", "light": "#1c1503", "tonalRamp": ["#0b0801", "#140f02", "#1c1503", "#2e2306", "#4d3b0c", "#745810", "#9b7615", "#c49219"] },
+      "alarm": { "role": "secondary", "displayName": "Alarm Red", "canonical": "#d93a40", "light": "#d93a40", "tonalRamp": ["#380d10", "#5c1519", "#821e23", "#ac2a30", "#d93a40", "#ea6a6f", "#f59a9d", "#fbc9cb"] },
+      "alarm-text": { "role": "secondary", "displayName": "Alarm Red Text", "canonical": "#ff7b72", "light": "#c0262c", "tonalRamp": ["#c0262c", "#d93a40", "#ea5a5e", "#f56a68", "#ff7b72", "#ff9c95", "#ffbab5", "#ffd8d5"] },
+      "evacuation": { "role": "secondary", "displayName": "Evacuation Deep Red", "canonical": "#a8231f", "light": "#a8231f", "tonalRamp": ["#2a0907", "#470f0c", "#690f0a", "#86190f", "#a8231f", "#c4504b", "#dc827e", "#eeb8b5"] },
+      "alarm-fill": { "role": "secondary", "displayName": "Alarm Fill", "canonical": "#cc363f", "light": "#cc363f", "tonalRamp": ["#340c0f", "#561319", "#7a1b22", "#a1262d", "#cc363f", "#dc6269", "#ea9499", "#f6c7ca"] },
+      "on-alarm": { "role": "neutral", "displayName": "Ink on Alarm", "canonical": "#ffffff", "light": "#ffffff", "tonalRamp": ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"] },
+      "on-alarm-ok": { "role": "secondary", "displayName": "OK on Alarm", "canonical": "#6fdc8f", "light": "#6fdc8f", "tonalRamp": ["#1b5b2f", "#2a7d44", "#3fa05d", "#58be78", "#6fdc8f", "#93e6ab", "#b7efc7", "#dbf7e3"] },
+      "on-alarm-warn": { "role": "secondary", "displayName": "Warning on Alarm", "canonical": "#f0c458", "light": "#f0c458", "tonalRamp": ["#5e4709", "#876510", "#b0841a", "#d4a52f", "#f0c458", "#f4d27e", "#f8e0a4", "#fbeecb"] },
+      "priority": { "role": "tertiary", "displayName": "Priority Violet", "canonical": "#7a55e0", "light": "#7a55e0", "tonalRamp": ["#221548", "#35216f", "#4b2f9a", "#6240c4", "#7a55e0", "#9a7ee9", "#b9a2ff", "#dcd0fb"] },
+      "priority-text": { "role": "tertiary", "displayName": "Priority Violet Text", "canonical": "#b9a2ff", "light": "#5d3cc2", "tonalRamp": ["#5d3cc2", "#7a55e0", "#9174e8", "#a58cf2", "#b9a2ff", "#cbbaff", "#dcd0fb", "#ede7fd"] },
+      "series-blue": { "role": "data", "displayName": "Series Blue", "canonical": "#5b93ff", "light": "#2563eb", "tonalRamp": ["#14295a", "#1e3f87", "#2d58b8", "#4274e0", "#5b93ff", "#86adff", "#b0c9ff", "#d8e4ff"] },
+      "series-sky": { "role": "data", "displayName": "Series Sky", "canonical": "#9ccfff", "light": "#2b85d3", "tonalRamp": ["#143a5c", "#1f5a8f", "#2f7ac2", "#5a9fe0", "#7ab9f5", "#9ccfff", "#bfe0ff", "#e0f0ff"] },
+      "series-cyan": { "role": "data", "displayName": "Series Cyan", "canonical": "#2fc3d6", "light": "#0a8aa0", "tonalRamp": ["#0b3a42", "#10565f", "#17787f", "#1f9aab", "#2fc3d6", "#62d6e4", "#98e5ee", "#cdf3f7"] },
+      "series-teal": { "role": "data", "displayName": "Series Teal", "canonical": "#4fd1b5", "light": "#0d8a72", "tonalRamp": ["#0e3a31", "#175a4c", "#217a67", "#2fa88a", "#4fd1b5", "#7ddfca", "#a8ebdc", "#d2f6ee"] },
+      "series-slate": { "role": "data", "displayName": "Series Slate", "canonical": "#a3adbb", "light": "#6b7685", "tonalRamp": ["#2b313a", "#444c58", "#5f6977", "#7c8694", "#a3adbb", "#b9c1cc", "#d0d6de", "#e8ebef"] },
+      "hazard-tape-black": { "role": "tertiary", "displayName": "Hazard Tape Black", "canonical": "#111111", "light": "#111111", "tonalRamp": ["#000000", "#0a0a0a", "#111111", "#222222", "#333333", "#444444", "#666666", "#888888"] },
+      "hazard-tape-amber": { "role": "tertiary", "displayName": "Hazard Tape Amber", "canonical": "#e0aa1c", "light": "#e0aa1c", "tonalRamp": ["#3a2c06", "#5e460a", "#8a6710", "#b88914", "#e0aa1c", "#eac04e", "#f2d682", "#f8e8b8"] },
+      "wordmark-dot": { "role": "tertiary", "displayName": "Wordmark Yellow", "canonical": "#f2c417", "light": "#d99a00", "tonalRamp": ["#3d3005", "#63500a", "#8f730e", "#bf9a12", "#f2c417", "#f5d34a", "#f8e07f", "#fbefb5"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Command-view hero statistic (40px)." },
+      "headline": { "displayName": "Headline", "purpose": "Incident banner title, tile and command values, metric counts." },
+      "title": { "displayName": "Title", "purpose": "Card headings, topbar title, section titles." },
+      "body": { "displayName": "Body", "purpose": "Default text with tabular numerals." },
+      "label": { "displayName": "Label", "purpose": "Muted sentence-case captions, field labels and table heads." },
+      "mono": { "displayName": "Mono", "purpose": "Device ids, raw JSON and evidence chips." }
+    },
+    "shadows": [
+      { "name": "shadow-pop", "value": "0 8px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)", "purpose": "Popovers, tooltips, command popovers. Light: rgba(20,23,28,0.12) / 0.08." },
+      { "name": "shadow-modal", "value": "0 24px 64px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)", "purpose": "Command view and dialogs. Light: rgba(20,23,28,0.22) / 0.1." },
+      { "name": "scrim", "value": "rgba(4,6,9,0.68)", "purpose": "Overlay backdrop. Light: rgba(20,23,28,0.42)." },
+      { "name": "selection-ring", "value": "0 0 0 1px var(--accent)", "purpose": "Selected chip, highlighted sensor, current item." },
+      { "name": "focus-field", "value": "0 0 0 3px var(--accent-soft)", "purpose": "Input focus." }
+    ],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "State transitions at 0.15s on hover, border and background." },
+      { "name": "evac-pulse", "value": "1.2s ease-in-out infinite, scale 1 to 1.06, opacity 1 to 0.88", "purpose": "The exit pictogram on the evacuation banner; the only moving element there. Background and hazard sign stay still. Off under reduced motion." },
+      { "name": "fp-pulse", "value": "1.6s ease-out infinite", "purpose": "Floor-plan source marker. Static at 0.6 opacity under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "wide-forms", "value": "1100px" },
+      { "name": "single-column", "value": "1000px" },
+      { "name": "rail-to-tabs", "value": "900px" },
+      { "name": "command-fullscreen", "value": "760px" },
+      { "name": "one-row-scope-bar", "value": "640px" },
+      { "name": "stack-and-compact-plan", "value": "560px" }
+    ],
+    "layout": [
+      { "name": "rail-width", "value": "232px" },
+      { "name": "utility-bar-height", "value": "52px" },
+      { "name": "content-max", "value": "1480px" },
+      { "name": "pad", "value": "24px (16px at 900px and below)" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "custom",
+      "refersTo": "button-primary",
+      "description": "The single action per panel.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Acknowledge</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; min-height:32px; padding:5px 12px; border:1px solid var(--border-strong,#323943); border-radius:6px; background:var(--panel,#13161a); color:var(--text,#e8eaed); font:500 14px/20px inherit; cursor:pointer; transition:background-color .15s, border-color .15s; } .ds-btn:hover { background:var(--panel-2,#1a1e24); } .ds-btn-primary { background:var(--accent,#3b7cf0); border-color:var(--accent,#3b7cf0); color:#fff; } .ds-btn-primary:hover { background:var(--accent,#3b7cf0); filter:brightness(1.1); } .ds-btn:focus-visible { outline:2px solid var(--accent-fg,#7aa9ff); outline-offset:2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "custom",
+      "refersTo": "button-danger",
+      "description": "Destructive or emergency action, solid red.",
+      "html": "<button class=\"ds-btn-danger\">Evacuate</button>",
+      "css": ".ds-btn-danger { min-height:32px; padding:5px 12px; border:1px solid var(--red,#d93a40); border-radius:6px; background:var(--red,#d93a40); color:#fff; font:500 14px/20px inherit; cursor:pointer; } .ds-btn-danger:hover { filter:brightness(1.08); } .ds-btn-danger:focus-visible { outline:2px solid var(--accent-fg,#7aa9ff); outline-offset:2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Field with accent focus ring.",
+      "html": "<label class=\"ds-field\"><span>Username</span><input class=\"ds-input\" placeholder=\"ana\" /></label>",
+      "css": ".ds-field { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:500; color:var(--text-2,#b9bfc8); } .ds-input { padding:6px 10px; border:1px solid var(--border-strong,#323943); border-radius:6px; background:var(--panel,#13161a); color:var(--text,#e8eaed); font:14px/20px inherit; transition:border-color .15s, box-shadow .15s; } .ds-input:hover { border-color:var(--muted,#8b94a1); } .ds-input:focus { outline:none; border-color:var(--accent,#3b7cf0); box-shadow:0 0 0 3px var(--accent-soft,rgba(76,141,255,.14)); }"
+    },
+    {
+      "name": "Status Pills",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "State text on soft tint; evacuation solid; demo neutral outline.",
+      "html": "<span class=\"ds-pill ds-ok\">Normal</span> <span class=\"ds-pill ds-warn\">Stale</span> <span class=\"ds-pill ds-bad\">Alarm</span> <span class=\"ds-pill ds-evac\">Evacuation</span> <span class=\"ds-pill ds-demo\">Demo</span>",
+      "css": ".ds-pill { display:inline-block; padding:2px 8px; border:1px solid transparent; border-radius:6px; font:600 12px/16px inherit; } .ds-ok { color:var(--green-fg,#56c878); background:var(--green-soft,rgba(47,168,79,.14)); } .ds-warn { color:var(--amber-fg,#e3b54a); background:var(--amber-soft,rgba(212,161,30,.14)); } .ds-bad { color:var(--red-fg,#ff7b72); background:var(--red-soft,rgba(229,72,77,.14)); } .ds-evac { color:#fff; background:var(--deep-red,#a8231f); } .ds-demo { color:var(--text-2,#b9bfc8); border-color:var(--border-strong,#323943); }"
+    },
+    {
+      "name": "Scope Chip",
+      "kind": "chip",
+      "refersTo": "scope-chip-selected",
+      "description": "Floor / apartment / room selector; selected adds accent border, tint and 1px ring.",
+      "html": "<button class=\"ds-chip\">Floor 1</button> <button class=\"ds-chip ds-on\">Apt 12</button>",
+      "css": ".ds-chip { min-height:32px; padding:4px 10px 4px 12px; border:1px solid var(--border,#23282f); border-radius:6px; background:var(--panel,#13161a); color:var(--text-2,#b9bfc8); font:500 14px inherit; cursor:pointer; transition:border-color .15s, background-color .15s; } .ds-chip:hover { border-color:var(--muted,#8b94a1); color:var(--text,#e8eaed); } .ds-on { border-color:var(--accent,#3b7cf0); background:var(--accent-soft,rgba(76,141,255,.14)); color:var(--text,#e8eaed); box-shadow:0 0 0 1px var(--accent,#3b7cf0); } .ds-chip:focus-visible { outline:2px solid var(--accent-fg,#7aa9ff); outline-offset:2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Panel surface with hairline and no shadow.",
+      "html": "<section class=\"ds-card\"><h3>Environment</h3><p>Readings are within the normal range.</p></section>",
+      "css": ".ds-card { background:var(--panel,#13161a); border:1px solid var(--border,#23282f); border-radius:8px; padding:16px; color:var(--text,#e8eaed); } .ds-card h3 { margin:0 0 12px; font:600 14px inherit; } .ds-card p { margin:0; color:var(--text-2,#b9bfc8); font-size:14px; }"
+    },
+    {
+      "name": "Rail Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "232px rail destinations with a red incident count badge.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">Manager</a><a href=\"#\" class=\"ds-active\">Dispatch <span class=\"ds-count\">2</span></a><a href=\"#\">Sensors</a></nav>",
+      "css": ".ds-nav { display:flex; flex-direction:column; gap:2px; width:208px; } .ds-nav a { display:flex; align-items:center; gap:10px; height:34px; padding:0 10px; border-radius:6px; color:var(--text-2,#b9bfc8); font:500 14px inherit; text-decoration:none; transition:background-color .15s; } .ds-nav a:hover { background:var(--panel-2,#1a1e24); color:var(--text,#e8eaed); } .ds-nav a.ds-active { background:var(--panel-2,#1a1e24); color:var(--text,#e8eaed); font-weight:600; } .ds-nav a:focus-visible { outline:2px solid var(--accent-fg,#7aa9ff); outline-offset:2px; } .ds-count { margin-left:auto; min-width:20px; padding:1px 6px; border-radius:999px; background:var(--red,#d93a40); color:#fff; font:600 12px/16px inherit; text-align:center; }"
+    },
+    {
+      "name": "State Cell",
+      "kind": "custom",
+      "refersTo": "state-cell",
+      "description": "Compact 30px cell for matrices and grids; tone sets colour, none is dashed.",
+      "html": "<span class=\"ds-cell\" title=\"Smoke sensor offline\">!</span> <span class=\"ds-cell ds-att\" title=\"Stale\">~</span> <span class=\"ds-cell ds-dng\" title=\"Gas high\">!</span> <span class=\"ds-cell ds-none\" title=\"No sensor\"></span>",
+      "css": ".ds-cell { --fg:var(--muted,#8b94a1); --bg:var(--well,#0f1215); --line:var(--border-strong,#323943); display:inline-grid; place-items:center; width:30px; height:30px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:600 13px inherit; } .ds-att { --fg:var(--amber-fg,#e3b54a); --bg:var(--amber-soft,rgba(212,161,30,.14)); --line:var(--amber,#d4a11e); } .ds-dng { --fg:var(--red-fg,#ff7b72); --bg:var(--red-soft,rgba(229,72,77,.14)); --line:var(--red,#d93a40); } .ds-none { --line:var(--border,#23282f); border-style:dashed; }"
+    },
+    {
+      "name": "Evacuation Banner",
+      "kind": "custom",
+      "refersTo": "incident-banner-evacuation",
+      "description": "Deep red panel, 8px radius, with a 4px black-and-amber tape strip along the top; the only loud surface in the system. Only the exit pictogram pulses.",
+      "html": "<div class=\"ds-evac\"><div class=\"ds-evac-head\"><h2>Evacuation in progress</h2><div>Building 7, 14 residents unaccounted</div></div></div>",
+      "css": ".ds-evac { position:relative; overflow:hidden; border-radius:8px; background:#a8231f; color:#fff; } .ds-evac::before { content:\"\"; position:absolute; inset:0 0 auto 0; height:4px; background:repeating-linear-gradient(45deg,#111 0 8px,#e0aa1c 8px 16px); } .ds-evac-head { padding:22px 20px 18px; } .ds-evac h2 { margin:0 0 4px; font:600 24px inherit; letter-spacing:-0.02em; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Console",
+    "overview": "A building-safety operations console for a dispatcher under time pressure, with a manager and a technician behind them. Cool near-neutral surfaces, 1px hairlines, one blue accent, precise Inter type with tabular numerals. Dark is the default; light is a full second theme on the same token names. Colour means state and nothing else; with every other surface held neutral, an alarm is the loudest thing on any screen. The shell reports building state on every page through the incident count on the Dispatch destination.",
+    "keyCharacteristics": [
+      "Three surface steps (ground, panel, raised) separated by 1px hairlines, not shadows.",
+      "8px containers, 6px controls.",
+      "State colour has three steps each: solid, text, soft tint, re-tuned per theme.",
+      "Long repeated lists collapse into compact state cells and matrices with the full sentence on tooltip and accessible name.",
+      "Evacuation is the one place the system gets loud: deep red, a slim black-and-amber tape strip, ISO pictograms."
+    ],
+    "rules": [
+      { "name": "The State-Only Colour Rule", "body": "Green, amber and red mean state. They never decorate, never mark a category, never fill a series.", "section": "colors" },
+      { "name": "The One Blue Rule", "body": "Blue means \"you can act on this\" or \"this is selected\". Motion cells use blue as selection-like info, never as a hazard.", "section": "colors" },
+      { "name": "The Neutral Demo Rule", "body": "The Demo badge is a neutral outlined pill. Demo is not a hazard state.", "section": "colors" },
+      { "name": "The Sentence Case Rule", "body": "Labels are sentence case at 12px muted. No uppercase, no tracked-out eyebrows or kickers.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Numbers are tabular everywhere; never swap in a proportional face for a figure.", "section": "typography" },
+      { "name": "The Flat Surface Rule", "body": "Cards, tiles and cells never carry a shadow at rest. Only overlays do.", "section": "elevation" },
+      { "name": "The No-Glow Rule", "body": "No glows, no coloured side stripes. A selected item uses the accent border plus a 1px ring.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use green, amber and red only for state, always as a dot or fill plus text, with a soft tint behind it.",
+      "Do use the -text step of a colour for text and the solid step for dots, fills and borders.",
+      "Do keep blue for action and selection, and one primary button per panel.",
+      "Do build both themes from the same token names; add a light value whenever a dark one is added.",
+      "Do compact long repeated lists into state cells or matrices, keeping the full sentence as tooltip and accessible name.",
+      "Do separate chart series by dash pattern as well as by colour, and keep series to the five data colours.",
+      "Do honour prefers-reduced-motion for every pulse."
+    ],
+    "donts": [
+      "Don't use state colours to decorate or categorise.",
+      "Don't use blue or violet for hazard, or green / amber / red for series.",
+      "Don't add glows, coloured side stripes, or shadows at rest.",
+      "Don't add uppercase labels, eyebrows or kickers.",
+      "Don't treat Demo mode as a hazard state; keep its badge neutral and outlined.",
+      "Don't use the black-and-amber tape or deep red outside evacuation.",
+      "Don't introduce a fourth surface step or a radius beyond 4, 6, 8 and 12."
+    ]
+  }
+}

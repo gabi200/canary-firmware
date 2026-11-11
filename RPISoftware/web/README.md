@@ -53,6 +53,11 @@ The hardware API it consumes (`/buildings/{id}/summary`, `/buildings/{id}/nodes`
   at most every 10 s, the reporting node's history; unknown event types are ignored)
 - **Recharts** for telemetry trends
 - **react-router-dom** for routing + role-gated routes
+- **Themes**: dark (default) and light, switched in the top bar and on the login page and
+  stored per browser (`canary.theme`). Every colour is a token in `src/styles.css`
+  (`:root` = dark, `:root[data-theme="light"]`); charts and floor plans read the same
+  tokens, so add colours there rather than as hex values in components. The UI font
+  (Inter) is bundled, so the hub needs no internet access to render it.
 - Floor plan is hand-rolled **SVG** (zones auto-laid-out, sensor dots colored by edge
   state, hazard heatmap on affected zones, pulsing SOURCE marker with its confidence on
   the triangulated source zone, falling back to the incident's first-detection zone). A
@@ -134,6 +139,6 @@ npm run typecheck
   sensors in `ppm`); the manager trend charts never put two units on one axis.
 - Hazard "source" is the backend's triangulated zone (`est_source_zone_id`, rule-based,
   gas/CO from `verification` onward) with its confidence, shown on the floor plan and in
-  the Dispatch view's "Hazard source (AI triangulation)" card; before an estimate exists
+  the Dispatch view's "Hazard source (rule-based estimate)" card; before an estimate exists
   it is the incident's first-detection zone. The learned model is a later phase
   (ARCHITECTURE.md §B).

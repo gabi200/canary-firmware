@@ -197,11 +197,12 @@ export const TrendDownIcon = (p: IconProps) => (
   </Icon>
 );
 
-/** Trend: stable. */
+/** Trend: steady. A level line ending in a point, like the rising / falling lines, with no
+ *  arrowhead (a right arrow reads as "open"). */
 export const TrendFlatIcon = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M4 12h15" />
-    <path d="M15 8l4 4-4 4" />
+    <path d="M4 12h12" />
+    <circle cx="18.5" cy="12" r="1.75" />
   </Icon>
 );
 
@@ -414,5 +415,92 @@ export const ChipIcon = (p: IconProps) => (
     <rect x="6.5" y="6.5" width="11" height="11" rx="1.8" />
     <rect x="9.5" y="9.5" width="5" height="5" rx="0.8" />
     <path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3" />
+  </Icon>
+);
+
+export const SunIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5" />
+  </Icon>
+);
+
+export const MoonIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" />
+  </Icon>
+);
+
+export const BuildingIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5" y="3" width="14" height="18" rx="1.5" />
+    <path d="M9 7.5h1.5M13.5 7.5H15M9 11.5h1.5M13.5 11.5H15M10 21v-4.5h4V21" />
+  </Icon>
+);
+
+export const SirenIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 17v-4.5a5 5 0 0 1 10 0V17" />
+    <path d="M5 17h14v3.5H5z" />
+    <path d="M12 3v1.8M4.2 6.2l1.3 1.3M19.8 6.2l-1.3 1.3" />
+  </Icon>
+);
+
+export const SlidersIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+    <circle cx="15" cy="7" r="2" />
+    <circle cx="9" cy="17" r="2" />
+  </Icon>
+);
+
+export const SignOutIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14" />
+    <path d="M10 8l-4 4 4 4M6 12h9" />
+  </Icon>
+);
+
+/** Arrow up (higher than usual). */
+/** Chevron right: after the label of a link that leads to another page. */
+export const ChevronRightIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 5.5l6.5 6.5L9 18.5" />
+  </Icon>
+);
+
+export const ArrowUpIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 19V5.5" />
+    <path d="M6 11.5l6-6 6 6" />
+  </Icon>
+);
+
+/** Arrow down (lower than usual). */
+export const ArrowDownIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 5v13.5" />
+    <path d="M6 12.5l6 6 6-6" />
+  </Icon>
+);
+
+/** Dotted ring (still learning: nothing to compare against yet). */
+export const DashedCircleIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="7.5" strokeDasharray="1.6 3.3" />
+  </Icon>
+);
+
+/** Dashed line (no data). */
+export const DashedLineIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4.5 12h15" strokeDasharray="2.6 3.4" />
+  </Icon>
+);
+
+/** Activity pulse (motion detected). */
+export const ActivityIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 12h4l2.5-6 4 12 2.5-6H21" />
   </Icon>
 );

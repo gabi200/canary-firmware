@@ -184,7 +184,7 @@ function Gauge({ value, color, center, variant }: { value: number | null; color:
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="#2c3846"
+          stroke="var(--border-strong)"
           strokeWidth={stroke}
           strokeDasharray={`${c * span} ${c}`}
           strokeLinecap="round"
@@ -249,13 +249,13 @@ function ChannelChart({ c, rows, from, to }: { c: ChannelState; rows: Row[]; fro
           labelFormatter={(ms) => fmtTooltipTime(Number(ms), lang, minutes)}
           formatter={(v) => (typeof v === "number" ? `${fmtNumber(v, lang, c.metric.digits, c.metric.fixed)} ${c.metric.unit}` : "—")}
         />
-        {c.warn != null && <ReferenceLine y={c.warn} stroke="#d29922" strokeDasharray="5 4" ifOverflow="extendDomain" />}
-        {c.danger != null && <ReferenceLine y={c.danger} stroke="#f85149" strokeDasharray="5 4" ifOverflow="extendDomain" />}
+        {c.warn != null && <ReferenceLine y={c.warn} stroke="var(--amber)" strokeDasharray="5 4" ifOverflow="extendDomain" />}
+        {c.danger != null && <ReferenceLine y={c.danger} stroke="var(--red)" strokeDasharray="5 4" ifOverflow="extendDomain" />}
         <Area
           type="monotone"
           dataKey={key}
-          stroke={c.level === "danger" ? "#f85149" : c.level === "attention" ? "#d29922" : c.metric.color}
-          fill={c.level === "danger" ? "#f85149" : c.level === "attention" ? "#d29922" : c.metric.color}
+          stroke={c.level === "danger" ? "var(--red)" : c.level === "attention" ? "var(--amber)" : c.metric.color}
+          fill={c.level === "danger" ? "var(--red)" : c.level === "attention" ? "var(--amber)" : c.metric.color}
           fillOpacity={0.18}
           strokeWidth={2}
           dot={false}
@@ -292,12 +292,12 @@ function MiniMap({ ctx, selectedId, onSelect }: { ctx: CommandContext; selectedI
               width={u.w}
               height={u.h}
               rx={10}
-              fill={u.common ? "#141a21" : "#121922"}
-              stroke="#35424f"
+              fill={u.common ? "var(--fp-block-2)" : "var(--fp-block)"}
+              stroke="var(--fp-block-stroke)"
               strokeWidth={2}
               strokeDasharray={u.common ? "8 6" : undefined}
             />
-            <text className="fp-text" x={u.x + 10} y={u.y + 25} fill="#e6edf3" fontSize={22} fontWeight={800}>
+            <text className="fp-text fp-halo" x={u.x + 10} y={u.y + 25} fill="var(--text)" fontSize={22} fontWeight={800}>
               {u.label.length > max ? `${u.label.slice(0, max - 1)}…` : u.label}
             </text>
           </g>
@@ -311,20 +311,20 @@ function MiniMap({ ctx, selectedId, onSelect }: { ctx: CommandContext; selectedI
           width={z.placed.w}
           height={z.placed.h}
           rx={8}
-          fill={z.level === "unknown" || z.level === "none" ? "#222c38" : LEVEL_COLOR[z.level]}
+          fill={z.level === "unknown" || z.level === "none" ? "var(--fp-tile)" : LEVEL_COLOR[z.level]}
           fillOpacity={z.level === "unknown" || z.level === "none" ? 1 : 0.35}
         />
       ))}
       {source && (
         <g clipPath={`url(#${clip})`} pointerEvents="none">
-          <circle cx={source.x} cy={source.y} r={source.r} fill="#f85149" fillOpacity={0.16} stroke="#f85149" strokeDasharray="6 6" strokeWidth={2} />
+          <circle cx={source.x} cy={source.y} r={source.r} fill="var(--red)" fillOpacity={0.16} stroke="var(--red)" strokeDasharray="6 6" strokeWidth={2} />
           {contributors.map((c) => (
-            <line key={c.deviceId} x1={c.x} y1={c.y} x2={source.x} y2={source.y} stroke="#fff" strokeOpacity={0.35 + 0.6 * c.weight} strokeWidth={2 + 4 * c.weight} />
+            <line key={c.deviceId} x1={c.x} y1={c.y} x2={source.x} y2={source.y} stroke="var(--fp-contrast)" strokeOpacity={0.35 + 0.6 * c.weight} strokeWidth={2 + 4 * c.weight} />
           ))}
           {contributors.map((c) => (
-            <circle key={`d-${c.deviceId}`} cx={c.x} cy={c.y} r={6 + 3 * c.weight} fill="#f85149" stroke="#fff" strokeWidth={2.5} />
+            <circle key={`d-${c.deviceId}`} cx={c.x} cy={c.y} r={6 + 3 * c.weight} fill="var(--red)" stroke="#fff" strokeWidth={2.5} />
           ))}
-          <circle cx={source.x} cy={source.y} r={8} fill="#fff" stroke="#f85149" strokeWidth={3.5} />
+          <circle cx={source.x} cy={source.y} r={8} fill="#fff" stroke="var(--red)" strokeWidth={3.5} />
         </g>
       )}
       {zones.map((z) => {
@@ -352,11 +352,11 @@ function MiniMap({ ctx, selectedId, onSelect }: { ctx: CommandContext; selectedI
             }}
           >
             <title>{label}</title>
-            <rect x={x} y={y} width={w} height={h} rx={8} fill="transparent" stroke={sel ? "#ffffff" : "#2c3846"} strokeWidth={sel ? 6 : 2} />
+            <rect x={x} y={y} width={w} height={h} rx={8} fill="transparent" stroke={sel ? "var(--fp-contrast)" : "var(--border-strong)"} strokeWidth={sel ? 6 : 2} />
             {KindIcon ? (
-              <KindIcon x={x + w / 2 - 13} y={y + h / 2 - 13} width={26} height={26} style={{ color: "#e6edf3", pointerEvents: "none" }} />
+              <KindIcon x={x + w / 2 - 13} y={y + h / 2 - 13} width={26} height={26} style={{ color: "var(--text)", pointerEvents: "none" }} />
             ) : (
-              <text className="fp-text" x={x + w / 2} y={y + h / 2 + 7} textAnchor="middle" fill="#e6edf3" fontSize={20} fontWeight={800} pointerEvents="none">
+              <text className="fp-text fp-halo" x={x + w / 2} y={y + h / 2 + 7} textAnchor="middle" fill="var(--text)" fontSize={20} fontWeight={800} pointerEvents="none">
                 {name.slice(0, 3)}
               </text>
             )}
@@ -776,7 +776,7 @@ export function ZoneCommand({
             <Gauge
               variant="arc"
               value={worst?.ratio ?? null}
-              color={worst ? LEVEL_COLOR[worst.level] : "#8b98a8"}
+              color={worst ? LEVEL_COLOR[worst.level] : "var(--muted)"}
               center={<b>{worst ? pctText(worst.ratio!, lang) : "—"}</b>}
             />
             <span className="cmd-stat-caption">{t("cmd.ofDanger")}</span>
@@ -794,7 +794,7 @@ export function ZoneCommand({
             <Gauge
               variant="donut"
               value={incident && tri?.source_zone_id ? tri.confidence : null}
-              color="#58a6ff"
+              color="var(--sky)"
               center={<b>{incident && tri?.source_zone_id ? pctText(tri.confidence, lang) : "—"}</b>}
             />
           </StatTile>

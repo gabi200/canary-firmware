@@ -12,12 +12,14 @@ import { EscalationLine } from "../components/EscalationLine";
 import { FusionExplanationPanel } from "../components/FusionExplanation";
 import { HazardMap } from "../components/HazardMap";
 import { IncidentActions } from "../components/IncidentActions";
+import { IncidentBanner } from "../components/IncidentBanner";
 import { IncidentBriefCard } from "../components/IncidentBrief";
 import { WaterImpactCard } from "../components/WaterImpactCard";
 import { IncidentTimeline } from "../components/IncidentTimeline";
+import { OccupiedZonesCard } from "../components/OccupiedZonesCard";
 import { PriorityAlert, PriorityPanel, priorityAwaiting } from "../components/PriorityPanel";
 import { ResidentRoster } from "../components/ResidentRoster";
-import { SafetySign, hazardAdviceSigns, hazardSign, signName } from "../components/SafetySigns";
+import { SafetySign } from "../components/SafetySigns";
 import { SignalBadge } from "../components/SignalBadge";
 import { SignatureBadge } from "../components/SignatureBadge";
 import { StatusPill } from "../components/StatusPill";
@@ -25,14 +27,6 @@ import { useT } from "../i18n";
 import { fmtNumber } from "../lib/format";
 import { buildZoneNames, hazardLabel, triangulationMethodLabel, zoneLabel } from "../lib/labels";
 import { fmtClock } from "../lib/time";
-
-const STATE_COLOR: Record<string, string> = {
-  evacuation: "#b62324",
-  alarm: "#f85149",
-  escalation: "#f85149",
-  detection: "#d29922",
-  verification: "#d29922",
-};
 
 export function DispatchView() {
   const { t, lang } = useT();
@@ -61,7 +55,6 @@ export function DispatchView() {
   const total = acc?.occupancy_total ?? 0;
   const accounted = acc?.accounted ?? 0;
   const pct = total > 0 ? Math.round((accounted / total) * 100) : 100;
-  const banner = STATE_COLOR[incident.state] ?? "#1565c0";
   const hazard = hazardLabel(incident.hazard_type, t);
   // care profiles: only ever sent for an active incident (this view shows active ones only)
   const priority = roster.data?.priority ?? [];
@@ -69,47 +62,34 @@ export function DispatchView() {
 
   return (
     <>
-      <div className={`sitrep ${incident.state === "evacuation" ? "evac" : ""}`} style={{ background: banner, marginBottom: 16 }}>
-        <div className="sitrep-head">
-          {incident.state === "evacuation" && (
-            <SafetySign code="E002" size={58} className="safety-sign pulse" title={t("evac.nowTitle")} />
-          )}
-          <SafetySign
-            code={hazardSign(incident.hazard_type)}
-            size={52}
-            className={`safety-sign ${incident.state === "evacuation" ? "flash" : ""}`}
-            title={hazard}
-          />
-          <div>
-            <h2>{incident.state === "evacuation" ? t("evac.now") : hazard}</h2>
-            <div className="sub">
-              {t("dispatch.sub", {
-                hazard,
-                zone: zoneLabel(zoneNames, incident.primary_zone_id),
-                time: fmtClock(incident.opened_ts, lang),
-              })}
-            </div>
-          </div>
-        </div>
-        <div className="sign-row">
-          {hazardAdviceSigns(incident.hazard_type).map((code) => (
-            <span key={code} className="sign-chip">
-              <SafetySign code={code} size={36} className="safety-sign" />
-              {signName(code, lang)}
-            </span>
-          ))}
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <SignalBadge cls={incident.false_alarm_class} />
-          <SignatureBadge signature={incident.signature} />
-        </div>
-        <PriorityAlert count={prioAwaiting} />
-        <EscalationLine incidentId={incident.id} onDark />
-      </div>
+      <IncidentBanner
+        state={incident.state}
+        hazardType={incident.hazard_type}
+        hazardTitle={hazard}
+        headline={incident.state === "evacuation" ? t("evac.now") : hazard}
+        sub={t("dispatch.sub", {
+          hazard,
+          zone: zoneLabel(zoneNames, incident.primary_zone_id),
+          time: fmtClock(incident.opened_ts, lang),
+        })}
+        tags={
+          <>
+            <SignalBadge cls={incident.false_alarm_class} />
+            <SignatureBadge signature={incident.signature} />
+          </>
+        }
+        status={
+          <>
+            <PriorityAlert count={prioAwaiting} />
+            <EscalationLine incidentId={incident.id} onDark />
+          </>
+        }
+        advice
+      />
 
       <PriorityPanel people={priority} />
 
-      <div className="grid cols-3" style={{ marginBottom: 16 }}>
+      <div className="grid cols-3 metric-row" style={{ marginBottom: 16 }}>
         <Card>
           <div className="metric">
             <div className="n">{Math.round(total)}</div>
@@ -117,13 +97,13 @@ export function DispatchView() {
           </div>
         </Card>
         <Card>
-          <div className="metric good">
+          <div className={`metric ${total > 0 ? "good" : ""}`}>
             <div className="n">{accounted}</div>
             <div className="l">{t("dispatch.accounted")}</div>
           </div>
         </Card>
         <Card>
-          <div className={`metric ${(acc?.unaccounted ?? 0) > 0 ? "danger" : "good"}`}>
+          <div className={`metric ${(acc?.unaccounted ?? 0) > 0 ? "danger" : total > 0 ? "good" : ""}`}>
             <div className="n">{acc?.unaccounted ?? 0}</div>
             <div className="l">{t("dispatch.unaccounted")}</div>
           </div>
@@ -135,7 +115,42 @@ export function DispatchView() {
           <HazardMap incident={incident} />
         </Card>
 
-        <div className="grid" style={{ gap: 16 }}>
+        <div className="grid dispatch-side" style={{ gap: 16 }}>
+          <Card title={t("dispatch.progress")} className="dispatch-actions">
+            <div className={`progress ${total > 0 ? "" : "idle"}`}>
+              <div style={{ width: `${pct}%` }} />
+            </div>
+            <div className="muted small" style={{ marginTop: 8 }}>
+              {t("dispatch.progressLine", {
+                accounted,
+                total: Math.round(total),
+                pct,
+                help: acc?.needs_help ?? 0,
+              })}
+            </div>
+            <PriorityAlert count={prioAwaiting} />
+            <div style={{ marginTop: 12 }}>
+              <IncidentActions incident={incident} />
+            </div>
+            {evacuation.data?.assembly_points?.[0] && (
+              <div className="assembly-row">
+                <SafetySign code="E007" size={40} className="safety-sign" />
+                <div className="small">
+                  <div className="muted">{t("dispatch.assembly")}</div>
+                  <div style={{ fontWeight: 700 }}>{evacuation.data.assembly_points[0].label}</div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <Card title={t("dispatch.accountability")} className="dispatch-roster">
+            {roster.data ? (
+              <ResidentRoster roster={roster.data} />
+            ) : (
+              <div className="muted small">{t("dispatch.loadingRoster")}</div>
+            )}
+          </Card>
+
           <Card title={t("dispatch.source")}>
             {triangulation.data && triangulation.data.source_zone_id ? (
               <>
@@ -176,53 +191,7 @@ export function DispatchView() {
           <IncidentBriefCard incidentId={incident.id} />
           {incident.hazard_type === "water_leak" && <WaterImpactCard incidentId={incident.id} />}
 
-          <Card title={t("dispatch.progress")}>
-            <div className="progress">
-              <div style={{ width: `${pct}%` }} />
-            </div>
-            <div className="muted small" style={{ marginTop: 8 }}>
-              {t("dispatch.progressLine", {
-                accounted,
-                total: Math.round(total),
-                pct,
-                help: acc?.needs_help ?? 0,
-              })}
-            </div>
-            <PriorityAlert count={prioAwaiting} />
-            <div style={{ marginTop: 12 }}>
-              <IncidentActions incident={incident} />
-            </div>
-            {evacuation.data?.assembly_points?.[0] && (
-              <div className="assembly-row">
-                <SafetySign code="E007" size={40} className="safety-sign" />
-                <div className="small">
-                  <div className="muted">{t("dispatch.assembly")}</div>
-                  <div style={{ fontWeight: 700 }}>{evacuation.data.assembly_points[0].label}</div>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card title={t("dispatch.accountability")}>
-            {roster.data ? (
-              <ResidentRoster roster={roster.data} />
-            ) : (
-              <div className="muted small">{t("dispatch.loadingRoster")}</div>
-            )}
-          </Card>
-
-          <Card title={t("dispatch.occupiedZones")}>
-            {(acc?.zones_with_people ?? []).length === 0 ? (
-              <div className="muted small">{t("dispatch.noOccupancy")}</div>
-            ) : (
-              (acc?.zones_with_people ?? []).map((z) => (
-                <div className="row" key={z.zone_id}>
-                  <div className="grow">{zoneLabel(zoneNames, z.zone_id)}</div>
-                  <span className="pill detection">{t("dispatch.people", { n: z.persons_est })}</span>
-                </div>
-              ))
-            )}
-          </Card>
+          <OccupiedZonesCard occupied={acc?.zones_with_people ?? []} />
 
           <Card title={t("dispatch.timeline")}>
             <div style={{ marginBottom: 8 }}>
