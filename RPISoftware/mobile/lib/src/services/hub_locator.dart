@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:bonsoir/bonsoir.dart';
+import 'package:dio/dio.dart';
 
 /// Answers whether a Canary hub's API is at [baseUrl] (e.g. `http://10.0.0.5:8000`).
 typedef HubProbe = Future<bool> Function(String baseUrl);
@@ -86,20 +87,22 @@ class HubLocator {
   }
 }
 
-/// GET `<baseUrl>/health`: true only for a Canary backend.
+/// GET `<baseUrl>/health`: true only for a Canary backend. Uses dio, not dart:io's
+/// HttpClient, so the probe also works in the web build.
 Future<bool> probeHub(String baseUrl, {Duration timeout = const Duration(seconds: 2)}) async {
-  final client = HttpClient()..connectionTimeout = timeout;
+  final dio = Dio(BaseOptions(
+    responseType: ResponseType.plain,
+    validateStatus: (_) => true,
+  ));
   try {
-    final request = await client.getUrl(Uri.parse('$baseUrl/health')).timeout(timeout);
-    final response = await request.close().timeout(timeout);
+    final response = await dio.get<String>('$baseUrl/health').timeout(timeout);
     if (response.statusCode != 200) return false;
-    final body = await response.transform(utf8.decoder).join().timeout(timeout);
-    final json = jsonDecode(body);
+    final json = jsonDecode(response.data ?? '');
     return json is Map && json['service'] == 'canary-backend';
   } catch (_) {
     return false;
   } finally {
-    client.close(force: true);
+    dio.close(force: true);
   }
 }
 
