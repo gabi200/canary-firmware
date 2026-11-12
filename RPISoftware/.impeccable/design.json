@@ -1,78 +1,833 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-11T00:00:00Z",
+  "generatedAt": "2026-11-12T00:00:00Z",
   "title": "Design System: Canary Operations Console",
   "extensions": {
     "colorMeta": {
-      "accent": { "role": "primary", "displayName": "Action Blue", "canonical": "#3b7cf0", "light": "#2563eb", "tonalRamp": ["#0f2552", "#17387a", "#1f4ba3", "#2a62cf", "#3b7cf0", "#6b9cf5", "#9dbcf8", "#cfdefc"] },
-      "accent-text": { "role": "primary", "displayName": "Action Blue Text", "canonical": "#7aa9ff", "light": "#1d55cf", "tonalRamp": ["#1d55cf", "#2a62cf", "#3b7cf0", "#5a91f5", "#7aa9ff", "#9dbcf8", "#bdd2fb", "#dde8fd"] },
-      "ground": { "role": "neutral", "displayName": "Ground", "canonical": "#0c0e11", "light": "#f5f6f8", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
-      "panel": { "role": "neutral", "displayName": "Panel", "canonical": "#13161a", "light": "#ffffff", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
-      "raised": { "role": "neutral", "displayName": "Raised", "canonical": "#1a1e24", "light": "#f1f3f5", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
-      "well": { "role": "neutral", "displayName": "Well", "canonical": "#0f1215", "light": "#f7f8fa", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
-      "rail": { "role": "neutral", "displayName": "Rail", "canonical": "#0f1215", "light": "#fbfbfc", "tonalRamp": ["#0c0e11", "#0f1215", "#13161a", "#1a1e24", "#23282f", "#323943", "#8b94a1", "#e8eaed"] },
-      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#23282f", "light": "#e2e5ea", "tonalRamp": ["#0f1215", "#181c21", "#1d2228", "#23282f", "#2b313a", "#323943", "#4a525e", "#6a7380"] },
-      "hairline-strong": { "role": "neutral", "displayName": "Hairline Strong", "canonical": "#323943", "light": "#cbd0d8", "tonalRamp": ["#181c21", "#23282f", "#2b313a", "#323943", "#3f4752", "#4a525e", "#6a7380", "#8b94a1"] },
-      "text": { "role": "neutral", "displayName": "Text", "canonical": "#e8eaed", "light": "#14171c", "tonalRamp": ["#323943", "#4a525e", "#6a7380", "#8b94a1", "#b9bfc8", "#cfd3d9", "#e8eaed", "#f5f6f8"] },
-      "text-secondary": { "role": "neutral", "displayName": "Text Secondary", "canonical": "#b9bfc8", "light": "#3c434e", "tonalRamp": ["#323943", "#4a525e", "#6a7380", "#8b94a1", "#a1a9b4", "#b9bfc8", "#cfd3d9", "#e8eaed"] },
-      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#8b94a1", "light": "#5d6673", "tonalRamp": ["#23282f", "#323943", "#4a525e", "#6a7380", "#8b94a1", "#a1a9b4", "#b9bfc8", "#cfd3d9"] },
-      "safe": { "role": "secondary", "displayName": "Safe Green", "canonical": "#2fa84f", "light": "#1f9d45", "tonalRamp": ["#0d2e18", "#134a25", "#1b6a35", "#248c43", "#2fa84f", "#56c878", "#8adca2", "#c2eed0"] },
-      "safe-text": { "role": "secondary", "displayName": "Safe Green Text", "canonical": "#56c878", "light": "#17723a", "tonalRamp": ["#17723a", "#1b6a35", "#2fa84f", "#44bb66", "#56c878", "#78d595", "#9fe2b5", "#c6efd3"] },
-      "attention": { "role": "secondary", "displayName": "Attention Amber", "canonical": "#d4a11e", "light": "#c98a04", "tonalRamp": ["#2e2306", "#4d3b0c", "#745810", "#9b7615", "#d4a11e", "#e3b54a", "#eecb7c", "#f6e2b4"] },
-      "attention-text": { "role": "secondary", "displayName": "Attention Amber Text", "canonical": "#e3b54a", "light": "#875800", "tonalRamp": ["#875800", "#9b7615", "#c49219", "#d4a11e", "#e3b54a", "#eac56e", "#f0d490", "#f6e2b4"] },
-      "on-attention": { "role": "neutral", "displayName": "Ink on Amber", "canonical": "#1c1503", "light": "#1c1503", "tonalRamp": ["#0b0801", "#140f02", "#1c1503", "#2e2306", "#4d3b0c", "#745810", "#9b7615", "#c49219"] },
-      "alarm": { "role": "secondary", "displayName": "Alarm Red", "canonical": "#d93a40", "light": "#d93a40", "tonalRamp": ["#380d10", "#5c1519", "#821e23", "#ac2a30", "#d93a40", "#ea6a6f", "#f59a9d", "#fbc9cb"] },
-      "alarm-text": { "role": "secondary", "displayName": "Alarm Red Text", "canonical": "#ff7b72", "light": "#c0262c", "tonalRamp": ["#c0262c", "#d93a40", "#ea5a5e", "#f56a68", "#ff7b72", "#ff9c95", "#ffbab5", "#ffd8d5"] },
-      "evacuation": { "role": "secondary", "displayName": "Evacuation Deep Red", "canonical": "#a8231f", "light": "#a8231f", "tonalRamp": ["#2a0907", "#470f0c", "#690f0a", "#86190f", "#a8231f", "#c4504b", "#dc827e", "#eeb8b5"] },
-      "alarm-fill": { "role": "secondary", "displayName": "Alarm Fill", "canonical": "#cc363f", "light": "#cc363f", "tonalRamp": ["#340c0f", "#561319", "#7a1b22", "#a1262d", "#cc363f", "#dc6269", "#ea9499", "#f6c7ca"] },
-      "on-alarm": { "role": "neutral", "displayName": "Ink on Alarm", "canonical": "#ffffff", "light": "#ffffff", "tonalRamp": ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"] },
-      "on-alarm-ok": { "role": "secondary", "displayName": "OK on Alarm", "canonical": "#6fdc8f", "light": "#6fdc8f", "tonalRamp": ["#1b5b2f", "#2a7d44", "#3fa05d", "#58be78", "#6fdc8f", "#93e6ab", "#b7efc7", "#dbf7e3"] },
-      "on-alarm-warn": { "role": "secondary", "displayName": "Warning on Alarm", "canonical": "#f0c458", "light": "#f0c458", "tonalRamp": ["#5e4709", "#876510", "#b0841a", "#d4a52f", "#f0c458", "#f4d27e", "#f8e0a4", "#fbeecb"] },
-      "priority": { "role": "tertiary", "displayName": "Priority Violet", "canonical": "#7a55e0", "light": "#7a55e0", "tonalRamp": ["#221548", "#35216f", "#4b2f9a", "#6240c4", "#7a55e0", "#9a7ee9", "#b9a2ff", "#dcd0fb"] },
-      "priority-text": { "role": "tertiary", "displayName": "Priority Violet Text", "canonical": "#b9a2ff", "light": "#5d3cc2", "tonalRamp": ["#5d3cc2", "#7a55e0", "#9174e8", "#a58cf2", "#b9a2ff", "#cbbaff", "#dcd0fb", "#ede7fd"] },
-      "series-blue": { "role": "data", "displayName": "Series Blue", "canonical": "#5b93ff", "light": "#2563eb", "tonalRamp": ["#14295a", "#1e3f87", "#2d58b8", "#4274e0", "#5b93ff", "#86adff", "#b0c9ff", "#d8e4ff"] },
-      "series-sky": { "role": "data", "displayName": "Series Sky", "canonical": "#9ccfff", "light": "#2b85d3", "tonalRamp": ["#143a5c", "#1f5a8f", "#2f7ac2", "#5a9fe0", "#7ab9f5", "#9ccfff", "#bfe0ff", "#e0f0ff"] },
-      "series-cyan": { "role": "data", "displayName": "Series Cyan", "canonical": "#2fc3d6", "light": "#0a8aa0", "tonalRamp": ["#0b3a42", "#10565f", "#17787f", "#1f9aab", "#2fc3d6", "#62d6e4", "#98e5ee", "#cdf3f7"] },
-      "series-teal": { "role": "data", "displayName": "Series Teal", "canonical": "#4fd1b5", "light": "#0d8a72", "tonalRamp": ["#0e3a31", "#175a4c", "#217a67", "#2fa88a", "#4fd1b5", "#7ddfca", "#a8ebdc", "#d2f6ee"] },
-      "series-slate": { "role": "data", "displayName": "Series Slate", "canonical": "#a3adbb", "light": "#6b7685", "tonalRamp": ["#2b313a", "#444c58", "#5f6977", "#7c8694", "#a3adbb", "#b9c1cc", "#d0d6de", "#e8ebef"] },
-      "hazard-tape-black": { "role": "tertiary", "displayName": "Hazard Tape Black", "canonical": "#111111", "light": "#111111", "tonalRamp": ["#000000", "#0a0a0a", "#111111", "#222222", "#333333", "#444444", "#666666", "#888888"] },
-      "hazard-tape-amber": { "role": "tertiary", "displayName": "Hazard Tape Amber", "canonical": "#e0aa1c", "light": "#e0aa1c", "tonalRamp": ["#3a2c06", "#5e460a", "#8a6710", "#b88914", "#e0aa1c", "#eac04e", "#f2d682", "#f8e8b8"] },
-      "wordmark-dot": { "role": "tertiary", "displayName": "Wordmark Yellow", "canonical": "#f2c417", "light": "#d99a00", "tonalRamp": ["#3d3005", "#63500a", "#8f730e", "#bf9a12", "#f2c417", "#f5d34a", "#f8e07f", "#fbefb5"] }
+      "accent": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "#3b7cf0",
+        "light": "#2563eb",
+        "tonalRamp": [
+          "#0f2552",
+          "#17387a",
+          "#1f4ba3",
+          "#2a62cf",
+          "#3b7cf0",
+          "#6b9cf5",
+          "#9dbcf8",
+          "#cfdefc"
+        ]
+      },
+      "accent-text": {
+        "role": "primary",
+        "displayName": "Action Blue Text",
+        "canonical": "#7aa9ff",
+        "light": "#1d55cf",
+        "tonalRamp": [
+          "#1d55cf",
+          "#2a62cf",
+          "#3b7cf0",
+          "#5a91f5",
+          "#7aa9ff",
+          "#9dbcf8",
+          "#bdd2fb",
+          "#dde8fd"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "canonical": "#0c0e11",
+        "light": "#f5f6f8",
+        "tonalRamp": [
+          "#0c0e11",
+          "#0f1215",
+          "#13161a",
+          "#1a1e24",
+          "#23282f",
+          "#323943",
+          "#8b94a1",
+          "#e8eaed"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "#13161a",
+        "light": "#ffffff",
+        "tonalRamp": [
+          "#0c0e11",
+          "#0f1215",
+          "#13161a",
+          "#1a1e24",
+          "#23282f",
+          "#323943",
+          "#8b94a1",
+          "#e8eaed"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised",
+        "canonical": "#1a1e24",
+        "light": "#f1f3f5",
+        "tonalRamp": [
+          "#0c0e11",
+          "#0f1215",
+          "#13161a",
+          "#1a1e24",
+          "#23282f",
+          "#323943",
+          "#8b94a1",
+          "#e8eaed"
+        ]
+      },
+      "well": {
+        "role": "neutral",
+        "displayName": "Well",
+        "canonical": "#0f1215",
+        "light": "#f7f8fa",
+        "tonalRamp": [
+          "#0c0e11",
+          "#0f1215",
+          "#13161a",
+          "#1a1e24",
+          "#23282f",
+          "#323943",
+          "#8b94a1",
+          "#e8eaed"
+        ]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Rail",
+        "canonical": "#0f1215",
+        "light": "#fbfbfc",
+        "tonalRamp": [
+          "#0c0e11",
+          "#0f1215",
+          "#13161a",
+          "#1a1e24",
+          "#23282f",
+          "#323943",
+          "#8b94a1",
+          "#e8eaed"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#23282f",
+        "light": "#e2e5ea",
+        "tonalRamp": [
+          "#0f1215",
+          "#181c21",
+          "#1d2228",
+          "#23282f",
+          "#2b313a",
+          "#323943",
+          "#4a525e",
+          "#6a7380"
+        ]
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Strong",
+        "canonical": "#323943",
+        "light": "#cbd0d8",
+        "tonalRamp": [
+          "#181c21",
+          "#23282f",
+          "#2b313a",
+          "#323943",
+          "#3f4752",
+          "#4a525e",
+          "#6a7380",
+          "#8b94a1"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#e8eaed",
+        "light": "#14171c",
+        "tonalRamp": [
+          "#323943",
+          "#4a525e",
+          "#6a7380",
+          "#8b94a1",
+          "#b9bfc8",
+          "#cfd3d9",
+          "#e8eaed",
+          "#f5f6f8"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Text Secondary",
+        "canonical": "#b9bfc8",
+        "light": "#3c434e",
+        "tonalRamp": [
+          "#323943",
+          "#4a525e",
+          "#6a7380",
+          "#8b94a1",
+          "#a1a9b4",
+          "#b9bfc8",
+          "#cfd3d9",
+          "#e8eaed"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#8b94a1",
+        "light": "#5d6673",
+        "tonalRamp": [
+          "#23282f",
+          "#323943",
+          "#4a525e",
+          "#6a7380",
+          "#8b94a1",
+          "#a1a9b4",
+          "#b9bfc8",
+          "#cfd3d9"
+        ]
+      },
+      "safe": {
+        "role": "secondary",
+        "displayName": "Safe Green",
+        "canonical": "#2fa84f",
+        "light": "#1f9d45",
+        "tonalRamp": [
+          "#0d2e18",
+          "#134a25",
+          "#1b6a35",
+          "#248c43",
+          "#2fa84f",
+          "#56c878",
+          "#8adca2",
+          "#c2eed0"
+        ]
+      },
+      "safe-text": {
+        "role": "secondary",
+        "displayName": "Safe Green Text",
+        "canonical": "#56c878",
+        "light": "#17723a",
+        "tonalRamp": [
+          "#17723a",
+          "#1b6a35",
+          "#2fa84f",
+          "#44bb66",
+          "#56c878",
+          "#78d595",
+          "#9fe2b5",
+          "#c6efd3"
+        ]
+      },
+      "attention": {
+        "role": "secondary",
+        "displayName": "Attention Amber",
+        "canonical": "#d4a11e",
+        "light": "#c98a04",
+        "tonalRamp": [
+          "#2e2306",
+          "#4d3b0c",
+          "#745810",
+          "#9b7615",
+          "#d4a11e",
+          "#e3b54a",
+          "#eecb7c",
+          "#f6e2b4"
+        ]
+      },
+      "attention-text": {
+        "role": "secondary",
+        "displayName": "Attention Amber Text",
+        "canonical": "#e3b54a",
+        "light": "#875800",
+        "tonalRamp": [
+          "#875800",
+          "#9b7615",
+          "#c49219",
+          "#d4a11e",
+          "#e3b54a",
+          "#eac56e",
+          "#f0d490",
+          "#f6e2b4"
+        ]
+      },
+      "on-attention": {
+        "role": "neutral",
+        "displayName": "Ink on Amber",
+        "canonical": "#1c1503",
+        "light": "#1c1503",
+        "tonalRamp": [
+          "#0b0801",
+          "#140f02",
+          "#1c1503",
+          "#2e2306",
+          "#4d3b0c",
+          "#745810",
+          "#9b7615",
+          "#c49219"
+        ]
+      },
+      "alarm": {
+        "role": "secondary",
+        "displayName": "Alarm Red",
+        "canonical": "#d93a40",
+        "light": "#d93a40",
+        "tonalRamp": [
+          "#380d10",
+          "#5c1519",
+          "#821e23",
+          "#ac2a30",
+          "#d93a40",
+          "#ea6a6f",
+          "#f59a9d",
+          "#fbc9cb"
+        ]
+      },
+      "alarm-text": {
+        "role": "secondary",
+        "displayName": "Alarm Red Text",
+        "canonical": "#ff7b72",
+        "light": "#c0262c",
+        "tonalRamp": [
+          "#c0262c",
+          "#d93a40",
+          "#ea5a5e",
+          "#f56a68",
+          "#ff7b72",
+          "#ff9c95",
+          "#ffbab5",
+          "#ffd8d5"
+        ]
+      },
+      "evacuation": {
+        "role": "secondary",
+        "displayName": "Evacuation Deep Red",
+        "canonical": "#a8231f",
+        "light": "#a8231f",
+        "tonalRamp": [
+          "#2a0907",
+          "#470f0c",
+          "#690f0a",
+          "#86190f",
+          "#a8231f",
+          "#c4504b",
+          "#dc827e",
+          "#eeb8b5"
+        ]
+      },
+      "alarm-fill": {
+        "role": "secondary",
+        "displayName": "Alarm Fill",
+        "canonical": "#cc363f",
+        "light": "#cc363f",
+        "tonalRamp": [
+          "#340c0f",
+          "#561319",
+          "#7a1b22",
+          "#a1262d",
+          "#cc363f",
+          "#dc6269",
+          "#ea9499",
+          "#f6c7ca"
+        ]
+      },
+      "on-alarm": {
+        "role": "neutral",
+        "displayName": "Ink on Alarm",
+        "canonical": "#ffffff",
+        "light": "#ffffff",
+        "tonalRamp": [
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff"
+        ]
+      },
+      "on-alarm-ok": {
+        "role": "secondary",
+        "displayName": "OK on Alarm",
+        "canonical": "#6fdc8f",
+        "light": "#6fdc8f",
+        "tonalRamp": [
+          "#1b5b2f",
+          "#2a7d44",
+          "#3fa05d",
+          "#58be78",
+          "#6fdc8f",
+          "#93e6ab",
+          "#b7efc7",
+          "#dbf7e3"
+        ]
+      },
+      "on-alarm-warn": {
+        "role": "secondary",
+        "displayName": "Warning on Alarm",
+        "canonical": "#f0c458",
+        "light": "#f0c458",
+        "tonalRamp": [
+          "#5e4709",
+          "#876510",
+          "#b0841a",
+          "#d4a52f",
+          "#f0c458",
+          "#f4d27e",
+          "#f8e0a4",
+          "#fbeecb"
+        ]
+      },
+      "priority": {
+        "role": "tertiary",
+        "displayName": "Priority Violet",
+        "canonical": "#7a55e0",
+        "light": "#7a55e0",
+        "tonalRamp": [
+          "#221548",
+          "#35216f",
+          "#4b2f9a",
+          "#6240c4",
+          "#7a55e0",
+          "#9a7ee9",
+          "#b9a2ff",
+          "#dcd0fb"
+        ]
+      },
+      "priority-text": {
+        "role": "tertiary",
+        "displayName": "Priority Violet Text",
+        "canonical": "#b9a2ff",
+        "light": "#5d3cc2",
+        "tonalRamp": [
+          "#5d3cc2",
+          "#7a55e0",
+          "#9174e8",
+          "#a58cf2",
+          "#b9a2ff",
+          "#cbbaff",
+          "#dcd0fb",
+          "#ede7fd"
+        ]
+      },
+      "series-blue": {
+        "role": "data",
+        "displayName": "Series Blue",
+        "canonical": "#5b93ff",
+        "light": "#2563eb",
+        "tonalRamp": [
+          "#14295a",
+          "#1e3f87",
+          "#2d58b8",
+          "#4274e0",
+          "#5b93ff",
+          "#86adff",
+          "#b0c9ff",
+          "#d8e4ff"
+        ]
+      },
+      "series-sky": {
+        "role": "data",
+        "displayName": "Series Sky",
+        "canonical": "#9ccfff",
+        "light": "#2b85d3",
+        "tonalRamp": [
+          "#143a5c",
+          "#1f5a8f",
+          "#2f7ac2",
+          "#5a9fe0",
+          "#7ab9f5",
+          "#9ccfff",
+          "#bfe0ff",
+          "#e0f0ff"
+        ]
+      },
+      "series-cyan": {
+        "role": "data",
+        "displayName": "Series Cyan",
+        "canonical": "#2fc3d6",
+        "light": "#0a8aa0",
+        "tonalRamp": [
+          "#0b3a42",
+          "#10565f",
+          "#17787f",
+          "#1f9aab",
+          "#2fc3d6",
+          "#62d6e4",
+          "#98e5ee",
+          "#cdf3f7"
+        ]
+      },
+      "series-teal": {
+        "role": "data",
+        "displayName": "Series Teal",
+        "canonical": "#4fd1b5",
+        "light": "#0d8a72",
+        "tonalRamp": [
+          "#0e3a31",
+          "#175a4c",
+          "#217a67",
+          "#2fa88a",
+          "#4fd1b5",
+          "#7ddfca",
+          "#a8ebdc",
+          "#d2f6ee"
+        ]
+      },
+      "series-slate": {
+        "role": "data",
+        "displayName": "Series Slate",
+        "canonical": "#a3adbb",
+        "light": "#6b7685",
+        "tonalRamp": [
+          "#2b313a",
+          "#444c58",
+          "#5f6977",
+          "#7c8694",
+          "#a3adbb",
+          "#b9c1cc",
+          "#d0d6de",
+          "#e8ebef"
+        ]
+      },
+      "hazard-tape-black": {
+        "role": "tertiary",
+        "displayName": "Hazard Tape Black",
+        "canonical": "#111111",
+        "light": "#111111",
+        "tonalRamp": [
+          "#000000",
+          "#0a0a0a",
+          "#111111",
+          "#222222",
+          "#333333",
+          "#444444",
+          "#666666",
+          "#888888"
+        ]
+      },
+      "hazard-tape-amber": {
+        "role": "tertiary",
+        "displayName": "Hazard Tape Amber",
+        "canonical": "#e0aa1c",
+        "light": "#e0aa1c",
+        "tonalRamp": [
+          "#3a2c06",
+          "#5e460a",
+          "#8a6710",
+          "#b88914",
+          "#e0aa1c",
+          "#eac04e",
+          "#f2d682",
+          "#f8e8b8"
+        ]
+      },
+      "wordmark-dot": {
+        "role": "tertiary",
+        "displayName": "Wordmark Yellow",
+        "canonical": "#f2c417",
+        "light": "#d99a00",
+        "tonalRamp": [
+          "#3d3005",
+          "#63500a",
+          "#8f730e",
+          "#bf9a12",
+          "#f2c417",
+          "#f5d34a",
+          "#f8e07f",
+          "#fbefb5"
+        ]
+      },
+      "safe-fill": {
+        "role": "secondary",
+        "displayName": "Deepened Safe Green",
+        "canonical": "#1c7f39",
+        "light": "#1c7f39",
+        "tonalRamp": [
+          "#082611",
+          "#0d3a1a",
+          "#124f24",
+          "#17652e",
+          "#1c7f39",
+          "#4a9a62",
+          "#82bd93",
+          "#c1dfc9"
+        ],
+        "purpose": "Mobile alarm screen \"I'm out and safe\" fill only; white 18px text holds 4.5:1."
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Command-view hero statistic (40px)." },
-      "headline": { "displayName": "Headline", "purpose": "Incident banner title, tile and command values, metric counts." },
-      "title": { "displayName": "Title", "purpose": "Card headings, topbar title, section titles." },
-      "body": { "displayName": "Body", "purpose": "Default text with tabular numerals." },
-      "label": { "displayName": "Label", "purpose": "Muted sentence-case captions, field labels and table heads." },
-      "mono": { "displayName": "Mono", "purpose": "Device ids, raw JSON and evidence chips." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "Command-view hero statistic (40px)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Incident banner title, tile and command values, metric counts."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card headings, topbar title, section titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default text with tabular numerals."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Muted sentence-case captions, field labels and table heads."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Device ids, raw JSON and evidence chips."
+      },
+      "mobile-alarm-title": {
+        "displayName": "Alarm title (mobile)",
+        "purpose": "Full-screen alarm hazard name or evacuation command. Flutter displaySmall at w700."
+      },
+      "mobile-headline": {
+        "displayName": "Headline (mobile)",
+        "purpose": "Status block title; dashboard evacuation banner title. headlineMedium."
+      },
+      "mobile-banner-title": {
+        "displayName": "Banner title (mobile)",
+        "purpose": "Incident banner title on Home and lists; the where-now question. headlineSmall."
+      },
+      "mobile-title": {
+        "displayName": "Title (mobile)",
+        "purpose": "App bar title, status subtitle, room names, sensor headlines. titleMedium."
+      },
+      "mobile-body": {
+        "displayName": "Body large (mobile)",
+        "purpose": "Readable body at arm's length; 14px bodyMedium is the default, 13px bodySmall in Text Secondary for room lines. bodyLarge."
+      },
+      "mobile-label": {
+        "displayName": "Label (mobile)",
+        "purpose": "State lines, captions, the Demo badge, nav labels; Muted by default. labelMedium."
+      },
+      "mobile-button": {
+        "displayName": "Button (mobile)",
+        "purpose": "Filled button labels; 14px/600 on outlined and text buttons, 17 to 18px on alarm answers and check-in."
+      }
     },
     "shadows": [
-      { "name": "shadow-pop", "value": "0 8px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)", "purpose": "Popovers, tooltips, command popovers. Light: rgba(20,23,28,0.12) / 0.08." },
-      { "name": "shadow-modal", "value": "0 24px 64px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)", "purpose": "Command view and dialogs. Light: rgba(20,23,28,0.22) / 0.1." },
-      { "name": "scrim", "value": "rgba(4,6,9,0.68)", "purpose": "Overlay backdrop. Light: rgba(20,23,28,0.42)." },
-      { "name": "selection-ring", "value": "0 0 0 1px var(--accent)", "purpose": "Selected chip, highlighted sensor, current item." },
-      { "name": "focus-field", "value": "0 0 0 3px var(--accent-soft)", "purpose": "Input focus." }
+      {
+        "name": "shadow-pop",
+        "value": "0 8px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)",
+        "purpose": "Popovers, tooltips, command popovers. Light: rgba(20,23,28,0.12) / 0.08."
+      },
+      {
+        "name": "shadow-modal",
+        "value": "0 24px 64px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)",
+        "purpose": "Command view and dialogs. Light: rgba(20,23,28,0.22) / 0.1."
+      },
+      {
+        "name": "scrim",
+        "value": "rgba(4,6,9,0.68)",
+        "purpose": "Overlay backdrop. Light: rgba(20,23,28,0.42)."
+      },
+      {
+        "name": "selection-ring",
+        "value": "0 0 0 1px var(--accent)",
+        "purpose": "Selected chip, highlighted sensor, current item."
+      },
+      {
+        "name": "focus-field",
+        "value": "0 0 0 3px var(--accent-soft)",
+        "purpose": "Input focus."
+      },
+      {
+        "name": "mobile-elevation",
+        "value": "none (elevation 0, surfaceTintColor transparent)",
+        "purpose": "Mobile cards, app bar, navigation bar and buttons. Depth is tone and hairline."
+      }
     ],
     "motion": [
-      { "name": "ease", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "State transitions at 0.15s on hover, border and background." },
-      { "name": "evac-pulse", "value": "1.2s ease-in-out infinite, scale 1 to 1.06, opacity 1 to 0.88", "purpose": "The exit pictogram on the evacuation banner; the only moving element there. Background and hazard sign stay still. Off under reduced motion." },
-      { "name": "fp-pulse", "value": "1.6s ease-out infinite", "purpose": "Floor-plan source marker. Static at 0.6 opacity under reduced motion." }
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "State transitions at 0.15s on hover, border and background."
+      },
+      {
+        "name": "evac-pulse",
+        "value": "1.2s ease-in-out infinite, scale 1 to 1.06, opacity 1 to 0.88",
+        "purpose": "The exit pictogram on the evacuation banner; the only moving element there. Background and hazard sign stay still. Off under reduced motion."
+      },
+      {
+        "name": "fp-pulse",
+        "value": "1.6s ease-out infinite",
+        "purpose": "Floor-plan source marker. Static at 0.6 opacity under reduced motion."
+      },
+      {
+        "name": "mobile-fold",
+        "value": "200ms Curves.easeOut (AnimatedSize, top-aligned)",
+        "purpose": "Mobile section folds and a room's sensors opening inline under its row."
+      },
+      {
+        "name": "mobile-evac-pulse",
+        "value": "1200ms repeat reverse, easeInOut, scale 1 to 1.06, opacity 1 to 0.88",
+        "purpose": "Exit sign on the mobile manager evacuation banner; static when MediaQuery.disableAnimations."
+      }
     ],
     "breakpoints": [
-      { "name": "wide-forms", "value": "1100px" },
-      { "name": "single-column", "value": "1000px" },
-      { "name": "rail-to-tabs", "value": "900px" },
-      { "name": "command-fullscreen", "value": "760px" },
-      { "name": "one-row-scope-bar", "value": "640px" },
-      { "name": "stack-and-compact-plan", "value": "560px" }
+      {
+        "name": "wide-forms",
+        "value": "1100px"
+      },
+      {
+        "name": "single-column",
+        "value": "1000px"
+      },
+      {
+        "name": "rail-to-tabs",
+        "value": "900px"
+      },
+      {
+        "name": "command-fullscreen",
+        "value": "760px"
+      },
+      {
+        "name": "one-row-scope-bar",
+        "value": "640px"
+      },
+      {
+        "name": "stack-and-compact-plan",
+        "value": "560px"
+      },
+      {
+        "name": "mobile-room-columns",
+        "value": "computed, not a breakpoint: floor((width + 8) / (150 * textScale + 8)), clamped 1 to 3"
+      }
     ],
     "layout": [
-      { "name": "rail-width", "value": "232px" },
-      { "name": "utility-bar-height", "value": "52px" },
-      { "name": "content-max", "value": "1480px" },
-      { "name": "pad", "value": "24px (16px at 900px and below)" }
-    ]
+      {
+        "name": "rail-width",
+        "value": "232px"
+      },
+      {
+        "name": "utility-bar-height",
+        "value": "52px"
+      },
+      {
+        "name": "content-max",
+        "value": "1480px"
+      },
+      {
+        "name": "pad",
+        "value": "24px (16px at 900px and below)"
+      },
+      {
+        "name": "mobile-bar-height",
+        "value": "52px app bar, Hairline below"
+      },
+      {
+        "name": "mobile-nav-height",
+        "value": "64px bottom navigation, Hairline above"
+      },
+      {
+        "name": "mobile-gutter",
+        "value": "16px"
+      },
+      {
+        "name": "mobile-home-rhythm",
+        "value": "status block, 12px, panel row (calm only), 20px, 44px fold header, room grid (8px gaps)"
+      },
+      {
+        "name": "mobile-scope-row",
+        "value": "max(52px, 16px label scaled * 1.4 + 22px); 8px between chips; 16px side inset"
+      },
+      {
+        "name": "touch-target",
+        "value": "48px (44px minimum on outlined and text buttons)"
+      },
+      {
+        "name": "mobile-check-in-bar",
+        "value": "fixed bottom, Panel, Hairline Strong top, max 48% of screen height, scrolls inside"
+      }
+    ],
+    "platforms": {
+      "flutter": {
+        "source": "mobile/lib/src/theme.dart",
+        "themeMode": "ThemeMode.system by default; Settings can pin light or dark (theme_controller.dart)",
+        "font": "Inter static TTFs 400/500/600/700 bundled in mobile/assets/fonts/inter with OFL LICENSE.txt; family 'Inter' in pubspec.yaml; FontFeature.tabularFigures on every style; letterSpacing = em * fontSize",
+        "palette": "CanaryPalette ThemeExtension (context.palette): ground, panel, raised, well, hairline, hairlineStrong, text, textSecondary, muted, accent, accentText, safeText, attentionText, alarmText, wordmarkDot; light and darkPalette",
+        "paletteAliases": {
+          "surface": "panel",
+          "tile": "well",
+          "tileBorder": "hairline",
+          "divider": "hairline",
+          "chip": "raised",
+          "faint": "muted"
+        },
+        "paletteHelpers": {
+          "ink(solid)": "the theme's -text step for a state solid",
+          "tint(solid, alpha=22)": "solid alpha-blended over panel; +6 alpha in dark",
+          "stateBorder(solid)": "solid at alpha 140 light, 120 dark"
+        },
+        "hazardColors": {
+          "normal": "safe",
+          "warning": "attention",
+          "alarm": "alarm",
+          "evacuation": "evacuation",
+          "alarmFill": "alarm-fill",
+          "info": "accent",
+          "unknown": "muted",
+          "onAlarmOk": "on-alarm-ok",
+          "onAlarmWarn": "on-alarm-warn",
+          "warnFg": "on-attention",
+          "tapeBlack": "hazard-tape-black",
+          "tapeAmber": "hazard-tape-amber",
+          "bannerFill(state)": "incident banner fill by state",
+          "onBanner(state)": "ink on that fill"
+        },
+        "colorScheme": {
+          "primary": "accent",
+          "surface": "ground",
+          "surfaceContainerLowest": "well",
+          "surfaceContainerLow": "panel",
+          "surfaceContainer": "panel",
+          "surfaceContainerHigh": "raised",
+          "surfaceContainerHighest": "raised",
+          "outline": "hairline-strong",
+          "outlineVariant": "hairline",
+          "error": "alarm",
+          "onSurfaceVariant": "muted",
+          "surfaceTint": "transparent"
+        },
+        "radius": {
+          "CanaryRadius.container": "rounded.md",
+          "CanaryRadius.control": "rounded.sm",
+          "CanaryRadius.tag": "rounded.tag",
+          "CanaryRadius.overlay": "rounded.overlay"
+        },
+        "textTheme": {
+          "displayLarge": "40/600/1/-0.03em",
+          "displayMedium": "32/600/1.1/-0.025em",
+          "displaySmall": "28/600/1.15/-0.02em (alarm title at 700)",
+          "headlineMedium": "24/600/1.15/-0.02em",
+          "headlineSmall": "20/600/1.2/-0.015em",
+          "titleLarge": "18/600/1.3/-0.011em",
+          "titleMedium": "15/600/1.4/-0.011em",
+          "titleSmall": "14/600/1.45/-0.011em",
+          "bodyLarge": "15/400/1.45",
+          "bodyMedium": "14/400/1.45",
+          "bodySmall": "13/400/1.45 textSecondary",
+          "labelLarge": "14/500/1.25",
+          "labelMedium": "12/500/1.25 muted",
+          "labelSmall": "11/500/1.25 muted"
+        }
+      }
+    }
   },
   "components": [
     {
@@ -146,11 +901,43 @@
       "description": "Deep red panel, 8px radius, with a 4px black-and-amber tape strip along the top; the only loud surface in the system. Only the exit pictogram pulses.",
       "html": "<div class=\"ds-evac\"><div class=\"ds-evac-head\"><h2>Evacuation in progress</h2><div>Building 7, 14 residents unaccounted</div></div></div>",
       "css": ".ds-evac { position:relative; overflow:hidden; border-radius:8px; background:#a8231f; color:#fff; } .ds-evac::before { content:\"\"; position:absolute; inset:0 0 auto 0; height:4px; background:repeating-linear-gradient(45deg,#111 0 8px,#e0aa1c 8px 16px); } .ds-evac-head { padding:22px 20px 18px; } .ds-evac h2 { margin:0 0 4px; font:600 24px inherit; letter-spacing:-0.02em; }"
+    },
+    {
+      "name": "Status Block (mobile)",
+      "kind": "card",
+      "refersTo": "status-block",
+      "description": "First block on Home and the manager dashboard: soft state tint, 1px state border, state line with a shape mark, one headline, one line.",
+      "html": "<section class=\"ds-sb\"><div class=\"ds-sb-line\"><span class=\"ds-sb-dot\"></span>Live</div><h2>All is well</h2><p>Your home is monitored</p></section>",
+      "css": ".ds-sb { padding:16px 16px 18px; border:1px solid rgba(47,168,79,.47); border-radius:8px; background:color-mix(in srgb, #2fa84f 11%, #13161a); color:#e8eaed; } .ds-sb-line { display:flex; align-items:center; gap:8px; margin-bottom:10px; color:#56c878; font:600 12px/1.25 Inter, sans-serif; } .ds-sb-dot { width:9px; height:9px; border-radius:50%; background:#2fa84f; } .ds-sb h2 { margin:0; font:600 24px/1.15 Inter, sans-serif; letter-spacing:-0.02em; } .ds-sb p { margin:4px 0 0; color:#b9bfc8; font:400 14px/1.45 Inter, sans-serif; }"
+    },
+    {
+      "name": "Room Tile (mobile)",
+      "kind": "card",
+      "refersTo": "room-tile",
+      "description": "Two-column room card: name, state mark, one non-breaking line; only attention and danger take the tint.",
+      "html": "<div class=\"ds-rooms\"><button class=\"ds-room\"><span class=\"ds-room-head\">Kitchen<i class=\"ds-mk\"></i></span><span class=\"ds-room-line\">All clear&nbsp;&middot;&nbsp;&asymp;&nbsp;23&nbsp;&deg;C</span></button><button class=\"ds-room ds-att\"><span class=\"ds-room-head\">Bathroom<i class=\"ds-mk ds-sq\"></i></span><span class=\"ds-room-line\">Needs a look</span></button></div>",
+      "css": ".ds-rooms { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; } .ds-room { display:flex; flex-direction:column; justify-content:space-between; gap:10px; min-height:96px; padding:12px; border:1px solid #23282f; border-radius:8px; background:#13161a; color:#e8eaed; text-align:left; cursor:pointer; transition:background-color .15s; } .ds-room:hover { background:#1a1e24; } .ds-room:focus-visible { outline:2px solid #7aa9ff; outline-offset:2px; } .ds-room-head { display:flex; justify-content:space-between; gap:8px; font:600 15px/1.3 Inter, sans-serif; } .ds-room-line { color:#8b94a1; font:400 13px/1.45 Inter, sans-serif; } .ds-mk { flex:none; width:9px; height:9px; margin-top:5px; border-radius:50%; background:#2fa84f; } .ds-sq { border-radius:2px; background:#d4a11e; } .ds-att { border-color:rgba(212,161,30,.47); background:color-mix(in srgb, #d4a11e 11%, #13161a); } .ds-att .ds-room-line { color:#e3b54a; font-weight:600; }"
+    },
+    {
+      "name": "Bottom Navigation (mobile)",
+      "kind": "nav",
+      "refersTo": "mobile-nav-bar",
+      "description": "64px three-tab bar on Ground with a hairline above; selected tab has a Raised 6px indicator and a blue icon.",
+      "html": "<nav class=\"ds-tabs\"><a href=\"#\" class=\"ds-on\"><span class=\"ds-ind\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\"/></svg></span>Home</a><a href=\"#\"><span class=\"ds-ind\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z\"/></svg></span>Household</a></nav>",
+      "css": ".ds-tabs { display:flex; height:64px; border-top:1px solid #23282f; background:#0c0e11; } .ds-tabs a { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#8b94a1; font:500 12px/1.25 Inter, sans-serif; text-decoration:none; } .ds-ind { display:grid; place-items:center; width:64px; height:32px; border-radius:6px; transition:background-color .15s; } .ds-tabs a:hover .ds-ind { background:#13161a; } .ds-tabs a.ds-on { color:#e8eaed; font-weight:600; } .ds-tabs a.ds-on .ds-ind { background:#1a1e24; color:#7aa9ff; } .ds-tabs a:focus-visible { outline:2px solid #7aa9ff; outline-offset:-2px; }"
+    },
+    {
+      "name": "Check-in Bar (mobile)",
+      "kind": "custom",
+      "refersTo": "check-in-safe",
+      "description": "Fixed bottom bar on the alarm screen: deepened green 'I'm out and safe', then help and call side by side when both fit.",
+      "html": "<div class=\"ds-ci\"><button class=\"ds-ci-safe\">I'm out and safe</button><div class=\"ds-ci-row\"><button class=\"ds-ci-help\">I need help</button><button class=\"ds-ci-call\">Call 112</button></div></div>",
+      "css": ".ds-ci { display:flex; flex-direction:column; gap:8px; padding:12px 16px 10px; border-top:1px solid #323943; background:#13161a; } .ds-ci button { border-radius:6px; font:600 16px/1.25 Inter, sans-serif; cursor:pointer; } .ds-ci button:focus-visible { outline:2px solid #7aa9ff; outline-offset:2px; } .ds-ci-safe { min-height:56px; border:0; background:#1c7f39; color:#fff; font-size:18px; } .ds-ci-safe:hover { filter:brightness(1.08); } .ds-ci-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .ds-ci-help { min-height:48px; border:0; background:#cc363f; color:#fff; } .ds-ci-help:hover { filter:brightness(1.08); } .ds-ci-call { min-height:48px; border:1px solid #323943; background:#13161a; color:#e8eaed; } .ds-ci-call:hover { background:#1a1e24; }"
     }
   ],
   "narrative": {
     "northStar": "The Quiet Console",
-    "overview": "A building-safety operations console for a dispatcher under time pressure, with a manager and a technician behind them. Cool near-neutral surfaces, 1px hairlines, one blue accent, precise Inter type with tabular numerals. Dark is the default; light is a full second theme on the same token names. Colour means state and nothing else; with every other surface held neutral, an alarm is the loudest thing on any screen. The shell reports building state on every page through the incident count on the Dispatch destination.",
+    "overview": "A building-safety operations console for a dispatcher under time pressure, with a manager and a technician behind them. Cool near-neutral surfaces, 1px hairlines, one blue accent, precise Inter type with tabular numerals. Dark is the default; light is a full second theme on the same token names. Colour means state and nothing else; with every other surface held neutral, an alarm is the loudest thing on any screen. The shell reports building state on every page through the incident count on the Dispatch destination. The resident app (mobile/, Flutter) runs on these tokens and rules; it is a phone adaptation of the Quiet Console, not a second world. Home is one status block, then the rooms as plain labelled cards, inside three bottom tabs (Home, Household, Settings). Under alarm the whole phone takes the incident-banner language full-screen. Unlike the dashboard, the phone follows the device's light / dark setting by default (Settings can pin light or dark); both themes are complete on the same names.",
     "keyCharacteristics": [
       "Three surface steps (ground, panel, raised) separated by 1px hairlines, not shadows.",
       "8px containers, 6px controls.",
@@ -159,13 +946,56 @@
       "Evacuation is the one place the system gets loud: deep red, a slim black-and-amber tape strip, ISO pictograms."
     ],
     "rules": [
-      { "name": "The State-Only Colour Rule", "body": "Green, amber and red mean state. They never decorate, never mark a category, never fill a series.", "section": "colors" },
-      { "name": "The One Blue Rule", "body": "Blue means \"you can act on this\" or \"this is selected\". Motion cells use blue as selection-like info, never as a hazard.", "section": "colors" },
-      { "name": "The Neutral Demo Rule", "body": "The Demo badge is a neutral outlined pill. Demo is not a hazard state.", "section": "colors" },
-      { "name": "The Sentence Case Rule", "body": "Labels are sentence case at 12px muted. No uppercase, no tracked-out eyebrows or kickers.", "section": "typography" },
-      { "name": "The Tabular Rule", "body": "Numbers are tabular everywhere; never swap in a proportional face for a figure.", "section": "typography" },
-      { "name": "The Flat Surface Rule", "body": "Cards, tiles and cells never carry a shadow at rest. Only overlays do.", "section": "elevation" },
-      { "name": "The No-Glow Rule", "body": "No glows, no coloured side stripes. A selected item uses the accent border plus a 1px ring.", "section": "elevation" }
+      {
+        "name": "The State-Only Colour Rule",
+        "body": "Green, amber and red mean state. They never decorate, never mark a category, never fill a series.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Blue Rule",
+        "body": "Blue means \"you can act on this\" or \"this is selected\". Motion cells use blue as selection-like info, never as a hazard.",
+        "section": "colors"
+      },
+      {
+        "name": "The Neutral Demo Rule",
+        "body": "The Demo badge is a neutral outlined pill. Demo is not a hazard state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Labels are sentence case at 12px muted. No uppercase, no tracked-out eyebrows or kickers.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Numbers are tabular everywhere; never swap in a proportional face for a figure.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Surface Rule",
+        "body": "Cards, tiles and cells never carry a shadow at rest. Only overlays do.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Glow Rule",
+        "body": "No glows, no coloured side stripes. A selected item uses the accent border plus a 1px ring.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Shape-And-Colour Mark Rule",
+        "body": "On the phone every state mark is a shape as well as a colour: a dot for normal, a rounded square for attention, a triangle for alarm, evacuation and danger, a 1.6px ring for unknown or offline. The status block, room tiles and scope chips all use it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Needs-A-Look Tint Rule",
+        "body": "Room tiles and reading cells stay on Panel or Well while normal. Only attention and danger take the soft tint, the state border and state-coloured text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Bundled Face Rule",
+        "body": "The phone never falls back to the platform face: every style names Inter, and the four weights ship in the app.",
+        "section": "typography"
+      }
     ],
     "dos": [
       "Do use green, amber and red only for state, always as a dot or fill plus text, with a soft tint behind it.",
@@ -174,7 +1004,12 @@
       "Do build both themes from the same token names; add a light value whenever a dark one is added.",
       "Do compact long repeated lists into state cells or matrices, keeping the full sentence as tooltip and accessible name.",
       "Do separate chart series by dash pattern as well as by colour, and keep series to the five data colours.",
-      "Do honour prefers-reduced-motion for every pulse."
+      "Do honour prefers-reduced-motion for every pulse.",
+      "Do pair every state colour on the phone with its shape mark: dot, square, triangle, ring.",
+      "Do keep room tiles and reading cells neutral while normal; tint only what needs a look.",
+      "Do follow the phone's light / dark setting by default, and keep both CanaryPalette themes complete.",
+      "Do send state text through palette.ink() and tints through palette.tint(), never a raw solid on Panel.",
+      "Do keep tap targets at 48px and let button pairs stack when their labels would not fit on one line."
     ],
     "donts": [
       "Don't use state colours to decorate or categorise.",
@@ -183,7 +1018,9 @@
       "Don't add uppercase labels, eyebrows or kickers.",
       "Don't treat Demo mode as a hazard state; keep its badge neutral and outlined.",
       "Don't use the black-and-amber tape or deep red outside evacuation.",
-      "Don't introduce a fourth surface step or a radius beyond 4, 6, 8 and 12."
+      "Don't introduce a fourth surface step or a radius beyond 4, 6, 8 and 12.",
+      "Don't let Material defaults back in on the phone: no seeded colour scheme, no surface tint, no resting elevation, no fully rounded buttons.",
+      "Don't use Deepened Safe Green outside the check-in button."
     ]
   }
 }
