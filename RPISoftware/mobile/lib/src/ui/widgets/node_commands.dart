@@ -17,7 +17,7 @@ import '../../theme.dart';
 // test + silence; water: close / open the valve + silence), the live result
 // of the last press and the hub's "Ultimul test" line.
 
-const _amberText = Color(0xFFB26A00); // amber dark enough for text on white
+const _amberText = HazardColors.warning; // drawn through palette.ink as text
 
 /// What the signed-in user may do with [node]'s commands (role, zone, own units).
 CommandAccess commandAccessFor(WidgetRef ref, NodeAnalysis node) {
@@ -237,9 +237,9 @@ class CommandRunRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withAlpha(24),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withAlpha(120)),
+          color: context.palette.tint(color),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: context.palette.stateBorder(color)),
         ),
         child: Row(
           children: [
@@ -249,7 +249,7 @@ class CommandRunRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _darker(color))),
+                  Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.palette.ink(color))),
                   Text(what, style: TextStyle(fontSize: 13, color: context.palette.muted)),
                 ],
               ),
@@ -260,9 +260,6 @@ class CommandRunRow extends StatelessWidget {
     );
   }
 }
-
-/// Status color, darkened enough to read as text (blue / grey stay).
-Color _darker(Color c) => c == HazardColors.normal ? const Color(0xFF1B5E20) : c;
 
 class _Note extends StatelessWidget {
   const _Note({required this.icon, required this.text});

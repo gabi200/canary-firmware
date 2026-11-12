@@ -194,12 +194,12 @@ void main() {
 
     // Status first: the danger, where it is, the way into the alarm screen.
     expect(find.text('EVACUAȚI ACUM'), findsOneWidget);
-    expect(find.text('În clădire: Bucătărie'), findsOneWidget);
+    expect(find.text('În clădire: Bucătărie'), findsWidgets); // the banner, and the building strip
     expect(find.text('Deschide instrucțiunile de evacuare'), findsOneWidget);
     expect(find.text('Camerele mele'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Clădirea: Scurgere de gaz'), 200);
     expect(find.text('Scurgere de gaz'), findsOneWidget); // the kitchen tile
-    expect(find.text('EVACUARE'), findsOneWidget);
+    expect(find.text('Evacuare'), findsOneWidget);
 
     // The full sensor list, one tap away.
     await openAllSensors(tester);
@@ -207,20 +207,20 @@ void main() {
     expect(find.text('Verifică bucătăria'), findsOneWidget); // hub headline as sent
     expect(find.text('5 din 6 senzori online · 1 incident activ'), findsOneWidget);
     expect(find.text('Deconectat · ultimul semnal acum 5 min'), findsOneWidget);
-    expect(find.text('OCUPAT'), findsOneWidget);
+    expect(find.text('Ocupat'), findsOneWidget);
     await tester.tap(find.byType(BackButton)); // pageBack() looks for the English tooltip
     await _pumpFor(tester);
 
     await tester.tap(find.byTooltip('Setări'));
     await _pumpFor(tester);
-    expect(find.text('Setări'), findsOneWidget);
-    expect(find.text('LIMBĂ'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Setări'), findsOneWidget);
+    expect(find.text('Limbă'), findsOneWidget);
     expect(find.text('Locatar · bld'), findsOneWidget);
 
     final summaryCalls = hub.requests.where((r) => r.path.endsWith('/summary')).length;
     await tester.tap(find.text('EN'));
     await _pumpFor(tester);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
     expect(find.text('Resident · bld'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Sign out'), 200);
     expect(find.text('Sign out'), findsOneWidget);
@@ -230,12 +230,12 @@ void main() {
     expect(summaryLangs.length, greaterThan(summaryCalls));
     expect(summaryLangs.last, 'en');
 
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Home')); // the Home tab
     await _pumpFor(tester);
     // Still scrolled to the building strip.
     expect(find.text('Building: Gas leak'), findsOneWidget);
     expect(find.text('In the building: Bucătărie'), findsWidgets);
-    expect(find.text('EVACUATION'), findsOneWidget);
+    expect(find.text('Evacuation'), findsOneWidget);
   });
 
   testWidgets('manager dashboard in Romanian', (tester) async {
@@ -250,7 +250,7 @@ void main() {
     expect(find.text('Au nevoie de ajutor'), findsOneWidget);
     expect(find.text('Ordonă evacuarea'), findsOneWidget);
     expect(find.text('Situația locatarilor'), findsOneWidget);
-    expect(find.text('ARE NEVOIE DE AJUTOR'), findsOneWidget);
+    expect(find.text('Are nevoie de ajutor'), findsOneWidget);
     expect(find.text('Ana Popescu'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Senzorii clădirii'), 200);
     expect(find.text('Senzorii clădirii'), findsOneWidget);

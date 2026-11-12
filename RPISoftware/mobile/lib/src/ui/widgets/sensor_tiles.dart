@@ -22,7 +22,7 @@ const _unitPpm = 'ppm';
 Color toneColor(Tone? tone) => switch (tone) {
       Tone.ok => HazardColors.normal,
       Tone.info => HazardColors.info,
-      Tone.attention => const Color(0xFFB26A00), // amber dark enough for text on white
+      Tone.attention => HazardColors.warning,
       Tone.danger => HazardColors.alarm,
       null => HazardColors.unknown,
     };
@@ -272,9 +272,7 @@ class SensorTile extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
-              color: context.palette.tile,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: context.palette.tileBorder),
+              border: Border(top: BorderSide(color: context.palette.hairline)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +286,7 @@ class SensorTile extends StatelessWidget {
                     child: Text.rich(TextSpan(children: [
                       TextSpan(
                           text: value,
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.palette.text)),
+                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: context.palette.text)),
                       if (unit != null)
                         TextSpan(
                             text: ' $unit',
@@ -302,7 +300,7 @@ class SensorTile extends StatelessWidget {
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(word,
-                        style: TextStyle(fontSize: value == null ? 22 : 15, fontWeight: FontWeight.w800, color: color)),
+                        style: TextStyle(fontSize: value == null ? 22 : 15, fontWeight: FontWeight.w600, color: color)),
                   ),
                 ]),
                 if (chart != null) ...[
@@ -332,7 +330,7 @@ class _Tappable extends StatelessWidget {
       ? child
       : Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
           clipBehavior: Clip.antiAlias,
           child: InkWell(onTap: onTap, child: child),
         );
@@ -631,8 +629,8 @@ class TileSkeletonGrid extends StatelessWidget {
             Container(
               height: 132,
               decoration: BoxDecoration(
-                color: const Color(0xFFECEEF1),
-                borderRadius: BorderRadius.circular(14),
+                color: context.palette.raised,
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
         ]),
@@ -791,10 +789,13 @@ class VitalChip extends StatelessWidget {
       label: semantics,
       excludeSemantics: true,
       child: Material(
-        color: tone == null ? context.palette.tile : context.palette.tint(toneColor(tone), 20),
-        borderRadius: BorderRadius.circular(12),
+        // Only what needs a look is tinted; a normal reading keeps the inset well.
+        color: tone == null || tone == Tone.ok || tone == Tone.info
+            ? Colors.transparent
+            : context.palette.tint(toneColor(tone), 20),
+        shape: Border(top: BorderSide(color: context.palette.hairline)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -818,7 +819,7 @@ class VitalChip extends StatelessWidget {
                       const SizedBox(width: 4),
                     ],
                     Text.rich(TextSpan(children: [
-                      TextSpan(text: value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+                      TextSpan(text: value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: color)),
                       if (unit != null)
                         TextSpan(
                             text: ' $unit',

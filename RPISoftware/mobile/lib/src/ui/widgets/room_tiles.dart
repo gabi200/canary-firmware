@@ -10,6 +10,7 @@ import '../../models/incident.dart';
 import '../../state/history_providers.dart';
 import '../../theme.dart';
 import 'home_status_section.dart';
+import 'status_hero.dart';
 
 /// A room on the resident's home: its sensors and name, the kind of room, and
 /// the open incident that reached it, if any.
@@ -44,8 +45,9 @@ String roomTileStatus(RoomTileData r) {
   return worstStatus(r.room.nodes.where((n) => n.isLive).map((n) => n.status));
 }
 
-/// The resident's rooms as small tiles, three to a row (two at large text):
-/// the kind of room, its name, a status dot and the temperature ≈. Tapping a
+/// The resident's rooms as cards, two to a row on a phone (one at large text,
+/// three on a tablet): the room's name, a state mark and one line (its state and
+/// the temperature ≈). Tapping a
 /// tile opens the room ([onOpen]); its chevron shows the room's sensors inline
 /// under the tile's row ([open] ids, toggled with [onToggle]).
 class RoomTileGrid extends StatelessWidget {
@@ -66,7 +68,7 @@ class RoomTileGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
-      final minTile = MediaQuery.textScalerOf(context).scale(104);
+      final minTile = MediaQuery.textScalerOf(context).scale(150);
       final cols = math.max(1, math.min(3, ((constraints.maxWidth + _gap) / (minTile + _gap)).floor()));
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -129,34 +131,36 @@ class _RoomTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final palette = context.palette;
+    final text = Theme.of(context).textTheme;
     final room = data.room;
     final incident = data.incident;
     final status = roomTileStatus(data);
-    final statusColor = palette.ink(HazardColors.forLevel(status));
+    final solid = HazardColors.forLevel(status);
     final flagged = status == 'attention' || status == 'danger';
     final air = room.nodes.where((n) => n.kind == 'air' && n.isLive).firstOrNull;
     final climate = air == null ? null : ref.watch(latestClimateProvider(air.nodeId)).valueOrNull;
     final temp = climate == null ? null : Series.of(climate, HistoryFields.temperature).latest;
     final tempText = temp == null ? null : l10n.decimal(temp, digits: 0);
     final offline = room.nodes.isNotEmpty && !room.nodes.any((n) => n.isLive);
-    final word = incident != null ? l10n.hazardName(incident.hazardType) : l10n.analysisStatus(status);
+    final word = incident != null
+        ? l10n.hazardName(incident.hazardType)
+        : offline
+            ? l10n.sensorOffline
+            : l10n.analysisStatus(status);
+    final line = [word, if (tempText != null && incident == null) '≈\u00A0$tempText\u00A0°C'].join('\u00A0·\u00A0');
 
     final semantics = [
       room.label,
       if (data.common) l10n.sketchCommonArea,
       word,
-      if (offline) l10n.sensorOffline,
       if (tempText != null) l10n.spokenTemperature(tempText),
     ].join(', ');
 
     return Material(
-      color: incident != null ? palette.tint(HazardColors.alarm, 46) : palette.surface,
+      color: flagged ? palette.tint(solid) : palette.panel,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: incident != null ? palette.ink(HazardColors.alarm) : palette.tileBorder,
-          width: incident != null ? 2.5 : 1,
-        ),
+        borderRadius: BorderRadius.circular(CanaryRadius.container),
+        side: BorderSide(color: flagged ? palette.stateBorder(solid) : palette.hairline, width: incident != null ? 1.5 : 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -170,45 +174,36 @@ class _RoomTile extends ConsumerWidget {
               hint: l10n.openRoom,
               excludeSemantics: true,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(roomKindIcon(data.kind), size: 28, color: incident != null ? statusColor : palette.muted),
-                        const Spacer(),
-                        // A dot, with "!" when something needs a look (not by colour alone).
-                        Icon(flagged ? Icons.error : Icons.circle, size: flagged ? 22 : 14, color: statusColor),
+                        Expanded(child: Text(room.label, style: text.titleSmall!.copyWith(fontSize: 15, height: 1.3))),
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: StateMark(color: offline && incident == null ? HazardColors.unknown : solid, size: 9),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(room.label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: palette.text)),
                     if (data.common)
-                      Text(l10n.sketchCommonArea,
-                          style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: palette.muted)),
-                    if (incident != null)
-                      Text(word, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: statusColor)),
-                    if (offline) Text(l10n.sensorOffline, style: TextStyle(fontSize: 13, color: palette.muted)),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(l10n.sketchCommonArea, style: text.labelMedium),
+                      ),
                     const Spacer(),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     // Room for the chevron at the bottom right.
                     Padding(
-                      padding: const EdgeInsets.only(right: 40),
-                      child: SizedBox(
-                        height: 28,
-                        child: tempText == null
-                            ? null
-                            : FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text('≈ $tempText °C',
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: palette.text)),
-                              ),
-                      ),
+                      padding: const EdgeInsets.only(right: 36),
+                      child: Text(line,
+                          style: text.bodySmall!.copyWith(
+                            color: flagged ? palette.ink(solid) : palette.muted,
+                            fontWeight: flagged ? FontWeight.w600 : FontWeight.w400,
+                          )),
                     ),
                   ],
                 ),
@@ -222,7 +217,7 @@ class _RoomTile extends ConsumerWidget {
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               onPressed: onToggle,
               tooltip: open ? l10n.hideSensors : l10n.showSensors,
-              icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 28, color: palette.muted),
+              icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 20, color: palette.muted),
             ),
           ),
         ],
@@ -231,39 +226,53 @@ class _RoomTile extends ConsumerWidget {
   }
 }
 
-/// A home section's title with a chevron that folds the section away.
+/// A home section's title with an optional [action] link and a chevron that folds
+/// the section away.
 class FoldHeader extends StatelessWidget {
-  const FoldHeader({super.key, required this.title, required this.expanded, required this.onToggle});
+  const FoldHeader({super.key, required this.title, required this.expanded, required this.onToggle, this.action});
   final String title;
   final bool expanded;
   final VoidCallback onToggle;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.palette;
-    return Semantics(
-      button: true,
-      expanded: expanded,
-      label: title,
-      hint: expanded ? l10n.collapseSection : l10n.expandSection,
-      excludeSemantics: true,
-      onTap: onToggle,
-      child: InkWell(
-        onTap: onToggle,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              button: true,
+              expanded: expanded,
+              label: title,
+              hint: expanded ? l10n.collapseSection : l10n.expandSection,
+              excludeSemantics: true,
+              onTap: onToggle,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(CanaryRadius.control),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Row(
+                    children: [
+                      Flexible(child: Text(title, style: Theme.of(context).textTheme.titleSmall)),
+                      const SizedBox(width: 4),
+                      Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20, color: palette.muted),
+                    ],
+                  ),
+                ),
               ),
-              Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 28, color: palette.muted),
-            ],
+            ),
           ),
-        ),
+          if (action != null)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.5),
+              child: action!,
+            ),
+        ],
       ),
     );
   }

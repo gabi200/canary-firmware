@@ -12,6 +12,7 @@ import 'package:canary_resident/src/services/storage.dart';
 import 'package:canary_resident/src/theme.dart';
 import 'package:canary_resident/src/ui/widgets/room_tiles.dart';
 import 'package:canary_resident/src/ui/widgets/unit_scope_bar.dart';
+import 'package:canary_resident/src/ui/widgets/status_hero.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -207,9 +208,9 @@ void main() {
     expect(_selected(tester, 'Ap. 12'), isTrue);
     expect(_selected(tester, 'Toate camerele'), isTrue);
     expect(find.bySemanticsLabel(RegExp(r'^Ap\. 12, 2 senzori, ok')), findsOneWidget);
-    final danger = tester.widget<Icon>(find.descendant(of: _chip('Ap. 14'), matching: find.byIcon(Icons.error)));
-    // The alarm red, as the active theme draws status colours on its surface.
-    expect(danger.color, tester.element(_chip('Ap. 14')).palette.ink(HazardColors.alarm));
+    // Danger is a red triangle mark (not by colour alone).
+    final danger = tester.widget<StateMark>(find.descendant(of: _chip('Ap. 14'), matching: find.byType(StateMark)));
+    expect(danger.color, HazardColors.alarm);
 
     await _reveal(tester, find.text('Living · aer'));
     expect(find.text('Ap12 bucătărie · aer'), findsOneWidget);

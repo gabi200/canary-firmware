@@ -6,7 +6,7 @@
   "language": "Language",
   "languageHint": "Also used for the sensor analysis from the hub.",
   "settings": "Settings",
-  "modeBadge": "DEMO",
+  "modeBadge": "Demo",
   "@modeBadge": {"description": "Chip shown while the hub is in demo mode."},
   "modeRealAlarm": "Real alarm in Canary Live",
   "@modeRealAlarm": {"description": "Banner: an incident is open in the real building while the hub shows the demo."},
@@ -154,7 +154,7 @@
   "residentAccountability": "Resident accountability",
   "couldNotLoadRoster": "Could not load roster",
   "noResidentsRegistered": "No residents registered.",
-  "rosterNeedsHelp": "NEEDS HELP",
+  "rosterNeedsHelp": "Needs help",
   "rosterSafeOutside": "Safe — out",
   "rosterSafeInside": "Safe — in",
   "rosterNoResponse": "No response",
@@ -610,5 +610,10 @@
   "classificationSteam": "Steam",
   "classificationCooking": "Cooking",
   "classificationAerosol": "Aerosol",
-  "classificationUpdated": "Assessed"
+  "classificationUpdated": "Assessed",
+  "navHome": "Home",
+  "navHousehold": "Household",
+  "noActiveIncidents": "No active incidents",
+  "demoAccount": "Demo account",
+  "careHintShort": "Who needs help getting out?"
 }

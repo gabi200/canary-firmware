@@ -14,9 +14,9 @@ import 'src/models/household.dart';
 import 'src/ui/care_profiles_screen.dart';
 import 'src/ui/find_hub_screen.dart';
 import 'src/ui/invite_accept_screen.dart';
-import 'src/ui/home_screen.dart';
 import 'src/ui/manager_dashboard_screen.dart';
 import 'src/ui/onboarding_screen.dart';
+import 'src/ui/resident_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,7 +71,7 @@ class CanaryApp extends ConsumerWidget {
     } else if (session == null) {
       home = const OnboardingScreen();
     } else if (session.isResident) {
-      home = const HomeScreen();
+      home = const ResidentShell();
     } else {
       // Managers, dispatchers and admins get the operations dashboard.
       home = const ManagerDashboardScreen();

@@ -9,6 +9,7 @@ import 'package:canary_resident/src/state/providers.dart';
 import 'package:canary_resident/src/ui/alarm_screen.dart';
 import 'package:canary_resident/src/ui/room_screen.dart';
 import 'package:canary_resident/src/ui/widgets/floor_plan_sketch.dart';
+import 'package:canary_resident/src/ui/widgets/home_banner.dart';
 import 'package:canary_resident/src/ui/widgets/room_tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,7 +125,7 @@ Future<void> _tapVisible(WidgetTester tester, Finder f, {double delta = 120}) as
 }
 
 Finder _filled(String label) =>
-    find.ancestor(of: find.text(label), matching: find.byWidgetPredicate((w) => w is FilledButton)).first;
+    find.ancestor(of: find.text(label), matching: find.byWidgetPredicate((w) => w is ButtonStyleButton)).first;
 
 Finder _tile(String label) => find.descendant(of: find.byType(RoomTileGrid), matching: find.text(label));
 
@@ -148,11 +149,11 @@ void main() {
           reason: '${order[i]} after ${order[i - 1]}');
     }
     expect(find.text('spațiu comun'), findsOneWidget);
-    expect(find.text('≈ 22 °C'), findsNWidgets(5));
+    expect(find.textContaining('≈ 22 °C'), findsNWidgets(5)); // never broken inside
     expect(find.bySemanticsLabel(RegExp(r'^Bucătărie, Totul e în regulă, aproximativ 22 grade$')), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Clădirea: niciun incident activ'), 200,
+    await tester.scrollUntilVisible(find.text('Niciun incident activ'), 200,
         scrollable: find.byType(Scrollable).first);
-    expect(find.text('Clădirea: niciun incident activ'), findsOneWidget);
+    expect(find.text('Niciun incident activ'), findsOneWidget);
   });
 
   testWidgets('home: sections fold, a room opens inline or as a page, all remembered', (tester) async {
@@ -206,7 +207,8 @@ void main() {
     ));
     await settle(tester);
 
-    expect(find.text('SCURGERE DE GAZ'), findsOneWidget);
+    expect(find.descendant(of: find.byType(HomeStatusBanner), matching: find.text('Scurgere de gaz')),
+        findsOneWidget);
     expect(find.text('În locuința ta: Bucătărie'), findsOneWidget);
     expect(find.text('Deschide instrucțiunile de evacuare'), findsOneWidget);
     await tester.scrollUntilVisible(find.byType(RoomTileGrid), 200, scrollable: find.byType(Scrollable).first);
@@ -297,16 +299,20 @@ void main() {
     expect(find.descendant(of: plan, matching: find.text('Tu')), findsWidgets);
   });
 
-  testWidgets('appearance: dark by default, Auto / Light / Dark saved on the device', (tester) async {
+  testWidgets('appearance: follows the phone by default, Auto / Light / Dark saved on the device', (tester) async {
     phoneView(tester);
     final storage = await signedInStorage();
     await tester.pumpWidget(ProviderScope(overrides: hubOverrides(storage, _hub()), child: const CanaryApp()));
     await settle(tester);
-    expect(Theme.of(tester.element(find.byType(RoomTileGrid))).brightness, Brightness.dark);
+    // The test platform is light: the app follows it until the resident picks.
+    expect(Theme.of(tester.element(find.byType(RoomTileGrid))).brightness, Brightness.light);
 
     await tester.tap(find.byTooltip('Setări'));
     await settle(tester);
-    expect(find.text('ASPECT'), findsOneWidget);
+    expect(find.text('Aspect'), findsOneWidget);
+    await tester.tap(find.text('Întunecat'));
+    await settle(tester);
+    expect(storage.themeMode, 'dark');
     await tester.tap(find.text('Luminos'));
     await settle(tester);
     expect(storage.themeMode, 'light');

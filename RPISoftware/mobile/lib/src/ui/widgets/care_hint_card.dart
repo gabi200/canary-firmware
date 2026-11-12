@@ -7,7 +7,8 @@ import '../../theme.dart';
 import '../care_profiles_screen.dart';
 
 /// Home hint for emergency profiles: shown only once the profiles loaded and
-/// are empty, until the resident dismisses it (persisted).
+/// are empty, until the resident dismisses it (persisted). A plain panel row:
+/// the question, the action as a link, and a close button.
 class CareHintCard extends ConsumerWidget {
   const CareHintCard({super.key});
 
@@ -17,40 +18,42 @@ class CareHintCard extends ConsumerWidget {
     final profiles = ref.watch(careProfilesProvider).valueOrNull;
     if (profiles == null || profiles.isNotEmpty) return const SizedBox.shrink();
     final l10n = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Card(
-        margin: EdgeInsets.zero,
-        color: const Color(0xFFE8F0FB),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const CareProfilesScreen())),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
-            child: Row(
-              children: [
-                const Icon(Icons.health_and_safety, color: HazardColors.info, size: 34),
-                const SizedBox(width: 12),
-                Expanded(
+    final palette = context.palette;
+    final text = Theme.of(context).textTheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CareProfilesScreen())),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 4, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  hint: l10n.careHintAction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(l10n.careHintTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text(l10n.careHintAction,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w700, color: HazardColors.info)),
+                      Text(l10n.careProfileTitle, style: text.titleSmall),
+                      const SizedBox(height: 2),
+                      Text(l10n.careHintShort, style: text.bodySmall!.copyWith(color: palette.muted)),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  onPressed: () => ref.read(careHintDismissedProvider.notifier).dismiss(),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(minimumSize: const Size(64, 36), padding: const EdgeInsets.symmetric(horizontal: 12)),
+                onPressed: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const CareProfilesScreen())),
+                child: Text(l10n.healthAdd),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: palette.muted, size: 20),
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => ref.read(careHintDismissedProvider.notifier).dismiss(),
+              ),
+            ],
           ),
         ),
       ),

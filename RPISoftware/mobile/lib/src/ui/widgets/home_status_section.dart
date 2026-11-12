@@ -12,6 +12,7 @@ import '../sensor_chart_page.dart';
 import 'floor_plan_sketch.dart';
 import 'node_commands.dart';
 import 'sensor_tiles.dart';
+import 'status_hero.dart';
 import 'status_pill.dart';
 
 /// "Home status": the hub's analysis of the building's sensors — an overall
@@ -81,7 +82,7 @@ class HomeStatusSection extends ConsumerWidget {
         else if (!summary.hasNodes)
           const _NoSensorsCard()
         else ...[
-          _OverallCard(summary: summary),
+          _OverallCard(summary: summary, secondary: title != null),
           if (sketch) ...[
             const SizedBox(height: 12),
             FloorPlanSketch(
@@ -103,46 +104,44 @@ class HomeStatusSection extends ConsumerWidget {
 }
 
 class _OverallCard extends StatelessWidget {
-  const _OverallCard({required this.summary});
+  const _OverallCard({required this.summary, this.secondary = false});
   final BuildingSummary summary;
+
+  /// Shown under another status block (the manager dashboard).
+  final bool secondary;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final base = HazardColors.forLevel(summary.status);
-    final color = context.palette.ink(base);
     final incidents = summary.activeIncidents;
-    return Card(
-      color: context.palette.tint(base, 20),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(_statusIcon(summary.status), color: color, size: 36),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    summary.headline.isNotEmpty ? summary.headline : l10n.analysisStatus(summary.status),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    [
-                      l10n.sensorsOnline(summary.nodesOnline, summary.nodesTotal),
-                      if (incidents > 0) l10n.activeIncidentCount(incidents),
-                    ].join(' · '),
-                    style: TextStyle(color: context.palette.muted),
-                  ),
-                ],
-              ),
-            ),
-          ],
+    final online = l10n.sensorsOnline(summary.nodesOnline, summary.nodesTotal);
+    final count = incidents > 0 ? l10n.activeIncidentCount(incidents) : null;
+    final detail = [online, if (count != null) count].join(' · ');
+    final headline = summary.headline.isNotEmpty ? summary.headline : l10n.analysisStatus(summary.status);
+    // Under the dashboard's own status block (manager): one quiet line with the state
+    // mark while all is well, so "all clear" is said once; the full block when the hub
+    // has something to look at.
+    if (secondary && summary.status == 'ok') {
+      final palette = context.palette;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: palette.panel,
+          borderRadius: BorderRadius.circular(CanaryRadius.container),
+          border: Border.all(color: palette.hairline),
         ),
-      ),
-    );
+        child: Row(children: [
+          StateMark(color: base, size: 9),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(detail,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(color: palette.textSecondary)),
+          ),
+        ]),
+      );
+    }
+    return StatusBlock(color: base, stateLine: detail, title: headline);
   }
 }
 
@@ -176,11 +175,11 @@ class RoomCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
             child: Row(
               children: [
-                Icon(Icons.circle, size: 12, color: context.palette.ink(HazardColors.forLevel(zone.status))),
+                StateMark(color: HazardColors.forLevel(zone.status), size: 9),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(showLabel ? label : context.l10n.analysisStatus(zone.status),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
                 if (occupied != null)
                   StatusPill(
@@ -244,8 +243,10 @@ class _NodeTile extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if (!node.isLive) ...[_NotReporting(node: node), const SizedBox(height: 6)],
-            Text(_headline(context, node), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
+            if (node.status != 'ok') ...[
+              Text(_headline(context, node), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+            ],
             LastTestLine(command: node.lastCommand, fontSize: 12),
           ],
         ),
@@ -376,7 +377,7 @@ class _History extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: context.palette.tile,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(children: [
               const Icon(Icons.hourglass_empty, color: HazardColors.unknown),
@@ -611,13 +612,6 @@ class _RefreshFailedNote extends StatelessWidget {
 
 String _headline(BuildContext context, NodeAnalysis node) =>
     node.headline.isNotEmpty ? node.headline : context.l10n.analysisStatus(node.status);
-
-IconData _statusIcon(String status) => switch (status) {
-      'ok' => Icons.verified_user,
-      'attention' => Icons.error_outline,
-      'danger' => Icons.warning_rounded,
-      _ => Icons.help_outline,
-    };
 
 IconData _kindIcon(String kind) => switch (kind) {
       'air' => Icons.air,

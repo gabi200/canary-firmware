@@ -121,8 +121,9 @@ void main() {
     expect(find.text('TOTUL E ÎN REGULĂ'), findsNothing);
     expect(find.byType(AlarmScreen), findsNothing);
     expect(find.text('Cineva din casă are nevoie de ajutor să iasă?'), findsNothing);
-    await tester.scrollUntilVisible(find.text('VERIFICARE'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(find.text('Clădirea: Scurgere de gaz'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('Clădirea: Scurgere de gaz'), findsOneWidget);
+    expect(find.text('Verificare'), findsWidgets); // the status line and the strip's pill
 
     await openRoom(tester, 'Bucătărie');
     await tester.scrollUntilVisible(find.text('Kitchen air'), 200, scrollable: find.byType(Scrollable).first);

@@ -310,7 +310,7 @@ class _ChecklistRow extends StatelessWidget {
               ),
             RunPhase.accepted => (const Icon(Icons.check_circle, color: HazardColors.normal), l10n.runAccepted),
             RunPhase.rejected => (
-                const Icon(Icons.warning_amber_rounded, color: Color(0xFFB26A00)),
+                Icon(Icons.warning_amber_rounded, color: context.palette.attentionText),
                 detail == null ? l10n.runRejectedPlain : l10n.runRejected(detail),
               ),
             RunPhase.timeout => (const Icon(Icons.help_outline, color: HazardColors.unknown), l10n.runTimeout),

@@ -49,6 +49,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        shape: const Border(),
         actions: const [
           Padding(padding: EdgeInsets.only(right: 12), child: LanguageToggle()),
         ],
@@ -63,22 +64,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.shield_moon, size: 72, color: Color(0xFF1565C0)),
-                  const SizedBox(height: 8),
-                  const Text('Canary', textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                  Row(children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(color: context.palette.wordmarkDot, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('Canary', style: Theme.of(context).textTheme.headlineLarge),
+                  ]),
+                  const SizedBox(height: 6),
                   Text(l10n.onboardingTagline,
-                      textAlign: TextAlign.center, style: TextStyle(color: context.palette.muted)),
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(color: context.palette.textSecondary)),
                   const SizedBox(height: 32),
                   TextField(
                     controller: _username,
-                    decoration: InputDecoration(labelText: l10n.username, border: const OutlineInputBorder()),
+                    textInputAction: TextInputAction.go,
+                    onSubmitted: (_) => _busy ? null : _login(),
+                    decoration: InputDecoration(labelText: l10n.username),
                   ),
-                  const SizedBox(height: 12),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
+                      Text(l10n.demoAccount, style: Theme.of(context).textTheme.labelMedium),
                       for (final u in ['ana'])
                         ActionChip(label: Text(u), onPressed: () => _username.text = u),
                     ],
@@ -88,7 +98,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(l10n.loginFailed(l10n.errorReason(_error!)),
-                          style: const TextStyle(color: Colors.red)),
+                          style: TextStyle(color: context.palette.alarmText)),
                     ),
                   FilledButton(
                     onPressed: _busy ? null : _login,
@@ -98,8 +108,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(l10n.serverAddress(ref.watch(hubProvider).url ?? ''),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: context.palette.faint, fontSize: 12)),
+                      style: Theme.of(context).textTheme.labelMedium),
                 ],
               ),
             ),

@@ -38,15 +38,16 @@ class _WhereNowCardState extends State<WhereNowCard> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.palette;
-    final blue = palette.ink(HazardColors.info);
+    final blue = palette.accentText;
+    final text = Theme.of(context).textTheme;
     final answer = widget.answer;
     final asking = answer == null || _asking;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: palette.tint(HazardColors.info, 18),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: blue, width: 2),
+        color: palette.panel,
+        borderRadius: BorderRadius.circular(CanaryRadius.container),
+        border: Border.all(color: palette.hairlineStrong),
       ),
       child: asking
           ? Column(
@@ -54,11 +55,10 @@ class _WhereNowCardState extends State<WhereNowCard> {
               children: [
                 Semantics(
                   header: true,
-                  child: Text(l10n.whereNowQuestion,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: palette.text)),
+                  child: Text(l10n.whereNowQuestion, style: text.headlineSmall),
                 ),
                 const SizedBox(height: 4),
-                Text(l10n.whereNowWhy, style: TextStyle(fontSize: 15, color: palette.muted)),
+                Text(l10n.whereNowWhy, style: text.bodyMedium!.copyWith(color: palette.textSecondary)),
                 const SizedBox(height: 12),
                 for (final where in ResidentLocation.values)
                   Padding(
@@ -84,13 +84,12 @@ class _WhereNowCardState extends State<WhereNowCard> {
                     Icon(whereNowIcon(answer), size: 28, color: blue),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(l10n.whereYouSaid(l10n.whereNowLabel(answer)),
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: palette.text)),
+                      child: Text(l10n.whereYouSaid(l10n.whereNowLabel(answer)), style: text.titleMedium),
                     ),
                     TextButton(
                       onPressed: widget.busy ? null : () => setState(() => _asking = true),
                       style: TextButton.styleFrom(
-                          minimumSize: const Size(48, 48), textStyle: const TextStyle(fontSize: 16)),
+                          minimumSize: const Size(48, 48), textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 16)),
                       child: Text(l10n.change),
                     ),
                   ],
@@ -105,8 +104,7 @@ class _WhereNowCardState extends State<WhereNowCard> {
                         const SizedBox(width: 10),
                       ],
                       Expanded(
-                        child: Text(advice,
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: palette.text)),
+                        child: Text(advice, style: text.titleMedium!.copyWith(fontSize: 16)),
                       ),
                     ],
                   ),
@@ -125,16 +123,20 @@ class _AnswerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = Text(context.l10n.whereNowLabel(where));
-    final icon = Icon(whereNowIcon(where), size: 28);
-    final style = FilledButton.styleFrom(
-      minimumSize: const Size.fromHeight(60),
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      textStyle: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+    final palette = context.palette;
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(56),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        foregroundColor: palette.text,
+        backgroundColor: selected ? palette.tint(HazardColors.info, 40) : palette.panel,
+        side: BorderSide(color: selected ? palette.accent : palette.hairlineStrong, width: selected ? 1.5 : 1),
+        textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 17, fontWeight: FontWeight.w600),
+      ),
+      onPressed: onPressed,
+      icon: Icon(whereNowIcon(where), size: 24, color: palette.accentText),
+      label: Text(context.l10n.whereNowLabel(where)),
     );
-    return selected
-        ? FilledButton.icon(style: style, onPressed: onPressed, icon: icon, label: label)
-        : FilledButton.tonalIcon(style: style, onPressed: onPressed, icon: icon, label: label);
   }
 }

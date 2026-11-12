@@ -11,13 +11,21 @@ import 'safety_sign.dart';
 import 'status_hero.dart';
 import 'classification_text.dart';
 
-/// The one big status at the top of the resident's home. Calm: a shield,
-/// "Totul e în regulă" and "Locuința ta e monitorizată". An alarm: the danger
-/// in red, where it is for them, one line on what to do and the way into the
-/// alarm screen. Anything in between (verifying, hub attention, unknown): the
-/// status card shared with the manager dashboard.
+/// The one status at the top of the resident's home. Calm: "Totul e în regulă"
+/// and "Locuința ta e monitorizată" on the green tint, with the live connection
+/// on the state line. An alarm: the incident banner (fill by state, signs on
+/// white discs), where it is for them, one line on what to do and the way into
+/// the alarm screen. Anything in between (verifying, hub attention, unknown):
+/// the status block shared with the manager dashboard.
 class HomeStatusBanner extends StatelessWidget {
-  const HomeStatusBanner({super.key, required this.status, this.where, this.zoneLabel, this.onOpenAlarm});
+  const HomeStatusBanner({
+    super.key,
+    required this.status,
+    this.where,
+    this.zoneLabel,
+    this.onOpenAlarm,
+    this.connected = true,
+  });
   final BuildingStatus status;
 
   /// Where the alarming incident is, relative to the resident.
@@ -27,50 +35,23 @@ class HomeStatusBanner extends StatelessWidget {
   final String? zoneLabel;
   final VoidCallback? onOpenAlarm;
 
-  @override
-  Widget build(BuildContext context) => switch (status.kind) {
-        BuildingStatusKind.alarm => _DangerBanner(incident: status.incident!, where: where, onOpen: onOpenAlarm),
-        BuildingStatusKind.clear => const _AllWellBanner(),
-        _ => StatusHeroCard(status: status, zoneLabel: zoneLabel),
-      };
-}
-
-class _AllWellBanner extends StatelessWidget {
-  const _AllWellBanner();
+  /// The live connection to the hub, said on the calm state line.
+  final bool connected;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final palette = context.palette;
-    final green = palette.ink(HazardColors.normal);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: palette.tint(HazardColors.normal),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: green.withAlpha(110), width: 1.5),
-      ),
-      child: Semantics(
-        container: true,
-        child: Row(
-          children: [
-            Icon(Icons.verified_user, size: 56, color: green),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(l10n.homeAllWell,
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: palette.text)),
-                  const SizedBox(height: 4),
-                  Text(l10n.homeMonitored, style: TextStyle(fontSize: 16, color: palette.muted)),
-                ],
-              ),
-            ),
-          ],
+    final live = connected ? l10n.live : l10n.reconnecting;
+    return switch (status.kind) {
+      BuildingStatusKind.alarm => _DangerBanner(incident: status.incident!, where: where, onOpen: onOpenAlarm),
+      BuildingStatusKind.clear => StatusBlock(
+          color: HazardColors.normal,
+          stateLine: live,
+          title: l10n.homeAllWell,
+          body: l10n.homeMonitored,
         ),
-      ),
-    );
+      _ => StatusHeroCard(status: status, zoneLabel: zoneLabel),
+    };
   }
 }
 
@@ -83,54 +64,98 @@ class _DangerBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final color = HazardColors.forState(incident.state);
+    final text = Theme.of(context).textTheme;
+    final fill = HazardColors.bannerFill(incident.state);
+    final ink = HazardColors.onBanner(incident.state);
     final hazard = l10n.hazardName(incident.hazardType);
     final where = this.where;
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+    final evacuation = incident.isEvacuation;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(CanaryRadius.container),
+      child: ColoredBox(
+        color: fill,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                if (incident.isEvacuation) ...[
-                  const SafetySignImage(SafetySign.e002, size: 48),
-                  const SizedBox(width: 8),
-                ],
-                SafetySignImage(hazardSign(incident.hazardType), size: 48),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    incident.isEvacuation ? l10n.evacuateNow : hazard.toUpperCase(),
-                    style: const TextStyle(color: HazardColors.onHazard, fontSize: 24, fontWeight: FontWeight.w900),
+            if (evacuation) const HazardTape(),
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, evacuation ? 18 : 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      if (evacuation) ...[
+                        const SafetySignDisc(SafetySign.e002, size: 44),
+                        const SizedBox(width: 8),
+                      ],
+                      SafetySignDisc(hazardSign(incident.hazardType), size: 44),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(evacuation ? l10n.evacuateNow : hazard,
+                            style: text.headlineSmall!.copyWith(color: ink)),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            if (where != null) ...[
-              const SizedBox(height: 12),
-              Text(l10n.hazardWhereText(where),
-                  style: const TextStyle(color: HazardColors.onHazard, fontSize: 18, fontWeight: FontWeight.w700)),
-            ],
-            const SizedBox(height: 6),
-            ClassificationText(incident: incident, color: HazardColors.onHazard),
-            Text(
-              incident.isEvacuation ? l10n.homeEvacuateLine : hazardDont(l10n, incident.hazardType),
-              style: const TextStyle(color: HazardColors.onHazard, fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: HazardColors.surface, foregroundColor: color),
-              icon: const SafetySignImage(SafetySign.e002, size: 28, decorative: true),
-              label: OneLineLabel(l10n.openEvacuationGuidance),
-              onPressed: onOpen,
+                  if (where != null) ...[
+                    const SizedBox(height: 12),
+                    Text(l10n.hazardWhereText(where), style: text.titleMedium!.copyWith(color: ink)),
+                  ],
+                  const SizedBox(height: 4),
+                  ClassificationText(incident: incident, color: ink),
+                  Text(
+                    evacuation ? l10n.homeEvacuateLine : hazardDont(l10n, incident.hazardType),
+                    style: text.bodyMedium!.copyWith(color: ink),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: fill),
+                    icon: const SafetySignImage(SafetySign.e002, size: 26, decorative: true),
+                    label: OneLineLabel(l10n.openEvacuationGuidance),
+                    onPressed: onOpen,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// The 4px black-and-amber strip along the top of an active-evacuation banner, and
+/// nowhere else (DESIGN.md, Hazard tape).
+class HazardTape extends StatelessWidget {
+  const HazardTape({super.key, this.height = 4});
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: SizedBox(height: height, child: CustomPaint(painter: _TapePainter())),
+      );
+}
+
+class _TapePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = HazardColors.tapeBlack);
+    final amber = Paint()..color = HazardColors.tapeAmber;
+    const stripe = 8.0;
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    for (var x = -size.height; x < size.width + size.height; x += stripe * 2) {
+      final path = Path()
+        ..moveTo(x, size.height)
+        ..lineTo(x + size.height, 0)
+        ..lineTo(x + size.height + stripe, 0)
+        ..lineTo(x + stripe, size.height)
+        ..close();
+      canvas.drawPath(path, amber);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_TapePainter old) => false;
 }

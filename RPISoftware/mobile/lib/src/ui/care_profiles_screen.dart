@@ -120,13 +120,13 @@ class _ProfileCard extends StatelessWidget {
                       spacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(p.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                        Text(p.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                         if (p.isSelf)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: HazardColors.info.withAlpha(30),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(l10n.careSelfBadge,
                                 style: const TextStyle(fontWeight: FontWeight.w700, color: HazardColors.info)),
@@ -144,8 +144,8 @@ class _ProfileCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF1F3F5),
-                                borderRadius: BorderRadius.circular(10),
+                                color: context.palette.raised,
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(mainAxisSize: MainAxisSize.min, children: [
                                 Icon(careNeedIcon(n), size: 16, color: context.palette.muted),
@@ -397,7 +397,7 @@ class _CareProfileFormScreenState extends ConsumerState<CareProfileFormScreen> {
           Container(
             decoration: BoxDecoration(
               border: Border.all(color: _consent ? HazardColors.normal : context.palette.divider, width: 1.5),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: CheckboxListTile(
               value: _consent,
@@ -552,8 +552,8 @@ class _HealthImportPanelState extends ConsumerState<HealthImportPanel> {
               color: context.palette.tile,
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFFDADCE0)),
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: context.palette.hairline),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -641,11 +641,11 @@ class _NeedToggle extends StatelessWidget {
       child: Material(
         color: selected ? HazardColors.info.withAlpha(28) : context.palette.tile,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: selected ? HazardColors.info : const Color(0xFFDADCE0), width: selected ? 2 : 1),
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: selected ? HazardColors.info : context.palette.hairlineStrong, width: selected ? 1.5 : 1),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           onTap: () => onTap(need),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 56),

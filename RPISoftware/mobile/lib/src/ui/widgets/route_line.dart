@@ -93,11 +93,11 @@ class _Stop extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: HazardColors.start,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(l10n.startHere,
                             style: const TextStyle(color: HazardColors.onHazard, fontSize: 14,
-                                fontWeight: FontWeight.bold)),
+                                fontWeight: FontWeight.w600)),
                       ),
                     if (isFirst) const SizedBox(height: 6),
                     Row(
@@ -109,7 +109,7 @@ class _Stop extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(waypoint.label,
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
                                   color: context.palette.text)),
                         ),
                       ],
@@ -153,7 +153,7 @@ class _AvoidRow extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(text,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
                           color: HazardColors.alarm)),
                 ),
               ],

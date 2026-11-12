@@ -14,13 +14,13 @@ import '../state/scope_providers.dart';
 import '../theme.dart';
 import 'alarm_screen.dart';
 import 'room_screen.dart';
-import 'settings_screen.dart';
 import 'widgets/care_hint_card.dart';
 import 'widgets/classification_text.dart';
 import 'widgets/home_banner.dart';
 import 'widgets/mode_strip.dart';
 import 'widgets/room_tiles.dart';
 import 'widgets/safety_sign.dart';
+import 'widgets/status_hero.dart';
 import 'widgets/status_pill.dart';
 import 'widgets/unit_scope_bar.dart';
 
@@ -85,18 +85,14 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        // The resident's home ("Ap. 12 · Etaj 3"), the picked one with several.
-        title: Text(home.unit(scope.unit?.id)?.title ?? home.title ?? l10n.appTitle),
-        actions: [
-          const DemoChip(),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: l10n.settings,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
+        // The resident's home ("Ap. 12 · Etaj 3"), the picked one with several,
+        // after the wordmark's yellow dot.
+        title: Row(children: [
+          const WordmarkDot(),
+          const SizedBox(width: 10),
+          Flexible(child: Text(home.unit(scope.unit?.id)?.title ?? home.title ?? l10n.appTitle)),
+        ]),
+        actions: const [DemoChip(), SizedBox(width: 8)],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -115,6 +111,7 @@ class HomeScreen extends ConsumerWidget {
                   const RealAlarmBanner(),
                   HomeStatusBanner(
                     status: status,
+                    connected: state.connected,
                     where: status.incident == null ? null : whereOf(status.incident!),
                     zoneLabel: prettyZone(labels, status.incident?.primaryZoneId),
                     onOpenAlarm: status.incident == null ? null : () => _openAlarm(context, status.incident!.id),
@@ -124,11 +121,16 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     const CareHintCard(),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   FoldHeader(
                     title: l10n.myRooms,
                     expanded: roomsOpen,
                     onToggle: () => foldCtl.toggleSection(roomsSection),
+                    action: TextButton(
+                      onPressed: () => Navigator.of(context)
+                          .push(MaterialPageRoute<void>(builder: (_) => const HomeSensorsScreen())),
+                      child: Text(l10n.allSensors),
+                    ),
                   ),
                   AnimatedSize(
                     duration: const Duration(milliseconds: 200),
@@ -152,20 +154,10 @@ class HomeScreen extends ConsumerWidget {
                                         RoomScreen(zoneId: r.room.zoneId, title: r.room.label, sheetLabel: r.sheetLabel),
                                   )),
                                 ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton.icon(
-                                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                                  icon: const Icon(Icons.sensors),
-                                  label: Text(l10n.allSensors),
-                                  onPressed: () => Navigator.of(context)
-                                      .push(MaterialPageRoute<void>(builder: (_) => const HomeSensorsScreen())),
-                                ),
-                              ),
                             ],
                           ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   FoldHeader(
                     title: l10n.buildingSection,
                     expanded: buildingOpen,
@@ -183,8 +175,11 @@ class HomeScreen extends ConsumerWidget {
                             onOpen: (i) => _openAlarm(context, i.id),
                           ),
                   ),
-                  const SizedBox(height: 12),
-                  _ConnectivityRow(connected: state.connected, pending: state.pending),
+                  if (state.pending > 0) ...[
+                    const SizedBox(height: 12),
+                    _PendingRow(pending: state.pending),
+                  ],
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -219,8 +214,9 @@ class _NoRooms extends ConsumerWidget {
   }
 }
 
-/// "Clădirea: niciun incident activ", or a line per open incident: the hazard,
-/// where it is for the resident, its state. An alarming one opens the alarm.
+/// "Niciun incident activ" on one panel row, or a row per open incident: the
+/// hazard's sign, where it is for the resident, its state. An alarming one
+/// opens the alarm.
 class _BuildingStrip extends StatelessWidget {
   const _BuildingStrip({required this.incidents, required this.whereOf, required this.onOpen});
   final List<Incident> incidents;
@@ -231,23 +227,28 @@ class _BuildingStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.palette;
+    final text = Theme.of(context).textTheme;
     if (incidents.isEmpty) {
       return Card(
-        margin: const EdgeInsets.only(top: 4),
-        child: ListTile(
-          leading: Icon(Icons.apartment, color: palette.ink(HazardColors.normal)),
-          title: Text(l10n.buildingNoIncidents),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            const StateMark(color: HazardColors.normal, size: 9),
+            const SizedBox(width: 10),
+            Expanded(child: Text(l10n.noActiveIncidents, style: text.bodyMedium!.copyWith(color: palette.textSecondary))),
+          ]),
         ),
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final inc in incidents)
+        for (final (i, inc) in incidents.indexed) ...[
+          if (i > 0) const SizedBox(height: 8),
           Card(
-            margin: const EdgeInsets.only(top: 4),
+            clipBehavior: Clip.antiAlias,
             child: ListTile(
-              leading: SafetySignImage(hazardSign(inc.hazardType), size: 36),
+              leading: SafetySignImage(hazardSign(inc.hazardType), size: 32),
               title: Text(l10n.buildingIncident(l10n.hazardName(inc.hazardType))),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,35 +258,24 @@ class _BuildingStrip extends StatelessWidget {
               onTap: inc.isAlarming ? () => onOpen(inc) : null,
             ),
           ),
+        ],
       ],
     );
   }
 }
 
-class _ConnectivityRow extends StatelessWidget {
-  const _ConnectivityRow({required this.connected, required this.pending});
-  final bool connected;
+/// Check-ins waiting to be sent (offline queue).
+class _PendingRow extends StatelessWidget {
+  const _PendingRow({required this.pending});
   final int pending;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final palette = context.palette;
-    final warn = palette.ink(HazardColors.warning);
-    return Row(
-      children: [
-        Icon(connected ? Icons.wifi : Icons.wifi_off,
-            size: 18, color: connected ? palette.ink(HazardColors.normal) : palette.faint),
-        const SizedBox(width: 6),
-        Text(connected ? l10n.live : l10n.reconnecting, style: TextStyle(color: palette.muted)),
-        const Spacer(),
-        if (pending > 0)
-          Row(children: [
-            Icon(Icons.cloud_upload, size: 18, color: warn),
-            const SizedBox(width: 6),
-            Text(l10n.checkInsQueued(pending), style: TextStyle(color: warn)),
-          ]),
-      ],
-    );
+    final warn = context.palette.ink(HazardColors.warning);
+    return Row(children: [
+      Icon(Icons.cloud_upload_outlined, size: 18, color: warn),
+      const SizedBox(width: 6),
+      Expanded(child: Text(context.l10n.checkInsQueued(pending), style: TextStyle(color: warn))),
+    ]);
   }
 }

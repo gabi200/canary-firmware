@@ -46,7 +46,7 @@ class HouseholdCheckIn extends ConsumerWidget {
         Semantics(
           header: true,
           child: Text(l10n.householdTitle,
-              style: TextStyle(color: context.palette.text, fontSize: 20, fontWeight: FontWeight.bold)),
+              style: TextStyle(color: context.palette.text, fontSize: 20, fontWeight: FontWeight.w600)),
         ),
         const SizedBox(height: 10),
         for (final p in people) ...[
@@ -80,7 +80,7 @@ class _PersonRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.palette.surface,
         border: Border.all(color: context.palette.divider, width: 1.5),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -89,7 +89,7 @@ class _PersonRow extends StatelessWidget {
             label: l10n.householdPersonSemantics(profile.displayName),
             excludeSemantics: true,
             child: Text(profile.displayName,
-                style: TextStyle(color: context.palette.text, fontSize: 19, fontWeight: FontWeight.w800)),
+                style: TextStyle(color: context.palette.text, fontSize: 19, fontWeight: FontWeight.w600)),
           ),
           if (needs.isNotEmpty)
             Text(needs, style: TextStyle(color: context.palette.muted, fontSize: 14)),
@@ -130,7 +130,7 @@ class _PersonRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(l10n.householdSent(l10n.householdStatus(c.status)),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               TextButton(
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
@@ -151,7 +151,7 @@ class _StatusButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    const text = TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
+    const text = TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
     final out = FilledButton.icon(
       style: FilledButton.styleFrom(
         backgroundColor: HazardColors.normal,

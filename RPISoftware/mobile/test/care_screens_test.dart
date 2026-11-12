@@ -190,10 +190,10 @@ void main() {
     final storage = await signedInStorage();
     await tester.pumpWidget(ProviderScope(overrides: hubOverrides(storage, _hub()), child: const CanaryApp()));
     await settle(tester);
-    expect(find.text('Cineva din casă are nevoie de ajutor să iasă?'), findsOneWidget);
+    expect(find.text('Cine are nevoie de ajutor să iasă?'), findsOneWidget);
     await tester.tap(find.byTooltip('Închideți'));
     await settle(tester);
-    expect(find.text('Cineva din casă are nevoie de ajutor să iasă?'), findsNothing);
+    expect(find.text('Cine are nevoie de ajutor să iasă?'), findsNothing);
     expect(storage.careHintDismissed, isTrue);
   });
 
@@ -203,7 +203,7 @@ void main() {
     await tester.pumpWidget(
         ProviderScope(overrides: hubOverrides(storage, _hub(profiles: [_grandma()])), child: const CanaryApp()));
     await settle(tester);
-    expect(find.text('Cineva din casă are nevoie de ajutor să iasă?'), findsNothing);
+    expect(find.text('Cine are nevoie de ajutor să iasă?'), findsNothing);
   });
 
   testWidgets('alarm screen: household rows post care check-ins; failures offer retry', (tester) async {

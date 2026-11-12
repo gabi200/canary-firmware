@@ -234,7 +234,7 @@ class _RoomCellState extends ConsumerState<_RoomCell> with SingleTickerProviderS
             Text(label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             if (widget.common)
               Text(l10n.sketchCommonArea,
                   style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: context.palette.muted)),
@@ -255,7 +255,7 @@ class _RoomCellState extends ConsumerState<_RoomCell> with SingleTickerProviderS
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(l10n.sketchAvoid,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: HazardColors.alarm)),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: HazardColors.alarm)),
                 ),
               ]),
             ],
@@ -270,7 +270,7 @@ class _RoomCellState extends ConsumerState<_RoomCell> with SingleTickerProviderS
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text('≈ ${l10n.decimal(temp)} °C',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: context.palette.text)),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: context.palette.text)),
               ),
             const SizedBox(height: 4),
             Row(children: [
@@ -295,7 +295,7 @@ class _RoomCellState extends ConsumerState<_RoomCell> with SingleTickerProviderS
         child: Material(
           color: bg,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             side: widget.common ? BorderSide.none : BorderSide(color: color, width: incident != null ? 3 : 1.5),
           ),
           clipBehavior: Clip.antiAlias,
@@ -513,7 +513,7 @@ class _PlanBlockView extends StatelessWidget {
               child: Text(text,
                   textAlign: TextAlign.center,
                   maxLines: 2,
-                  style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, color: color ?? palette.text)),
+                  style: TextStyle(fontSize: size, fontWeight: FontWeight.w600, color: color ?? palette.text)),
             ),
           ),
         );
@@ -521,7 +521,7 @@ class _PlanBlockView extends StatelessWidget {
     switch (block.kind) {
       case PlanBlockKind.exit:
         return Container(
-          decoration: BoxDecoration(color: HazardColors.normal, borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(color: HazardColors.normal, borderRadius: BorderRadius.circular(8)),
           // Clear of the arrow coming in from above.
           padding: const EdgeInsets.only(top: 9),
           child: Column(
@@ -535,14 +535,14 @@ class _PlanBlockView extends StatelessWidget {
       case PlanBlockKind.common:
         if (block.danger) {
           return Container(
-            decoration: BoxDecoration(color: HazardColors.alarm, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: HazardColors.alarm, borderRadius: BorderRadius.circular(8)),
             child: label(block.label, color: HazardColors.onHazard, size: 14),
           );
         }
         final cell = Container(
           decoration: BoxDecoration(
             color: palette.tile,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: block.onRoute ? Border.all(color: palette.ink(HazardColors.normal), width: 2) : null,
           ),
           child: label(block.label, color: palette.muted, size: 13),
@@ -558,7 +558,7 @@ class _PlanBlockView extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: home ? palette.tint(HazardColors.info, 26) : palette.tile,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: block.danger ? red : (home ? palette.ink(HazardColors.info) : palette.tileBorder),
               width: block.danger ? 3 : (home ? 2 : 1.5),
@@ -595,7 +595,7 @@ class _PlanBlockView extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: room.danger ? HazardColors.alarm : palette.surface,
-                      borderRadius: BorderRadius.circular(7),
+                      borderRadius: BorderRadius.circular(6),
                       border: room.danger ? null : Border.all(color: palette.tileBorder),
                     ),
                     child: room.danger

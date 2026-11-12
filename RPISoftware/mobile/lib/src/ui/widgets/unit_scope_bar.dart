@@ -7,6 +7,7 @@ import '../../i18n.dart';
 import '../../logic/unit_scope.dart';
 import '../../state/scope_providers.dart';
 import '../../theme.dart';
+import 'status_hero.dart';
 
 /// The apartment picker pinned at the top of a sensor list (a sliver): one
 /// chip per apartment, then the common areas and "Toată clădirea"; with a
@@ -212,14 +213,14 @@ class _ScopeChip extends StatelessWidget {
       selected: selected,
       onSelected: (_) => onTap(),
       materialTapTargetSize: MaterialTapTargetSize.padded,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       labelPadding: const EdgeInsets.only(left: 4, right: 2),
-      backgroundColor: context.palette.surface,
-      selectedColor: scheme.primaryContainer,
-      shape: const StadiumBorder(),
-      side: BorderSide(color: selected ? scheme.primary : context.palette.divider, width: selected ? 2 : 1),
-      // A dot, with "!" when something needs a look (not by colour alone).
-      avatar: Icon(flagged ? Icons.error : Icons.circle, size: flagged ? 18 : 12, color: context.palette.ink(HazardColors.forLevel(status))),
+      backgroundColor: context.palette.panel,
+      selectedColor: context.palette.tint(HazardColors.info, 34),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CanaryRadius.control)),
+      side: BorderSide(color: selected ? scheme.primary : context.palette.hairlineStrong, width: selected ? 1.5 : 1),
+      // A state mark (dot / square / triangle), so state is not told by colour alone.
+      avatar: StateMark(color: HazardColors.forLevel(status), size: flagged ? 11 : 9),
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -229,7 +230,7 @@ class _ScopeChip extends StatelessWidget {
             style: TextStyle(
               fontSize: UnitScopeBar._labelSize,
               height: 1.2,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               color: context.palette.text,
             ),
           ),
@@ -238,16 +239,16 @@ class _ScopeChip extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
               decoration: BoxDecoration(
-                color: selected ? scheme.primary : context.palette.chip,
-                borderRadius: BorderRadius.circular(10),
+                color: context.palette.raised,
+                borderRadius: BorderRadius.circular(CanaryRadius.tag),
               ),
               child: Text(
                 l10n.count(count),
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.2,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? scheme.onPrimary : context.palette.text,
+                  fontWeight: FontWeight.w600,
+                  color: context.palette.textSecondary,
                 ),
               ),
             ),

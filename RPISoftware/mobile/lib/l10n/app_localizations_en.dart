@@ -21,7 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
-  String get modeBadge => 'DEMO';
+  String get modeBadge => 'Demo';
 
   @override
   String get modeRealAlarm => 'Real alarm in Canary Live';
@@ -470,7 +470,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noResidentsRegistered => 'No residents registered.';
 
   @override
-  String get rosterNeedsHelp => 'NEEDS HELP';
+  String get rosterNeedsHelp => 'Needs help';
 
   @override
   String get rosterSafeOutside => 'Safe — out';
@@ -1814,4 +1814,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get classificationUpdated => 'Assessed';
+
+  @override
+  String get navHome => 'Home';
+
+  @override
+  String get navHousehold => 'Household';
+
+  @override
+  String get demoAccount => 'Demo account';
+
+  @override
+  String get careHintShort => 'Who needs help getting out?';
 }

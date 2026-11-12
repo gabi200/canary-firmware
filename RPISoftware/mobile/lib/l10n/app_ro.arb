@@ -5,7 +5,7 @@
   "language": "Limbă",
   "languageHint": "Folosită și pentru analiza senzorilor primită de la hub.",
   "settings": "Setări",
-  "modeBadge": "DEMO",
+  "modeBadge": "Demo",
   "modeRealAlarm": "Alarmă reală în Canary Live",
   "live": "Live",
   "reconnecting": "Se reconectează…",
@@ -134,7 +134,7 @@
   "residentAccountability": "Situația locatarilor",
   "couldNotLoadRoster": "Lista locatarilor nu a putut fi încărcată",
   "noResidentsRegistered": "Niciun locatar înregistrat.",
-  "rosterNeedsHelp": "ARE NEVOIE DE AJUTOR",
+  "rosterNeedsHelp": "Are nevoie de ajutor",
   "rosterSafeOutside": "În siguranță — afară",
   "rosterSafeInside": "În siguranță — înăuntru",
   "rosterNoResponse": "Fără răspuns",
@@ -524,5 +524,10 @@
   "classificationSteam": "Abur",
   "classificationCooking": "Gătit",
   "classificationAerosol": "Aerosoli",
-  "classificationUpdated": "Evaluat"
+  "classificationUpdated": "Evaluat",
+  "navHome": "Acasă",
+  "navHousehold": "Familia",
+  "noActiveIncidents": "Niciun incident activ",
+  "demoAccount": "Cont demo",
+  "careHintShort": "Cine are nevoie de ajutor să iasă?"
 }

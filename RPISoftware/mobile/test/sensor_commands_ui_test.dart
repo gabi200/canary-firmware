@@ -239,9 +239,9 @@ void main() {
     expect(find.text('Aer centrală'), findsNothing);
     expect(find.text('Testează toate alarmele · Ap. 12'), findsOneWidget);
     expect(find.text('Ultimul test: reușit · acum 2 min · Ana Popescu'), findsOneWidget);
-    expect(find.text('CONECTAT'), findsWidgets);
+    expect(find.text('Conectat'), findsWidgets);
     final list = _vertical().last;
-    await _reveal(tester, find.text('DECONECTAT'), scrollable: list);
+    await _reveal(tester, find.text('Deconectat'), scrollable: list);
     expect(find.text('Senzorul e deconectat. Îl poți testa când revine.'), findsOneWidget);
 
     // Whole building: every room with its unit, and no building-wide test-all.

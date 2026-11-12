@@ -100,17 +100,24 @@ class _ManagerDashboardScreenState extends ConsumerState<ManagerDashboardScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(session?.buildingId ?? 'Canary'),
+        title: Row(children: [
+          const WordmarkDot(),
+          const SizedBox(width: 10),
+          Flexible(child: Text(session?.buildingId ?? 'Canary')),
+        ]),
         actions: [
           const DemoChip(),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: primary == null ? BuildingStatusPill(status: status) : StatusPill(state: primary.state),
+          const SizedBox(width: 6),
+          // The status block already says "all clear"; the pill shows only what needs a look.
+          if (primary != null || status.kind != BuildingStatusKind.clear)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: primary == null ? BuildingStatusPill(status: status) : StatusPill(state: primary.state),
+              ),
             ),
-          ),
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_outlined),
             tooltip: l10n.settings,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -257,7 +264,7 @@ class _Metric extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: color)),
+          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: color)),
           const SizedBox(height: 2),
           Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: context.palette.muted)),
         ],
@@ -337,7 +344,7 @@ class _RosterStatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: m.color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: m.color, width: 1.5),
       ),
       child: Text(m.label, style: TextStyle(color: m.color, fontWeight: FontWeight.w700, fontSize: 11)),

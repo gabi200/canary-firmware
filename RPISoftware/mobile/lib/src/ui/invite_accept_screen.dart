@@ -29,8 +29,8 @@ class InviteGate extends ConsumerWidget {
         bottom: 16,
         child: SafeArea(
           child: Material(
-            color: const Color(0xFFE8F0FB),
-            borderRadius: BorderRadius.circular(12),
+            color: context.palette.tint(HazardColors.info),
+            borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(children: [
@@ -138,7 +138,7 @@ class _InviteAcceptScreenState extends ConsumerState<InviteAcceptScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
               Text(l10n.inviteFrom(inviter), style: const TextStyle(fontSize: 18)),
-              Text(p.unitLabel ?? '—', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+              Text(p.unitLabel ?? '—', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               row(Icons.location_city, l10n.inviteBuilding, p.buildingName),
               row(Icons.apartment, l10n.careUnit, p.unitLabel),
@@ -153,8 +153,8 @@ class _InviteAcceptScreenState extends ConsumerState<InviteAcceptScreen> {
                 const SizedBox(height: 8),
                 Material(
                   // A Material (not a decorated box) so the checkbox tiles' ink shows.
-                  color: const Color(0xFFEFF4FB),
-                  borderRadius: BorderRadius.circular(12),
+                  color: context.palette.tint(HazardColors.info),
+                  borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

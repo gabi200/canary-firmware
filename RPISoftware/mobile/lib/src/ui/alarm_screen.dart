@@ -20,6 +20,7 @@ import '../state/providers.dart';
 import '../theme.dart';
 import 'widgets/floor_plan_sketch.dart';
 import 'widgets/classification_text.dart';
+import 'widgets/home_banner.dart';
 import 'widgets/household_checkin.dart';
 import 'widgets/one_line_label.dart';
 import 'widgets/route_line.dart';
@@ -149,86 +150,112 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
     final assemblyPoint = (choice == null ? null : info?.assemblyById(choice.route.toAssemblyPointId)?.label) ??
         info?.assemblyPoints.firstOrNull?.label;
 
+    final fill = HazardColors.bannerFill(incident.state);
+    final ink = HazardColors.onBanner(incident.state);
+    final text = Theme.of(context).textTheme;
+    // The advice band: the fill darkened by the scrim ink (18%).
+    final band = Color.alphaBlend(const Color(0x2E000000), fill);
+
     return Scaffold(
-      backgroundColor: palette.surface,
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(slivers: [
-          SliverToBoxAdapter(child: Container(
-            color: HazardColors.forState(incident.state),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: HazardColors.onHazard),
-                      borderRadius: BorderRadius.circular(20),
+      backgroundColor: palette.ground,
+      body: CustomScrollView(slivers: [
+          SliverToBoxAdapter(child: ColoredBox(
+            color: fill,
+            child: SafeArea(
+              bottom: false,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (incident.isEvacuation) const HazardTape(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 18),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0x47000000),
+                            borderRadius: BorderRadius.circular(CanaryRadius.control),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(state.connected ? Icons.circle : Icons.cloud_off,
+                              size: state.connected ? 8 : 14,
+                              color: state.connected ? HazardColors.onAlarmOk : HazardColors.onAlarmWarn),
+                            const SizedBox(width: 6),
+                            Flexible(child: Text(state.connected ? l10n.live : l10n.offlineShowingSavedRoute,
+                              style: text.labelLarge!.copyWith(color: ink, fontSize: 13))),
+                          ]),
+                        ),
+                      )),
+                      Flexible(child: TextButton.icon(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: const Icon(Icons.expand_more),
+                        label: Text(l10n.minimize),
+                        style: TextButton.styleFrom(
+                          foregroundColor: ink,
+                          minimumSize: const Size(48, 48),
+                          textStyle: text.labelLarge!.copyWith(fontSize: 15, fontWeight: FontWeight.w600)),
+                      )),
+                    ]),
+                    const SizedBox(height: 10),
+                    // Signs beside the title, so the question below stays in view.
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Row(children: [
+                        if (incident.isEvacuation) ...[
+                          const SafetySignDisc(SafetySign.e002, size: 52),
+                          const SizedBox(width: 8),
+                        ],
+                        SafetySignDisc(hazardSign(incident.hazardType), size: 52),
+                        const SizedBox(width: 14),
+                        Expanded(child: Text(incident.isEvacuation ? l10n.evacuateNow : hazard,
+                          style: text.displaySmall!.copyWith(color: ink, fontWeight: FontWeight.w700))),
+                      ]),
                     ),
-                    child: Text(state.connected ? l10n.live : l10n.offlineShowingSavedRoute,
-                      style: const TextStyle(color: HazardColors.onHazard,
-                        fontSize: 14, fontWeight: FontWeight.bold)),
-                  ),
-                )),
-                Flexible(child: TextButton.icon(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.expand_more),
-                  label: Text(l10n.minimize),
-                  style: TextButton.styleFrom(
-                    foregroundColor: HazardColors.onHazard,
-                    minimumSize: const Size(48, 48),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                )),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(whereText, style: text.titleLarge!.copyWith(color: ink)),
+                        ClassificationText(incident: incident, color: ink),
+                        if (home.title case final String mine) ...[
+                          const SizedBox(height: 6),
+                          Row(children: [
+                            Icon(Icons.person_pin_circle_outlined, color: ink, size: 20),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(l10n.youAre(mine),
+                              style: text.bodyLarge!.copyWith(color: ink, fontWeight: FontWeight.w500))),
+                          ]),
+                        ],
+                      ]),
+                    ),
+                  ]),
+                ),
+                // What not to do, in the darker band.
+                Container(
+                  color: band,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    for (final sign in hazardAdviceSigns(incident.hazardType)) ...[
+                      SafetySignDisc(sign, size: 42),
+                      const SizedBox(width: 8),
+                    ],
+                    const SizedBox(width: 4),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(hazardDont(l10n, incident.hazardType),
+                        style: text.titleSmall!.copyWith(color: ink, fontSize: 15)),
+                      if (incident.isEvacuation) ...[
+                        const SizedBox(height: 2),
+                        Text(l10n.homeEvacuateLine, style: text.bodyMedium!.copyWith(color: ink)),
+                      ],
+                    ])),
+                  ]),
+                ),
               ]),
-              const SizedBox(height: 8),
-              // Signs beside the title, so the question below stays in view.
-              Row(children: [
-                if (incident.isEvacuation) ...[
-                  const SafetySignImage(SafetySign.e002, size: 48),
-                  const SizedBox(width: 8),
-                ],
-                SafetySignImage(hazardSign(incident.hazardType), size: 48),
-                const SizedBox(width: 12),
-                Expanded(child: Text(incident.isEvacuation ? l10n.evacuateNow
-                      : hazard.toUpperCase(),
-                  style: const TextStyle(color: HazardColors.onHazard,
-                    fontSize: 28, fontWeight: FontWeight.w900))),
-              ]),
-              const SizedBox(height: 10),
-              Text(whereText,
-                style: const TextStyle(color: HazardColors.onHazard,
-                  fontSize: 19, fontWeight: FontWeight.w700)),
-              ClassificationText(incident: incident, color: HazardColors.onHazard),
-              if (home.title case final String mine) ...[
-                const SizedBox(height: 6),
-                Row(children: [
-                  const Icon(Icons.person_pin_circle, color: HazardColors.onHazard, size: 20),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(l10n.youAre(mine),
-                    style: const TextStyle(color: HazardColors.onHazard,
-                      fontSize: 15, fontWeight: FontWeight.w600))),
-                ]),
-              ],
-            ]),
-          )),
-          SliverToBoxAdapter(child: Container(
-            color: HazardColors.warnBg,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              for (final sign in hazardAdviceSigns(incident.hazardType)) ...[
-                SafetySignImage(sign, size: 40),
-                const SizedBox(width: 8),
-              ],
-              const SizedBox(width: 2),
-              Expanded(child: Text(hazardDont(l10n, incident.hazardType),
-                style: const TextStyle(color: HazardColors.warnFg,
-                  fontSize: 16, fontWeight: FontWeight.bold))),
-            ]),
+            ),
           )),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
             sliver: SliverToBoxAdapter(child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -242,9 +269,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                 ),
                 if (zones.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  Text(l10n.dangerPlanTitle,
-                    style: TextStyle(color: palette.text,
-                      fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(l10n.dangerPlanTitle, style: text.titleLarge),
                   const SizedBox(height: 8),
                   IncidentPlan(incident: incident, zones: zones, home: home, route: choice?.route),
                 ],
@@ -253,16 +278,15 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      border: Border.all(color: HazardColors.alarm, width: 2),
-                      borderRadius: BorderRadius.circular(12)),
+                      color: palette.tint(HazardColors.alarm),
+                      border: Border.all(color: palette.stateBorder(HazardColors.alarm)),
+                      borderRadius: BorderRadius.circular(CanaryRadius.container)),
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SafetySignImage(SafetySign.w001, size: 28),
                         const SizedBox(width: 10),
                         Expanded(child: Text(
-                          l10n.routeCrossesHazard,
-                          style: TextStyle(color: palette.text,
-                            fontSize: 16, fontWeight: FontWeight.bold))),
+                          l10n.routeCrossesHazard, style: text.titleSmall!.copyWith(fontSize: 15))),
                       ]),
                   ),
                   const SizedBox(height: 20),
@@ -271,25 +295,21 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: HazardColors.warnBg,
-                      border: Border.all(color: HazardColors.warning, width: 2),
-                      borderRadius: BorderRadius.circular(12)),
+                      color: palette.tint(HazardColors.warning),
+                      border: Border.all(color: palette.stateBorder(HazardColors.warning)),
+                      borderRadius: BorderRadius.circular(CanaryRadius.container)),
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SafetySignImage(SafetySign.w001, size: 28),
                         const SizedBox(width: 10),
                         Expanded(child: Text(
-                          l10n.routeUnchecked,
-                          style: const TextStyle(color: HazardColors.warnFg,
-                            fontSize: 16, fontWeight: FontWeight.bold))),
+                          l10n.routeUnchecked, style: text.titleSmall!.copyWith(fontSize: 15))),
                       ]),
                   ),
                   const SizedBox(height: 20),
                 ],
-                Text(l10n.evacuationRoute,
-                  style: TextStyle(color: palette.text,
-                    fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
+                Text(l10n.evacuationRoute, style: text.titleLarge),
+                const SizedBox(height: 12),
                 routeState.when(
                   // A language switch refetches: keep the route on screen meanwhile.
                   skipLoadingOnReload: true,
@@ -314,7 +334,6 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> {
             )),
           ),
         ]),
-      ),
       bottomNavigationBar: _CheckInBar(
         submitting: _submitting,
         checkedInAs: _checkedInAs,
@@ -337,11 +356,9 @@ class _StaticFallback extends StatelessWidget {
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.useNearestExit,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(l10n.useNearestExit, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text(l10n.useNearestExitDetail,
-            style: const TextStyle(fontSize: 16)),
+          Text(l10n.useNearestExitDetail, style: Theme.of(context).textTheme.bodyLarge),
         ])),
     ]);
   }
@@ -366,20 +383,20 @@ class _CheckInBar extends StatelessWidget {
     final palette = context.palette;
     return SafeArea(top: false, child: Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.48),
-      decoration: BoxDecoration(color: palette.surface,
-        border: Border(top: BorderSide(color: palette.divider))),
+      decoration: BoxDecoration(color: palette.panel,
+        border: Border(top: BorderSide(color: palette.hairlineStrong))),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
         child: checkedInAs != null
           ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
                 Icon(Icons.check_circle, color: palette.ink(HazardColors.normal)),
                 const SizedBox(width: 8),
                 Expanded(child: Text(l10n.checkedIn(l10n.checkInLabel(checkedInAs!)),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                  style: Theme.of(context).textTheme.titleMedium)),
                 TextButton(onPressed: submitting ? null : onChange,
                   style: TextButton.styleFrom(minimumSize: const Size(48, 48),
-                    textStyle: const TextStyle(fontSize: 16)),
+                    textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 16)),
                   child: Text(l10n.change)),
               ]),
               household,
@@ -388,33 +405,34 @@ class _CheckInBar extends StatelessWidget {
               FilledButton.icon(
                 onPressed: submitting ? null : () => onCheckIn(CheckInStatus.safeOutside),
                 style: FilledButton.styleFrom(
-                  backgroundColor: HazardColors.normal,
+                  // Safe Green deepened so the white label holds 4.5:1.
+                  backgroundColor: const Color(0xFF1C7F39),
                   foregroundColor: HazardColors.onHazard,
                   minimumSize: const Size.fromHeight(56),
-                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 18, fontWeight: FontWeight.w600)),
                 icon: const SafetySignImage(SafetySign.e007, size: 28, decorative: true),
                 label: OneLineLabel(l10n.imOutAndSafe)),
               const SizedBox(height: 8),
               LayoutBuilder(builder: (context, constraints) {
                 // Side by side only if both labels fit on one line at this
                 // width and text size; otherwise full-width, stacked.
-                const style = TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
+                const style = TextStyle(fontFamily: 'Inter', fontSize: 16, fontWeight: FontWeight.w600);
                 final narrow = !labelsFit(context, [l10n.iNeedHelp, l10n.call112], style,
                   (constraints.maxWidth - 8) / 2);
                 final help = FilledButton.icon(
                   onPressed: submitting ? null : () => onCheckIn(CheckInStatus.needsHelp),
                   style: FilledButton.styleFrom(
-                    backgroundColor: HazardColors.alarm,
+                    backgroundColor: HazardColors.alarmFill,
                     foregroundColor: HazardColors.onHazard,
                     minimumSize: const Size.fromHeight(48),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    textStyle: style),
                   icon: const Icon(Icons.sos), label: OneLineLabel(l10n.iNeedHelp));
                 final call = OutlinedButton.icon(
                   onPressed: onCall,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: palette.text,
                     minimumSize: const Size.fromHeight(48),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    textStyle: style),
                   icon: const SafetySignImage(SafetySign.e004, size: 24, decorative: true),
                   label: OneLineLabel(l10n.call112));
                 if (narrow) {
@@ -428,9 +446,9 @@ class _CheckInBar extends StatelessWidget {
               TextButton.icon(
                 onPressed: submitting ? null : () => onCheckIn(CheckInStatus.safeInside),
                 style: TextButton.styleFrom(
-                  foregroundColor: palette.text,
+                  foregroundColor: palette.textSecondary,
                   minimumSize: const Size.fromHeight(48),
-                  textStyle: const TextStyle(fontSize: 16)),
+                  textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w500)),
                 icon: const Icon(Icons.home_outlined),
                 label: OneLineLabel(l10n.imSafeStillInside)),
             ]),
@@ -445,24 +463,34 @@ class _AllClear extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final palette = context.palette;
+    final text = Theme.of(context).textTheme;
     return Scaffold(
-      backgroundColor: HazardColors.normal,
+      backgroundColor: palette.ground,
       body: SafeArea(
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.verified_user, color: HazardColors.onHazard, size: 96),
-              const SizedBox(height: 16),
-              Text(l10n.allClear, style: const TextStyle(color: HazardColors.onHazard, fontSize: 28, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              Text(l10n.hazardCleared, style: const TextStyle(color: HazardColors.onHazardMuted)),
-              const SizedBox(height: 24),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: HazardColors.surface, foregroundColor: HazardColors.normal),
-                onPressed: onClose,
-                child: Text(l10n.returnAction),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: palette.tint(HazardColors.normal),
+                  borderRadius: BorderRadius.circular(CanaryRadius.container),
+                  border: Border.all(color: palette.stateBorder(HazardColors.normal)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.check_circle_outline, color: palette.safeText, size: 40),
+                  const SizedBox(height: 16),
+                  Text(l10n.allClear, style: text.displaySmall),
+                  const SizedBox(height: 6),
+                  Text(l10n.hazardCleared, style: text.bodyLarge!.copyWith(color: palette.textSecondary)),
+                ]),
               ),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: onClose, child: Text(l10n.returnAction)),
             ],
           ),
         ),

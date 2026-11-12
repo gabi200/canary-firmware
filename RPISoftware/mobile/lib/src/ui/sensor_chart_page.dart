@@ -169,7 +169,7 @@ class _MetricView extends StatelessWidget {
         : _InteractiveChart(metric: m, minutes: minutes, height: chartHeight);
     final explain = Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xFFEFF4FB), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: context.palette.tint(HazardColors.info), borderRadius: BorderRadius.circular(8)),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Icon(Icons.lightbulb_outline, color: HazardColors.info),
         const SizedBox(width: 10),
@@ -234,7 +234,7 @@ class _ValueHeader extends StatelessWidget {
             child: Text.rich(TextSpan(children: [
               TextSpan(
                 text: latest == null ? '—' : l10n.decimal(latest, digits: metric.digits),
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, color: context.palette.text),
+                style: TextStyle(fontSize: 40, fontWeight: FontWeight.w600, color: context.palette.text),
               ),
               if (latest != null)
                 TextSpan(
@@ -253,7 +253,7 @@ class _ValueHeader extends StatelessWidget {
               const SizedBox(width: 4),
               Flexible(
                 child: Text(word,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.palette.ink(toneColor(tone)))),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: context.palette.ink(toneColor(tone)))),
               ),
             ]),
           ),
@@ -294,7 +294,7 @@ class _LeakHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Flexible(
             child: Text(word,
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: context.palette.ink(toneColor(verdict?.tone)))),
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: context.palette.ink(toneColor(verdict?.tone)))),
           ),
         ]),
         Text(footer, style: TextStyle(fontSize: 15, color: context.palette.muted)),
@@ -335,7 +335,7 @@ class _StatsRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: context.palette.tile,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(label, style: TextStyle(fontSize: 13, color: context.palette.muted)),
@@ -343,7 +343,7 @@ class _StatsRow extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text('${fmt(value)}${value == null ? '' : ' ${metric.unit}'}',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                   ),
                 ]),
               ),

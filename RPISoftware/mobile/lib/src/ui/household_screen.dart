@@ -118,7 +118,7 @@ class _UnitCard extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(unit.unitLabel ?? prettyZone(null, unit.unitId),
-                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
               ),
             ]),
             const SizedBox(height: 10),
@@ -134,7 +134,7 @@ class _UnitCard extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: HazardColors.info.withAlpha(30),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(l10n.careSelfBadge,
                           style: const TextStyle(fontWeight: FontWeight.w700, color: HazardColors.info)),
@@ -237,7 +237,7 @@ Future<void> showInviteSheet(BuildContext context, CreatedInvite invite, {String
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: context.palette.well, borderRadius: BorderRadius.circular(8)),
               child: SelectableText(invite.url, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
             if (hours != null) ...[

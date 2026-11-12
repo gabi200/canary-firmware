@@ -22,7 +22,7 @@ class AppLocalizationsRo extends AppLocalizations {
   String get settings => 'Setări';
 
   @override
-  String get modeBadge => 'DEMO';
+  String get modeBadge => 'Demo';
 
   @override
   String get modeRealAlarm => 'Alarmă reală în Canary Live';
@@ -479,7 +479,7 @@ class AppLocalizationsRo extends AppLocalizations {
   String get noResidentsRegistered => 'Niciun locatar înregistrat.';
 
   @override
-  String get rosterNeedsHelp => 'ARE NEVOIE DE AJUTOR';
+  String get rosterNeedsHelp => 'Are nevoie de ajutor';
 
   @override
   String get rosterSafeOutside => 'În siguranță — afară';
@@ -1828,4 +1828,16 @@ class AppLocalizationsRo extends AppLocalizations {
 
   @override
   String get classificationUpdated => 'Evaluat';
+
+  @override
+  String get navHome => 'Acasă';
+
+  @override
+  String get navHousehold => 'Familia';
+
+  @override
+  String get demoAccount => 'Cont demo';
+
+  @override
+  String get careHintShort => 'Cine are nevoie de ajutor să iasă?';
 }

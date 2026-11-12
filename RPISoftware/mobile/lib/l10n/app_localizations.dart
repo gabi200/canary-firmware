@@ -125,7 +125,7 @@ abstract class AppLocalizations {
   /// Chip shown while the hub is in demo mode.
   ///
   /// In en, this message translates to:
-  /// **'DEMO'**
+  /// **'Demo'**
   String get modeBadge;
 
   /// Banner: an incident is open in the real building while the hub shows the demo.
@@ -851,7 +851,7 @@ abstract class AppLocalizations {
   /// No description provided for @rosterNeedsHelp.
   ///
   /// In en, this message translates to:
-  /// **'NEEDS HELP'**
+  /// **'Needs help'**
   String get rosterNeedsHelp;
 
   /// No description provided for @rosterSafeOutside.
@@ -3134,6 +3134,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assessed'**
   String get classificationUpdated;
+
+  /// No description provided for @navHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get navHome;
+
+  /// No description provided for @navHousehold.
+  ///
+  /// In en, this message translates to:
+  /// **'Household'**
+  String get navHousehold;
+
+  /// No description provided for @demoAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo account'**
+  String get demoAccount;
+
+  /// No description provided for @careHintShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Who needs help getting out?'**
+  String get careHintShort;
 }
 
 class _AppLocalizationsDelegate
